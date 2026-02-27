@@ -1,0 +1,110 @@
+# Advanced Weather Widget for KDE Plasma 6
+
+A modern, highly customizable weather widget built specifically for KDE Plasma 6.
+
+It delivers accurate forecasts, multiple weather provider support, adaptive failover logic, and extensive appearance customization — all while integrating naturally into the Plasma desktop.
+
+---
+
+## ✨ Key Features
+
+### 📍 Location Management
+- Automatic location detection (GeoClue2)
+- Convenient manual city search
+- Reverse geocoding using Nominatim (timezone & elevation detection)
+- Support for non-Latin names (e.g. Cyrillic)
+
+### 🌦 Multiple Weather Providers
+
+Choose between:
+- Open-Meteo
+- met.no
+- WeatherAPI
+- OpenWeather
+
+### 🔄 Adaptive Mode
+
+- Automatically switches providers if one fails
+- Improves reliability and availability
+- Seamless fallback handling
+
+### 🎨 Appearance Customization
+
+Individually configurable appearance for:
+- Panel mode
+- Full widget mode
+- Tooltip view
+
+Additional options:
+- Adjustable transparency
+- Native Plasma blur support
+- Flexible forecast layout
+- Scrollbox mode
+
+### ⚙ Advanced Personalization
+
+- Unit configuration
+- Provider selection
+- Auto / manual location mode
+- Clean first-run experience
+- Extensive customization settings
+
+---
+
+## 🖼 Screenshots
+
+### Panel Mode (Single line)
+![Panel Mode Single Line](screenshots/panel_single_line.png)
+
+### Panel Mode (Multiple lines)
+![Panel Mode Multiple Lines](screenshots/panel_multi_lines.png)
+
+### Widget from panel
+![Widget From Panel](screenshots/widget_from_panel.png)
+
+### Full Widget Mode
+![Widget Mode Desktop](screenshots/widget.png)
+
+### Tooltip View
+![Tooltip](screenshots/tooltip.png)
+
+### Settings – Location
+![Settings Location](screenshots/location.png)
+
+### Settings – General (Providers)
+![Settings Providers](screenshots/providers.png)
+
+### Settings – General (Appearance)
+![Settings Appearance](screenshots/appearance.png)
+
+
+---
+
+## 📦 Installation
+
+### Install from KDE Store (Recommended)
+
+Open:
+
+System Settings → Add Widgets → Download New Widgets
+
+Search for:
+
+**Advanced Weather Widget**
+
+Or visit:
+https://store.kde.org/
+
+---
+
+## 🛠 Manual Installation (Development)
+
+```bash
+kpackagetool6 --type Plasma/Applet --install .
+rm -rf ~/.cache/plasmashell/qmlcache
+systemctl --user restart plasma-plasmashell
+
+
+## 🎨 Icons & Fonts
+This project uses weather icons and font resources from:
+https://github.com/erikflowers/weather-icons

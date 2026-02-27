@@ -1,0 +1,30 @@
+{
+  "KPackageStructure": "Plasma/Applet",
+  "KPlugin": {
+    "Id": "org.kde.plasma.advanced-weather-widget",
+    "Name": "Advanced Weather Widget",
+    "Name[bg]": "Разширен уиджет за времето",
+
+    "Description": "A modern, highly customizable weather widget built specifically for KDE Plasma 6. Designed for seamless Plasma integration, performance, and flexibility.",
+    "Description[bg]": "Модерен и силно персонализируем уиджет за времето, създаден специално за KDE Plasma 6. Проектиран за естествена интеграция, производителност и гъвкавост.",
+
+    "Icon": "weather-clear",
+    "Category": "Environment and Weather",
+    "License": "GPL-2.0-or-later",
+
+    "Authors": [
+      {
+        "Name": "Petar Nedyalkov",
+        "Email": "petar.nedyalkov91@gmail.com",
+        "Role": "Author, design, development and Bulgarian translation"
+      }
+    ],
+
+    "Version": "1.0.0",
+    "Website": "https://github.com/pnedyalkov91/advanced-weather-widget",
+    "BugReportUrl": "https://github.com/pnedyalkov91/advanced-weather-widget/issues"
+  },
+
+  "X-Plasma-API-Minimum-Version": "6.0",
+  "X-Plasma-MainScript": "ui/main.qml"
+}

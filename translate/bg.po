@@ -1,0 +1,1152 @@
+# Advanced Weather Widget — Translatable strings
+# Copyright (C) 2026
+# This file is distributed under the same license as the Advanced Weather Widget package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: advanced-weather-widget\n"
+"Report-Msgid-Bugs-To: https://github.com/pnedyalkov91/advanced-weather-widget\n"
+"POT-Creation-Date: 2026-02-27 06:17+0000\n"
+"PO-Revision-Date: 2026-02-27 18:00+0200\n"
+"Last-Translator: Petar Nedyalkov\n"
+"Language-Team: Bulgarian <kde-i18n-bg@kde.org>\n"
+"Language: bg\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: configAppearance.qml:1038
+msgctxt "@action:button"
+msgid "Choose Style…"
+msgstr "Избор на шрифт…"
+
+#: configAppearance.qml:920
+msgid "0 = auto (120 px per chip). Increase if values are truncated."
+msgstr "0 = автоматично (120 px на елемент). Увеличете, ако стойностите се изрязват."
+
+#: configAppearance.qml:919
+msgid "0 = auto. Increase if items are cut off."
+msgstr "0 = автоматично. Увеличете, ако елементите се изрязват."
+
+#: configGeneral.qml:154
+msgid "Alternative provider. API key required below."
+msgstr "Алтернативен доставчик. Изисква се API ключ по-долу."
+
+#: configAppearance.qml:904
+msgid "Animate row scrolling"
+msgstr "Анимирано превъртане на редовете"
+
+#: configLocation.qml:372
+msgid "Auto-detected via GeoClue2."
+msgstr "Автоматично открито чрез GeoClue2."
+
+#: configGeneral.qml:107
+msgid "Adaptive (auto-fallback)"
+msgstr "Адаптивен режим (автоматично превключване на източниците)"
+
+#: configLocation.qml:373
+msgid "Auto-detection updated coordinates."
+msgstr "Автоматичното откриване обнови координатите."
+
+#: configAppearance.qml:386 configAppearance.qml:1741 configAppearance.qml:2216
+msgid "Both  07:17 / 18:03"
+msgstr "И двете  07:17 / 18:03"
+
+#: configAppearance.qml:934
+msgid "Bullet  •"
+msgstr "Разделител  •"
+
+#: configAppearance.qml:1764 configAppearance.qml:1980 configAppearance.qml:2235
+msgid "Button guide"
+msgstr "Ръководство за бутоните"
+
+#: configAppearance.qml:1453
+msgid "Celsius (°C)"
+msgstr "Целзий (°C)"
+
+#: config.qml:17
+msgid "Appearance"
+msgstr "Външен вид"
+
+#: CompactView.qml:415
+msgid "Add a location"
+msgstr "Добави локация"
+
+#: configAppearance.qml:1020
+msgid "Automatic"
+msgstr "Автоматично"
+
+#: configLocation.qml:607
+msgid "Change Location"
+msgstr "Промяна на местоположението"
+
+#: configAppearance.qml:1790 configAppearance.qml:2244
+msgid "Choose a custom icon for this item"
+msgstr "Избор на персонализирана икона за този елемент"
+
+#: configAppearance.qml:980
+msgid "Choose a Panel Font"
+msgstr "Избор на шрифт за панела"
+
+#: configAppearance.qml:601
+msgid "City / location name"
+msgstr "Име на град / местоположение"
+
+#: configAppearance.qml:87
+msgid "Clear (day)"
+msgstr "Ясно (ден)"
+
+#: configAppearance.qml:88
+msgid "Clear (night)"
+msgstr "Ясно (нощ)"
+
+#: main.qml:219
+msgid "Clear night"
+msgstr "Ясна нощ"
+
+#: main.qml:219
+msgid "Clear sky"
+msgstr "Ясно небе"
+
+#: configLocation.qml:571
+msgid "Automatically detect location"
+msgstr "Автоматично намиране на локацията"
+
+#: configLocation.qml:604
+msgid "Click 'Change Location' to search and set your location manually."
+msgstr "Натиснете 'Промяна на местоположението', за да потърсите и зададете ръчно местоположението си."
+
+#: TooltipContent.qml:172
+msgid "Click to configure a location"
+msgstr "Натиснете, за да настроите местоположение"
+
+#: configAppearance.qml:593 configAppearance.qml:621 DetailsView.qml:102
+msgid "Condition"
+msgstr "Метеорологични условия"
+
+#: configAppearance.qml:153
+msgid "Condition Icons"
+msgstr "Икони за метеорологични условия"
+
+#: TooltipContent.qml:347
+msgid "Condition:"
+msgstr "Метеорологични условия:"
+
+#: configAppearance.qml:1681 configAppearance.qml:2159
+msgid "Configure icon…"
+msgstr "Настройване на икона…"
+
+#: configAppearance.qml:1164 configAppearance.qml:1252 configAppearance.qml:1382
+msgid "Configure…"
+msgstr "Настройване…"
+
+#: configLocation.qml:535
+msgid "Apply detected location"
+msgstr "Потвърди автоматично намерената локация"
+
+#: configLocation.qml:500
+msgid "Confirm your location"
+msgstr "Потвърдете местоположението си"
+
+#: configAppearance.qml:602 configAppearance.qml:615 configAppearance.qml:629
+msgid "Current moon phase"
+msgstr "Текуща фаза на Луната"
+
+#: configAppearance.qml:594 configAppearance.qml:620
+msgid "Current temperature"
+msgstr "Текуща температура"
+
+#: configAppearance.qml:1081 configAppearance.qml:1298
+msgid "Custom"
+msgstr "Персонализиран"
+
+#: configAppearance.qml:1416
+msgid "Custom (set each unit manually)"
+msgstr "Персонализиран (задаване на всяка единица ръчно)"
+
+#: configAppearance.qml:176
+msgid "Custom per-condition icons"
+msgstr "Персонализирани икони по условия"
+
+#: configAppearance.qml:939
+msgid "Custom…"
+msgstr "Персонализиране…"
+
+#: configAppearance.qml:936
+msgid "Dash  –"
+msgstr "Тире  –"
+
+#: configGeneral.qml:267
+msgid "Data Refresh"
+msgstr "Обновяване на данните"
+
+#: FullView.qml:209
+msgid "Details"
+msgstr "Подробности"
+
+#: configAppearance.qml:1856
+msgid "Details Items"
+msgstr "Елементи в подробностите"
+
+#: configAppearance.qml:1225
+msgid "Details items:"
+msgstr "Елементи в подробностите:"
+
+#: FullView.qml:82
+msgid "Detect / change location…"
+msgstr "Откриване / промяна на местоположение…"
+
+#: configLocation.qml:580
+msgid "Detecting…"
+msgstr "Откриване…"
+
+#: configAppearance.qml:613 configAppearance.qml:627 DetailsView.qml:100
+msgid "Dew Point"
+msgstr "Точка на оросяване"
+
+#: configAppearance.qml:613 configAppearance.qml:627
+msgid "Dew point temperature"
+msgstr "Температура на точката на оросяване"
+
+#: TooltipContent.qml:374
+msgid "Dew point:"
+msgstr "Точка на оросяване:"
+
+#: configAppearance.qml:1710 configAppearance.qml:2188
+msgid "Disable item"
+msgstr "Деактивиране на елемент"
+
+#: configAppearance.qml:1546 configAppearance.qml:1849 configAppearance.qml:2030
+msgid "Back"
+msgstr "Назад"
+
+#: configAppearance.qml:245 configAppearance.qml:348 configAppearance.qml:416 configAppearance.qml:451
+msgid "Browse…"
+msgstr "Избери…"
+
+#: configAppearance.qml:1532 configAppearance.qml:1837 configAppearance.qml:2016
+msgid "Discard"
+msgstr "Отхвърляне"
+
+#: configAppearance.qml:1393
+msgid "Display"
+msgstr "Показване"
+
+#: configAppearance.qml:379 configAppearance.qml:867
+msgid "Display mode:"
+msgstr "Режим на показване:"
+
+#: configAppearance.qml:1778 configAppearance.qml:2240
+msgid "Drag to reorder enabled items"
+msgstr "Плъзнете, за да пренаредите активираните елементи"
+
+#: configAppearance.qml:1985
+msgid "Drag to reorder shown items"
+msgstr "Плъзнете, за да пренаредите показаните елементи"
+
+#: main.qml:226
+msgid "Drizzle"
+msgstr "Слаб дъжд"
+
+#: configAppearance.qml:1710 configAppearance.qml:2188
+msgid "Enable item"
+msgstr "Активиране на елемент"
+
+#: configAppearance.qml:2252
+msgid "Enable or disable this item"
+msgstr "Активиране или деактивиране на този елемент"
+
+#: configAppearance.qml:1812
+msgid "Enable or disable this item on the panel"
+msgstr "Активиране или деактивиране на този елемент в панела"
+
+#: configAppearance.qml:1568 configAppearance.qml:2051
+msgid "Enabled"
+msgstr "Активирани"
+
+#: configLocation.qml:732 configLocation.qml:741
+msgid "Enter Location"
+msgstr "Въведете местоположение"
+
+#: configGeneral.qml:210
+msgid "Enter your OpenWeatherMap API key"
+msgstr "Въведете своя API ключ за OpenWeatherMap"
+
+#: configGeneral.qml:211
+msgid "Enter your WeatherAPI.com key"
+msgstr "Въведете своя API ключ за WeatherAPI.com"
+
+#: configAppearance.qml:969
+msgid "Expand widget to fill available panel width"
+msgstr "Разширяване на джаджата до запълване на наличната ширина на панела"
+
+#: configAppearance.qml:1454
+msgid "Fahrenheit (°F)"
+msgstr "Фаренхайт (°F)"
+
+#: WeatherService.qml:103
+msgid "Failed: %1"
+msgstr "Неуспешно: %1"
+
+#: configAppearance.qml:598 configAppearance.qml:608 configAppearance.qml:622 DetailsView.qml:98
+msgid "Feels Like"
+msgstr "Усеща се като"
+
+#: TooltipContent.qml:343
+msgid "Feels like:"
+msgstr "Усеща се като:"
+
+#: configAppearance.qml:968
+msgid "Fill panel:"
+msgstr "Запълване на панела:"
+
+#: FullView.qml.134
+msgid "Feels like: %1"
+msgstr "Усеща се като: %1"
+
+#: configLocation.qml:683
+msgid "Altitude:"
+msgstr "Височина"
+
+#: moonphase.js
+msgid "First Quarter"
+msgstr "Първа четвърт"
+
+#: configAppearance.qml:1079 configAppearance.qml:1208 configAppearance.qml:1296
+msgid "Flat Color (SVG)"
+msgstr "Плоски цветове (SVG)"
+
+#: main.qml:223 configAppearance.qml:92
+msgid "Fog"
+msgstr "Мъгла"
+
+#: configAppearance.qml:1077 configAppearance.qml:1294
+msgid "Font icons (default)"
+msgstr "Икони от шрифт (по подразбиране)"
+
+#: configAppearance.qml:1185
+msgid "Footer:"
+msgstr "Долен колонтитул:"
+
+#: FullView.qml:209
+msgid "Forecast"
+msgstr "Прогноза"
+
+#: configAppearance.qml:1180
+msgid "Forecast days:"
+msgstr "Дни за прогноза:"
+
+#: configGeneral.qml:156
+msgid "Free and open-source. No API key needed. Recommended."
+msgstr "Безплатна и с отворен код. Не е необходим API ключ. Препоръчително."
+
+#: configGeneral.qml:155
+msgid "Free Norwegian Meteorological Institute service. No API key needed."
+msgstr "Безплатна услуга на Норвежкия метеорологичен институт. Не е необходим API ключ."
+
+#: main.qml:229
+msgid "Freezing drizzle"
+msgstr "Леден слаб дъжд"
+
+#: main.qml:234
+msgid "Freezing rain"
+msgstr "Леден дъжд"
+
+#: moonphase.js
+msgid "Full Moon"
+msgstr "Пълнолуние"
+
+#: config.qml:11
+msgid "General"
+msgstr "Общи настройки"
+
+#: configLocation.qml:491
+msgid "GeoClue2 error while retrieving location."
+msgstr "Грешка в GeoClue2 при получаване на местоположението."
+
+#: configLocation.qml:383
+msgid "GeoClue2 location unavailable on this system."
+msgstr "Местоположението чрез GeoClue2 не е налично в тази система."
+
+#: configLocation.qml:582
+msgid "Location detection is depending on system configuration and permissions."
+msgstr "Автоматичното засичане на локацията зависи от конфигурацията на системата и разрешенията."
+
+#: main.qml:227
+msgid "Heavy drizzle"
+msgstr "Силен слаб дъжд"
+
+#: main.qml:232
+msgid "Heavy rain"
+msgstr "Силен дъжд"
+
+#: main.qml:241
+msgid "Heavy showers"
+msgstr "Силни превалявания"
+
+#: main.qml:237
+msgid "Heavy snow"
+msgstr "Силен снеговалеж"
+
+#: main.qml:246
+msgid "Heavy thunderstorm with hail"
+msgstr "Силна гръмотевична буря с градушка"
+
+#: configAppearance.qml:1869
+msgid "Hidden"
+msgstr "Скрити"
+
+#: configAppearance.qml:1947
+msgid "Hide from details"
+msgstr "Скриване от подробностите"
+
+#: configAppearance.qml:1703 configAppearance.qml:2181
+msgid "Hide prefix icon"
+msgstr "Скриване на иконата отпред"
+
+#: FullView.qml:160
+msgid "High"
+msgstr "Максимална температура"
+
+#: configAppearance.qml:890
+msgid "How often the rows scroll to reveal the next item"
+msgstr "Колко често редовете се превъртат, за да покажат следващия елемент"
+
+#: configAppearance.qml:599 configAppearance.qml:609 configAppearance.qml:624 DetailsView.qml:98
+msgid "Humidity"
+msgstr "Влажност"
+
+#: TooltipContent.qml:366
+msgid "Humidity:"
+msgstr "Влажност:"
+
+#: configAppearance.qml:168
+msgid "Icon source:"
+msgstr "Източник на иконите:"
+
+#: configAppearance.qml:1070 configAppearance.qml:1200 configAppearance.qml:1286
+msgid "Icon theme:"
+msgstr "Тема на иконите:"
+
+#: configAppearance.qml:326
+msgid "Icon:"
+msgstr "Икона:"
+
+#: configAppearance.qml:1279
+msgid "Icons"
+msgstr "Икони"
+
+#: configLocation.qml:525
+msgid "If this looks correct, apply it. Otherwise, choose your location manually."
+msgstr "Ако това изглежда правилно, потвърдете местоположението. В противен случай изберете местоположението си ръчно."
+
+#: configAppearance.qml:1414
+msgid "Imperial (°F, mph, inHg, in)"
+msgstr "Имперска система (°F, mph, inHg, in)"
+
+#: configAppearance.qml:1502
+msgid ""
+"Individual dropdowns are editable only in Custom mode.\n"
+"Other presets set units automatically."
+msgstr ""
+"Отделните падащи менюта могат да се редактират само в режим „Персонализиран“.\n"
+"Останалите предварително зададени режими настройват единиците автоматично."
+
+#: configAppearance.qml:1445
+msgid "Individual units"
+msgstr "Отделни единици"
+
+#: configGeneral.qml:287
+msgid "Interval:"
+msgstr "Интервал:"
+
+#: configAppearance.qml:961
+msgid "Item spacing:"
+msgstr "Разстояние между елементите:"
+
+#: configAppearance.qml:909
+msgid "Item width:"
+msgstr "Ширина на елемент:"
+
+#: configAppearance.qml:171
+msgid "KDE System Icons (automatic, follows weather code)"
+msgstr "Системни икони на KDE (автоматично, според кода на времето)"
+
+#: configAppearance.qml:1530 configAppearance.qml:1835 configAppearance.qml:2014
+msgid "Keep Changes"
+msgstr "Запазване на промените"
+
+#: configAppearance.qml:1833
+msgid "Keep the changes you made to Details Items?"
+msgstr "Да се запазят ли промените, направени в елементите на подробностите?"
+
+#: configAppearance.qml:1528
+msgid "Keep the changes you made to Panel Items?"
+msgstr "Да се запазят ли промените, направени в елементите на панела?"
+
+#: configAppearance.qml:2012
+msgid "Keep the changes you made to Tooltip Items?"
+msgstr "Да се запазят ли промените, направени в елементите на подсказките?"
+
+#: configAppearance.qml:1473
+msgid "Knots (kn)"
+msgstr "Възли (kn)"
+
+#: configLocation.qml:649
+msgid "Latitude:"
+msgstr "Географска ширина:"
+
+#: main.qml:225
+msgid "Light drizzle"
+msgstr "Слаб ръмеж"
+
+#: main.qml:228
+msgid "Light freezing drizzle"
+msgstr "Слаб леден ръмеж"
+
+#: main.qml:233
+msgid "Light freezing rain"
+msgstr "Слаб леден дъжд"
+
+#: main.qml:230
+msgid "Light rain"
+msgstr "Слаб дъжд"
+
+#: main.qml:239
+msgid "Light showers"
+msgstr "Слаби превалявания"
+
+#: main.qml:235
+msgid "Light snow"
+msgstr "Слаб снеговалеж"
+
+#: main.qml:242
+msgid "Light snow showers"
+msgstr "Слаби снеговалежи"
+
+#: configAppearance.qml:894
+msgid "Lines:"
+msgstr "Редове:"
+
+#: ForecastView.qml:31
+msgid "Loading forecast…"
+msgstr "Зареждане на прогноза…"
+
+#: ForecastView.qml:175
+msgid "Loading hourly data…"
+msgstr "Зареждане на почасови данни…"
+
+#: configLocation.qml:786
+msgid "Loading locations…"
+msgstr "Зареждане на местоположения…"
+
+#: config.qml:6
+msgid "Location"
+msgstr "Местоположение"
+
+#: configLocation.qml:619
+msgid "Location information"
+msgstr "Информация за местоположението"
+
+#: configAppearance.qml:601
+msgid "Location Name"
+msgstr "Име на местоположението"
+
+#: configLocation.qml:636
+msgid "Location name:"
+msgstr "Име на местоположението:"
+
+#: configLocation.qml:736
+msgid "Location:"
+msgstr "Местоположение:"
+
+#: configLocation.qml:666
+msgid "Longitude:"
+msgstr "Географска дължина:"
+
+#: FullView.qml:178
+msgid "Low"
+msgstr "Минимална температура"
+
+#: main.qml:220
+msgid "Mainly clear"
+msgstr "Предимно ясно"
+
+#: configAppearance.qml:1020
+msgid "Manual"
+msgstr "Ръчно"
+
+#: configGeneral.qml:37
+msgid "met.no (free)"
+msgstr "met.no (безплатно)"
+
+#: configAppearance.qml:1413
+msgid "Metric (°C, km/h, hPa, mm)"
+msgstr "Метрична система (°C, km/h, hPa, mm)"
+
+#: configGeneral.qml:293
+msgid "minutes"
+msgstr "минути"
+
+#: configAppearance.qml:837
+msgid "Misc"
+msgstr "Разни"
+
+#: configAppearance.qml:602 configAppearance.qml:615 configAppearance.qml:629 DetailsView.qml:101
+msgid "Moon Phase"
+msgstr "Фаза на Луната"
+
+#: TooltipContent.qml:383
+msgid "Moon:"
+msgstr "Луна:"
+
+#: configAppearance.qml:871
+msgid "Multiple lines (tall panel)"
+msgstr "Няколко реда (висок панел)"
+
+#: moonphase.js
+msgid "New Moon"
+msgstr "Новолуние"
+
+#: ForecastView.qml:31
+msgid "No forecast data"
+msgstr "Няма налични данни за прогноза"
+
+#: FullView.qml:44
+msgid "No location set"
+msgstr "Няма зададено местоположение"
+
+#: configLocation.qml:789
+msgid "No weather stations found for '%1'"
+msgstr "Не са намерени метеорологични станции за „%1“"
+
+#: configLocation.qml:136
+msgid "None Selected"
+msgstr "Няма избрано"
+
+#: configAppearance.qml:1061
+msgid "Note: size may be reduced if the panel is not thick enough."
+msgstr "Забележка: размерът може да бъде намален, ако панелът не е достатъчно висок."
+
+#: configAppearance.qml:898
+msgid "Number of item rows visible at once. Resize the panel height in KDE settings to match."
+msgstr "Брой редове, видими едновременно. Променете височината на панела в настройките на KDE, за да съответства."
+
+#: configAppearance.qml:282
+msgid "OK"
+msgstr "Добре"
+
+#: configGeneral.qml:36
+msgid "Open-Meteo (recommended, free)"
+msgstr "Open-Meteo (препоръчително, безплатно)"
+
+#: configGeneral.qml:38
+msgid "OpenWeatherMap (Key Required)"
+msgstr "OpenWeatherMap (изисква се ключ)"
+
+#: configGeneral.qml:182
+msgid "OpenWeatherMap API Key:"
+msgstr "API ключ за OpenWeatherMap:"
+
+#: main.qml:222 configAppearance.qml:91
+msgid "Overcast"
+msgstr "Облачно"
+
+#: configAppearance.qml:834
+msgid "Panel"
+msgstr "Панел"
+
+#: configAppearance.qml:862
+msgid "Panel display settings"
+msgstr "Настройки за показване в панела"
+
+#: configAppearance.qml:1000
+msgid "Panel font:"
+msgstr "Шрифт на панела:"
+
+#: configAppearance.qml:1555
+msgid "Panel Items"
+msgstr "Елементи в панела"
+
+#: configAppearance.qml:974
+msgid "Panel items settings"
+msgstr "Настройки на елементите в панела"
+
+#: configAppearance.qml:1137
+msgid "Panel items:"
+msgstr "Елементи в панела:"
+
+#: main.qml:221 main.qml:247
+msgid "Partly cloudy"
+msgstr "Частично облачно"
+
+#: configAppearance.qml:89
+msgid "Partly cloudy (day)"
+msgstr "Частично облачно (ден)"
+
+#: configAppearance.qml:90
+msgid "Partly cloudy (night)"
+msgstr "Частично облачно (нощ)"
+
+#: configAppearance.qml:935
+msgid "Pipe  |"
+msgstr "Вертикална черта  |"
+
+#: configAppearance.qml:1271
+msgid "Prefix style:"
+msgstr "Стил на префикса:"
+
+#: configAppearance.qml:600 configAppearance.qml:610 configAppearance.qml:625 DetailsView.qml:99
+msgid "Pressure"
+msgstr "Налягане"
+
+#: configAppearance.qml:1484 TooltipContent.qml:370
+msgid "Pressure:"
+msgstr "Налягане:"
+
+#: configGeneral.qml:134
+msgid "Provider:"
+msgstr "Доставчик:"
+
+#: configGeneral.qml:123
+msgid ""
+"Providers are tried in order until one succeeds:\n"
+"Open-Meteo  →  met.no  →  OpenWeatherMap  →  WeatherAPI.com\n"
+"Open-Meteo is always tried first — it is free and requires no API key."
+msgstr ""
+"Доставчиците се опитват последователно, докато някой успее:\n"
+"Open-Meteo  →  met.no  →  OpenWeatherMap  →  WeatherAPI.com\n"
+"Open-Meteo винаги се опитва първи — той е безплатен и не изисква API ключ."
+
+#: configAppearance.qml:916
+msgid "px"
+msgstr "px"
+
+#: main.qml:231 configAppearance.qml:93
+msgid "Rain"
+msgstr "Дъжд"
+
+#: configLocation.qml:585 FullView.qml:97
+msgid "Refresh"
+msgstr "Обновяване"
+
+#: configGeneral.qml:277
+msgid "Refresh weather automatically"
+msgstr "Автоматично обновяване на времето"
+
+#: configAppearance.qml:609 configAppearance.qml:624
+msgid "Relative humidity %"
+msgstr "Относителна влажност %"
+
+#: configAppearance.qml:599
+msgid "Relative humidity percentage"
+msgstr "Процент относителна влажност"
+
+#: configLocation.qml:381
+msgid "Requesting location from GeoClue2…"
+msgstr "Заявяване на местоположение от GeoClue2…"
+
+#: configAppearance.qml:255 configAppearance.qml:424 configAppearance.qml:459
+msgid "Reset"
+msgstr "Нулиране"
+
+#: configAppearance.qml:269
+msgid "Reset All to Defaults"
+msgstr "Нулиране на всички до стойностите по подразбиране"
+
+#: configGeneral.qml:228
+msgid "Reset to bundled"
+msgstr "Възстановяване към вградените стойности"
+
+#: configAppearance.qml:360
+msgid "Reset to default"
+msgstr "Възстановяване към стойностите по подразбиране"
+
+#: main.qml:224
+msgid "Rime fog"
+msgstr "Скрежна мъгла"
+
+#: configAppearance.qml:1395
+msgid "Round values:"
+msgstr "Закръгляване на стойностите:"
+
+#: configAppearance.qml:902
+msgid "Scroll animation:"
+msgstr "Анимация на превъртането:"
+
+#: configAppearance.qml:886
+msgid "Scroll interval (sec):"
+msgstr "Интервал на превъртане (сек):"
+
+#: configLocation.qml:788
+msgid "Search a weather station to set your location"
+msgstr "Потърсете метеорологична станция, за да зададете местоположението си"
+
+#: configAppearance.qml:928
+msgid "Separator:"
+msgstr "Разделител:"
+
+#: FullView.qml:52
+msgid "Set Location…"
+msgstr "Задаване на местоположение…"
+
+#: configLocation.qml:533
+msgid "Set manually"
+msgstr "Задаване ръчно"
+
+#: configAppearance.qml:1130 configAppearance.qml:1344
+msgid "Set your own icons…"
+msgstr "Задайте собствени икони…"
+
+#: configAppearance.qml:2248
+msgid "Show / hide the prefix icon"
+msgstr "Показване / скриване на иконата отпред"
+
+#: configAppearance.qml:1801
+msgid "Show / hide the prefix icon on the panel"
+msgstr "Показване / скриване на иконата отпред в панела"
+
+#: configAppearance.qml:1947
+msgid "Show in details"
+msgstr "Показване в подробностите"
+
+#: configAppearance.qml:1989
+msgid "Show or hide this detail item"
+msgstr "Показване или скриване на този елемент в подробностите"
+
+#: configAppearance.qml:1703 configAppearance.qml:2181
+msgid "Show prefix icon"
+msgstr "Показване на иконата отпред"
+
+#: configAppearance.qml:1186
+msgid "Show update time and provider"
+msgstr "Показване на времето на обновяване и доставчика"
+
+#: configGeneral.qml:223
+msgid "Show/hide key"
+msgstr "Показване/скриване на ключа"
+
+#: main.qml:240
+msgid "Showers"
+msgstr "Превалявания"
+
+#: configAppearance.qml:1869
+msgid "Shown"
+msgstr "Показани"
+
+#: configAppearance.qml:870
+msgid "Single line (all items at once)"
+msgstr "Един ред (всички елементи наведнъж)"
+
+#: configAppearance.qml:1091 configAppearance.qml:1307
+msgid "Size:"
+msgstr "Размер:"
+
+#: configAppearance.qml:938
+msgid "Small circle  ⚬"
+msgstr "Малък кръг  ⚬"
+
+#: main.qml:236 configAppearance.qml:94
+msgid "Snow"
+msgstr "Сняг"
+
+#: main.qml:238
+msgid "Snow grains"
+msgstr "Снежни зърна"
+
+#: main.qml:243
+msgid "Snow showers"
+msgstr "Снеговалежи"
+
+#: configAppearance.qml:937
+msgid "Space"
+msgstr "Интервал"
+
+#: configGeneral.qml:153
+msgid "Standard provider. API key required below."
+msgstr "Стандартен доставчик. Изисква се API ключ по-долу."
+
+#: configAppearance.qml:95
+msgid "Storm / Thunderstorm"
+msgstr "Буря / Гръмотевична буря"
+
+#: configAppearance.qml:612 configAppearance.qml:626
+msgid "Sun rise & set times"
+msgstr "Часове на изгрев и залез"
+
+#: configAppearance.qml:1736 configAppearance.qml:2212
+msgid "Sun times mode:"
+msgstr "Режим за часовете на изгрев и залез:"
+
+#: configAppearance.qml:1672 configAppearance.qml:2150
+msgid "Sun times options"
+msgstr "Настройки за часовете на изгрев и залез"
+
+#: configAppearance.qml:595
+msgid "Sunrise and sunset times"
+msgstr "Часове на изгрев и залез"
+
+#: configAppearance.qml:400
+msgid "Sunrise icon:"
+msgstr "Икона за изгрев:"
+
+#: configAppearance.qml:387 configAppearance.qml:1742 configAppearance.qml:2218
+msgid "Sunrise only  07:17"
+msgstr "Само изгрев  07:17"
+
+#: configAppearance.qml:595 configAppearance.qml:612 configAppearance.qml:626 DetailsView.qml:100
+msgid "Sunrise/Sunset"
+msgstr "Изгрев/Залез"
+
+#: TooltipContent.qml:401 TooltipContent.qml:423 TooltipContent.qml:430
+msgid "Sunrise:"
+msgstr "Изгрев:"
+
+#: configAppearance.qml:435
+msgid "Sunset icon:"
+msgstr "Икона за залез:"
+
+#: configAppearance.qml:388 configAppearance.qml:1743 configAppearance.qml:2219
+msgid "Sunset only   18:03"
+msgstr "Само залез   18:03"
+
+#: TooltipContent.qml:407 TooltipContent.qml:418 TooltipContent.qml:431
+msgid "Sunset:"
+msgstr "Залез:"
+
+#: configAppearance.qml:1078 configAppearance.qml:1207 configAppearance.qml:1295
+msgid "Symbolic (SVG)"
+msgstr "Символични (SVG)"
+
+#: configAppearance.qml:594 configAppearance.qml:620
+msgid "Temperature"
+msgstr "Температура"
+
+#: configAppearance.qml:1448 TooltipContent.qml:339
+msgid "Temperature:"
+msgstr "Температура:"
+
+#: configAppearance.qml:1279
+msgid "Text labels (Temperature, Wind…)"
+msgstr "Текстови етикети (Температура, Вятър…)"
+
+#: configAppearance.qml:1027
+msgid "Text will follow the system font and expand to fill the available space."
+msgstr "Текстът ще следва системния шрифт и ще се разширява, за да запълни наличното пространство."
+
+#: configAppearance.qml:188
+msgid "The condition icon will automatically reflect the current weather using your KDE system icon theme. No customisation is needed."
+msgstr "Иконата за метеорологичните условия ще отразява автоматично текущото време, използвайки системната тема за икони на KDE. Не е необходима персонализация."
+
+#: moonphase.js
+msgid "Third Quarter"
+msgstr "Последна четвърт"
+
+#: main.qml:244
+msgid "Thunderstorm"
+msgstr "Гръмотевична буря"
+
+#: main.qml:245
+msgid "Thunderstorm with hail"
+msgstr "Гръмотевична буря с градушка"
+
+#: configLocation.qml:696
+msgid "Timezone:"
+msgstr "Часова зона:"
+
+#: ForecastView.qml:84
+msgid "Today"
+msgstr "Днес"
+
+#: configAppearance.qml:836
+msgid "Tooltip"
+msgstr "Подсказка"
+
+#: configAppearance.qml:1351
+msgid "Tooltip items"
+msgstr "Елементи в подсказката"
+
+#: configAppearance.qml:2038
+msgid "Tooltip Items"
+msgstr "Елементи в подсказката"
+
+#: configAppearance.qml:1265
+msgid "Tooltip items settings"
+msgstr "Настройки на елементите в подсказката"
+
+#: configAppearance.qml:1355
+msgid "Tooltip items:"
+msgstr "Елементи в подсказката:"
+
+#: configLocation.qml:470
+msgid "Unable to get valid position from GeoClue2."
+msgstr "Не може да се получи валидна позиция от GeoClue2."
+
+#: configAppearance.qml:1410
+msgid "Unit preset:"
+msgstr "Предварително зададени единици:"
+
+#: configAppearance.qml:1407
+msgid "Units"
+msgstr "Единици"
+
+#: configAppearance.qml:385 configAppearance.qml:1740 configAppearance.qml:2217
+msgid "Upcoming (next sunrise or sunset)"
+msgstr "Предстоящ (следващ изгрев или залез)"
+
+#: WeatherService.qml:342
+msgid "Updated %1 (met.no)"
+msgstr "Обновено в %1 (met.no)"
+
+#: WeatherService.qml:162
+msgid "Updated %1 (Open-Meteo)"
+msgstr "Обновено в %1 (Open-Meteo)"
+
+#: WeatherService.qml:222
+msgid "Updated %1 (OpenWeather)"
+msgstr "Обновено в %1 (OpenWeather)"
+
+#: WeatherService.qml:274
+msgid "Updated %1 (WeatherAPI.com)"
+msgstr "Обновено в %1 (WeatherAPI.com)"
+
+#: FullView.qml:88
+msgid "Updating…"
+msgstr "Обновяване…"
+
+#: configAppearance.qml:1415
+msgid "Use KDE locale settings"
+msgstr "Използване на регионалните настройки на KDE"
+
+#: configLocation.qml:594
+msgid "Use manual location"
+msgstr "Използване на ръчно зададено местоположение"
+
+#: configGeneral.qml:195
+msgid "Use my own API key"
+msgstr "Използване на собствен API ключ"
+
+#: configGeneral.qml:188
+msgid "Use the widget API key (limited)"
+msgstr "Използване на API ключа на джаджата (ограничен)"
+
+#: configAppearance.qml:1122
+msgid "Uses KDE system icons by default. Click the button to customise each item's icon."
+msgstr "По подразбиране използва системните икони на KDE. Натиснете бутона, за да персонализирате иконата на всеки елемент."
+
+#: configAppearance.qml:1338
+msgid "Uses KDE system icons by default. Click the button to customise each item’s icon."
+msgstr "По подразбиране използва системните икони на KDE. Натиснете бутона, за да персонализирате иконата на всеки елемент."
+
+#: configGeneral.qml:253
+msgid "Using your own API key."
+msgstr "Използва се собствен API ключ."
+
+#: configAppearance.qml:1402
+msgid "Values are rounded to whole numbers"
+msgstr "Стойностите се закръгляват до цели числа"
+
+#: configAppearance.qml:1402
+msgid "Values show decimal places"
+msgstr "Стойностите показват десетични знаци"
+
+#: configAppearance.qml:614 configAppearance.qml:628 DetailsView.qml:101
+msgid "Visibility"
+msgstr "Видимост"
+
+#: configAppearance.qml:614 configAppearance.qml:628
+msgid "Visibility distance"
+msgstr "Разстояние на видимост"
+
+#: TooltipContent.qml:378
+msgid "Visibility:"
+msgstr "Видимост:"
+
+#: moonphase.js
+msgid "Waning Crescent"
+msgstr "Намаляващ сърп"
+
+#: moonphase.js
+msgid "Waning Gibbous"
+msgstr "Намаляваща изпъкнала Луна"
+
+#: moonphase.js
+msgid "Waxing Crescent"
+msgstr "Нарастващ сърп"
+
+#: moonphase.js
+msgid "Waxing Gibbous"
+msgstr "Нарастваща изпъкнала Луна"
+
+#: configLocation.qml:520
+msgid "We detected your coordinates: <b>%1°, %2°</b>."
+msgstr "Открихме вашите координати: <b>%1°, %2°</b>."
+
+#: configLocation.qml:519
+msgid "We detected your location as: <b>%1</b>."
+msgstr "Открихме вашето местоположение като: <b>%1</b>."
+
+#: configAppearance.qml:621
+msgid "Weather condition text"
+msgstr "Текст за метеорологичните условия"
+
+#: configAppearance.qml:593
+msgid "Weather icon + condition text"
+msgstr "Икона за времето + текст за условията"
+
+#: configGeneral.qml:81
+msgid "Weather Provider"
+msgstr "Доставчик на метеорологични данни"
+
+#: TooltipContent.qml:151
+msgid "Weather Widget"
+msgstr "Джаджа за времето"
+
+#: configGeneral.qml:39
+msgid "WeatherAPI.com (Key Required)"
+msgstr "WeatherAPI.com (изисква се ключ)"
+
+#: configGeneral.qml:182
+msgid "WeatherAPI.com API Key:"
+msgstr "API ключ за WeatherAPI.com:"
+
+#: configAppearance.qml:835
+msgid "Widget"
+msgstr "Джаджа"
+
+#: configAppearance.qml:1194
+msgid "Widget items"
+msgstr "Елементи на джаджата"
+
+#: configAppearance.qml:1176
+msgid "Widget settings"
+msgstr "Настройки на джаджата"
+
+#: configAppearance.qml:596 configAppearance.qml:611 configAppearance.qml:623 DetailsView.qml:99
+msgid "Wind"
+msgstr "Вятър"
+
+#: configAppearance.qml:611 configAppearance.qml:623
+msgid "Wind speed + direction"
+msgstr "Скорост и посока на вятъра"
+
+#: configAppearance.qml:596
+msgid "Wind speed and direction"
+msgstr "Скорост и посока на вятъра"
+
+#: configAppearance.qml:1465
+msgid "Wind speed:"
+msgstr "Скорост на вятъра:"
+
+#: TooltipContent.qml:351
+msgid "Wind:"
+msgstr "Вятър:"
+
+#: configGeneral.qml:245
+msgid ""
+"You are using the widget's built-in API key, which is shared with all users of this widget and has strict rate limits. Weather data may be incomplete, delayed, or missing entirely.\n"
+"For reliable results, enter your own free API key above, or switch to Open-Meteo which is completely free and requires no key."
+msgstr ""
+"Използвате вградения API ключ на джаджата, който се споделя от всички потребители и има строги ограничения за заявките. Данните за времето може да бъдат непълни, забавени или изцяло липсващи.\n"
+"За надеждни резултати въведете свой безплатен API ключ по-горе или преминете към Open-Meteo, който е напълно безплатен и не изисква ключ."

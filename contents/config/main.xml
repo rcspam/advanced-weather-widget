@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="autoDetectLocation" type="Bool"><default>false</default></entry>
+    <entry name="locationName" type="String"><default></default></entry>
+    <entry name="latitude" type="Double"><default>0.0</default></entry>
+    <entry name="longitude" type="Double"><default>0.0</default></entry>
+    <entry name="altitude" type="Int"><default>0</default></entry>
+    <entry name="timezone" type="String"><default></default></entry>
+    <entry name="weatherProvider" type="String"><default>adaptive</default></entry>
+
+    <!-- User API keys: empty string means use the widget's bundled key -->
+    <entry name="owApiKey" type="String"><default></default></entry>
+    <entry name="waApiKey" type="String"><default></default></entry>
+
+    <!-- Units: Issue #8 — unitsMode controls the unit preset -->
+    <!-- Values: "metric", "imperial", "kde", "custom" -->
+    <entry name="unitsMode" type="String"><default>metric</default></entry>
+    <entry name="temperatureUnit" type="String"><default>C</default></entry>
+    <entry name="pressureUnit" type="String"><default>hPa</default></entry>
+    <entry name="windSpeedUnit" type="String"><default>kmh</default></entry>
+    <entry name="precipitationUnit" type="String"><default>mm</default></entry>
+    <entry name="altitudeUnit" type="String"><default>m</default></entry>
+    <entry name="apparentTemperatureMode" type="String"><default>apparent</default></entry>
+
+    <entry name="tooltipStyle" type="String"><default>verbose</default></entry>
+    <!-- Issue #6: configurable tooltip items order (semicolon-separated) -->
+    <entry name="tooltipItemOrder" type="String"><default>temperature;wind;humidity;pressure;suntimes</default></entry>
+    <!-- Tooltip item icon show/hide (semicolon-separated id=0/1 pairs) -->
+    <entry name="tooltipItemIcons" type="String"><default>temperature=1;condition=1;feelslike=1;wind=1;humidity=1;pressure=1;suntimes=1;moonphase=1</default></entry>
+    <!-- Tooltip icon theme: "symbolic" (default) | "wi-font" | "flat-color" | "3d-oxygen" | "kde" | "custom" -->
+    <entry name="tooltipIconTheme" type="String"><default>symbolic</default></entry>
+    <entry name="tooltipIconSize" type="Int"><default>22</default></entry>
+    <entry name="tooltipSymbolicVariant" type="String"><default>dark</default></entry>
+    <entry name="tooltipCustomIcons" type="String"><default></default></entry>
+    <entry name="tooltipUseIcons" type="Bool"><default>true</default></entry>
+    <entry name="tooltipSunTimesMode" type="String"><default>both</default></entry>
+    <entry name="panelWidth" type="Int"><default>0</default></entry>
+
+    <entry name="forecastLayout" type="String"><default>rows</default></entry>
+    <entry name="forecastDays" type="Int"><default>5</default><min>3</min><max>7</max></entry>
+    <entry name="roundValues" type="Bool"><default>true</default></entry>
+    <entry name="singlePanelRow" type="Bool"><default>true</default></entry>
+    <entry name="showScrollbox" type="Bool"><default>true</default></entry>
+    <entry name="scrollboxLines" type="Int"><default>2</default><min>1</min><max>6</max></entry>
+    <entry name="scrollboxItems" type="String"><default>Humidity;Wind;Pressure;Dew Point;Visibility</default></entry>
+    <entry name="animateTransitions" type="Bool"><default>true</default></entry>
+
+    <entry name="panelInfoMode" type="String"><default>single</default></entry>
+    <!-- multiline mode: number of visible rows and scroll animation toggle -->
+    <entry name="panelMultiLines" type="Int"><default>2</default><min>1</min><max>8</max></entry>
+    <entry name="panelMultiAnimate" type="Bool"><default>true</default></entry>
+    <entry name="panelScrollSeconds" type="Int"><default>4</default><min>1</min><max>30</max></entry>
+    <entry name="panelShowTemperature" type="Bool"><default>true</default></entry>
+    <entry name="panelShowWeatherIcon" type="Bool"><default>false</default></entry>
+    <entry name="panelShowSunTimes" type="Bool"><default>false</default></entry>
+    <entry name="panelShowWind" type="Bool"><default>false</default></entry>
+    <entry name="panelShowFeelsLike" type="Bool"><default>false</default></entry>
+    <entry name="panelShowHumidity" type="Bool"><default>true</default></entry>
+    <entry name="panelShowPressure" type="Bool"><default>false</default></entry>
+    <entry name="panelShowCondition" type="Bool"><default>false</default></entry>
+    <entry name="panelShowLocation" type="Bool"><default>true</default></entry>
+    <entry name="panelSunTimesMode" type="String"><default>upcoming</default></entry>
+
+    <!-- panelItemOrder: semicolon-separated enabled tokens in display order -->
+    <!-- Valid tokens: location, condition, temperature, suntimes, wind,
+    feelslike, humidity, pressure, moonphase            -->
+    <entry name="panelItemOrder" type="String"><default>location;temperature;humidity</default></entry>
+    <entry name="panelItemIcons" type="String"><default>location=1;condition=1;temperature=1;suntimes=1;wind=1;feelslike=1;humidity=1;pressure=1;moonphase=1</default></entry>
+    <entry name="panelSeparator" type="String"><default> • </default></entry>
+    <entry name="panelItemSpacing" type="Int"><default>5</default><min>0</min><max>32</max></entry>
+    <entry name="panelFillWidth" type="Bool"><default>false</default></entry>
+    <entry name="panelIconSizeMode" type="String"><default>auto</default></entry>
+    <entry name="panelIconSizeManual" type="Int"><default>22</default><min>12</min><max>48</max></entry>
+
+    <entry name="refreshIntervalMinutes" type="Int"><default>15</default><min>5</min><max>180</max></entry>
+    <entry name="autoRefresh" type="Bool"><default>true</default></entry>
+    <entry name="showUpdateText" type="Bool"><default>true</default></entry>
+
+    <!-- Issue #7: configurable widget details view items (semicolon-separated) -->
+    <entry name="widgetDetailsOrder" type="String"><default>feelslike;humidity;pressure;wind;suntimes;dewpoint;visibility;moonphase</default></entry>
+    <!-- Widget details icon theme -->
+    <entry name="widgetIconTheme" type="String"><default>symbolic</default></entry>
+    <!-- Widget popup size; 0 = use built-in default (540 × 500) -->
+    <entry name="widgetWidth"  type="Int"><default>0</default></entry>
+    <entry name="widgetHeight" type="Int"><default>0</default></entry>
+
+    <!-- Legacy Widget Details View toggles (kept for back-compat) -->
+    <entry name="widgetShowFeelsLike" type="Bool"><default>true</default></entry>
+    <entry name="widgetShowHumidity" type="Bool"><default>true</default></entry>
+    <entry name="widgetShowPressure" type="Bool"><default>true</default></entry>
+    <entry name="widgetShowWind" type="Bool"><default>true</default></entry>
+    <entry name="widgetShowSunrise" type="Bool"><default>true</default></entry>
+    <entry name="widgetShowDewPoint" type="Bool"><default>true</default></entry>
+    <entry name="widgetShowVisibility" type="Bool"><default>true</default></entry>
+
+    <entry name="panelFontSize" type="Int"><default>11</default><min>7</min><max>24</max></entry>
+    <!-- Panel icon theme: "symbolic" (default) | "wi-font" | "flat-color" | "3d-oxygen" | "3d-adwaita" | "kde" -->
+    <entry name="panelIconTheme" type="String"><default>symbolic</default></entry>
+    <entry name="panelIconSize" type="Int"><default>22</default></entry>
+    <entry name="panelSymbolicVariant" type="String"><default>dark</default></entry>
+    <entry name="panelCustomIcons" type="String"><default></default></entry>
+    <!-- Panel font: panelUseSystemFont=true → system font; false → panelFontFamily/Bold -->
+    <entry name="panelUseSystemFont" type="Bool"><default>true</default></entry>
+    <entry name="panelFontFamily" type="String"><default></default></entry>
+    <entry name="panelFontBold" type="Bool"><default>false</default></entry>
+    <!-- Widget font -->
+    <entry name="useSystemFont" type="Bool"><default>true</default></entry>
+    <entry name="fontFamily" type="String"><default>Noto Sans</default></entry>
+    <entry name="fontSize" type="Int"><default>11</default><min>7</min><max>24</max></entry>
+    <entry name="fontBold" type="Bool"><default>false</default></entry>
+  </group>
+</kcfg>
