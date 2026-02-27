@@ -103,7 +103,7 @@ https://store.kde.org/
 kpackagetool6 --type Plasma/Applet --install .
 rm -rf ~/.cache/plasmashell/qmlcache
 systemctl --user restart plasma-plasmashell
-
+```
 
 ## 🎨 Icons & Fonts
 This project uses weather icons and font resources from:
