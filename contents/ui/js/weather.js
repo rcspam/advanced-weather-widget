@@ -129,8 +129,8 @@ function weatherApiCodeToWmo(code) {
 function formatTemp(celsius, unit, round) {
     if (isNaN(celsius) || celsius === null || celsius === undefined) return "--";
     var value = (unit === "F") ? (celsius * 9 / 5 + 32) : celsius;
-    var str = round ? String(Math.round(value)) : Number(value).toFixed(1);
-    return str + (unit === "F" ? "\u00B0F" : "\u00B0C");
+    var numStr = round ? String(Math.round(value)) : Number(value).toFixed(1);
+    return numStr + "\u00B0"; // Unicode degree symbol
 }
 
 /**

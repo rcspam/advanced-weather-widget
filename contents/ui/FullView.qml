@@ -31,7 +31,17 @@ Rectangle {
     // the background on/off with the button that appears in desktop edit mode.
     color: "transparent"
 
-    property int activeTab: 0   // 0 = Details  1 = Forecast
+    // Reset to the configured default tab every time the popup opens
+    property int activeTab: Plasmoid.configuration.widgetDefaultTab === "forecast" ? 1 : 0
+
+    Connections {
+        target: Plasmoid
+        function onExpandedChanged() {
+            if (Plasmoid.expanded)
+                fullView.activeTab =
+                    Plasmoid.configuration.widgetDefaultTab === "forecast" ? 1 : 0
+        }
+    }
 
     // ── No-location placeholder ───────────────────────────────────────────
     ColumnLayout {
