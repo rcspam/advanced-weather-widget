@@ -554,6 +554,7 @@ Item {
                                             color: root.accentViolet
                                             Layout.alignment: Qt.AlignVCenter
                                             Layout.leftMargin: 10  // left margin from card edge
+                                            Layout.topMargin: 5
                                         }
                                         // Fallback SVG icon (when font not ready)
                                         Kirigami.Icon {
@@ -565,6 +566,7 @@ Item {
                                             implicitHeight: Math.round(root.iconSize * 0.7)
                                             Layout.alignment: Qt.AlignVCenter
                                             Layout.leftMargin: 10
+                                            Layout.topMargin: 5
                                         }
 
                                         // Moon phase name label (takes remaining width)
@@ -578,6 +580,7 @@ Item {
                                             Layout.fillWidth: true
                                             Layout.alignment: Qt.AlignVCenter
                                             Layout.leftMargin: 10    // optional left margin
+                                            Layout.topMargin: 5
                                         }
                                     }
                                 }
