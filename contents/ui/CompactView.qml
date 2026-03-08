@@ -72,23 +72,30 @@ PlasmaCore.ToolTipArea {
     // ── Vertical-panel size scale factors ────────────────────────────────
     // Change these two values to resize icon and temperature in vertical panels.
     // 1.0 = natural size (auto-fits panel thickness).  > 1.0 = larger, < 1.0 = smaller.
-    // Recommended range: 0.5 – 2.0
-    readonly property real vertIconScale: 0.5   // ← EDIT: icon / font-icon size in vertical panels
-    readonly property real vertTempScale: 1.0   // ← EDIT: temperature value size in vertical panels
-
-    // Derived pixel sizes for vertical-panel simple mode.
-    // Using fontSizeMode: FixedSize + explicit px so the scale actually takes effect.
-    // (HorizontalFit ignores font.pixelSize — it always shrinks to fit cell width.)
-    //   vertIconPx = panel thickness × vertIconScale
-    //   vertTempPx = vertIconPx × 0.5 × vertTempScale
-    readonly property int vertIconPx: Math.max(Math.round(Kirigami.Units.gridUnit / 2), Math.round((width - 2 * leftRightMargin) * vertIconScale))
-    readonly property int vertTempPx: Math.max(Math.round(Kirigami.Units.gridUnit / 2), Math.round(vertIconPx * 0.5 * vertTempScale))
+    // ── Simple-mode sizing (reads from Plasmoid.configuration) ──────────────
+    // Icon size: auto = fills cell via HorizontalFit/VerticalFit
+    //            manual = fixed pixel size set in settings (Icon Size spinner)
+    // Font size: auto = proportional to rendered icon (50% of paintedHeight)
+    //            manual = fixed pixel size set in settings (Font Size spinner)
+    readonly property bool simpleIconAuto: (Plasmoid.configuration.simpleIconSizeMode || "auto") === "auto"
+    readonly property int  simpleIconPx:   Plasmoid.configuration.simpleIconSizeManual || 32
+    readonly property bool simpleFontAuto: (Plasmoid.configuration.simpleFontSizeMode || "auto") === "auto"
+    readonly property int  simpleFontPx:   Plasmoid.configuration.simpleFontSizeManual || 14
 
     // ── Multiline options ─────────────────────────────────────────────────
     readonly property string mlIconStyle: Plasmoid.configuration.panelMultilineIconStyle || "colorful"
     readonly property int multiLines: Math.max(1, Plasmoid.configuration.panelMultiLines || 2)
     readonly property bool multiAnimate: Plasmoid.configuration.panelMultiAnimate !== false
-    readonly property int mlIconSize: Math.min(Math.max(multiLines * (panelFontPx + 8), 32) - 4, 64)
+    // 0 = auto-fit panel height; >0 = user-specified px (from settings spinner)
+    readonly property int _mlIconSizeCfg: Plasmoid.configuration.panelMultilineIconSize || 0
+    readonly property int mlIconSize: _mlIconSizeCfg > 0
+        ? _mlIconSizeCfg
+        : Math.min(Math.max(multiLines * (panelFontPx + 8), 32) - 4, 64)
+    // Vertical multiline sizing (panel width drives icon; font drives rows)
+    readonly property int mlVertIconSz: _mlIconSizeCfg > 0
+        ? _mlIconSizeCfg
+        : Math.min(Math.max(16, width - 4), 64)
+    readonly property int mlVertRowH:   Math.max(14, panelFontPx + 6)
 
     // ── Root implicit sizes ───────────────────────────────────────────────
     // For vertical panels + stacked simple mode, reserve double the usual
@@ -106,23 +113,26 @@ PlasmaCore.ToolTipArea {
     // vertical panels: fillHeight=false keeps the widget from consuming all
     // available panel height.  preferredHeight scales with panel thickness
     // (= widget width) so the click area grows as the panel gets wider.
-    Layout.fillHeight: !vertical || isMultiLine
-    Layout.fillWidth: Plasmoid.configuration.panelFillWidth
+    Layout.fillHeight: !vertical
+    Layout.fillWidth: vertical || Plasmoid.configuration.panelFillWidth
 
-    Layout.preferredWidth: Plasmoid.configuration.panelFillWidth ? -1 : isMultiLine ? mlIconSize + 6 + (Plasmoid.configuration.panelWidth || 110) + 2 * leftRightMargin : implicitWidth
+    Layout.preferredWidth: (vertical || Plasmoid.configuration.panelFillWidth) ? -1 : isMultiLine ? mlIconSize + 6 + (Plasmoid.configuration.panelWidth || 110) + 2 * leftRightMargin : implicitWidth
     Layout.preferredHeight: {
-        if (!vertical || isMultiLine)
+        if (vertical && isMultiLine)
+            return compactRoot.mlVertIconSz + compactRoot.multiLines * compactRoot.mlVertRowH + 8;
+        if (vertical && !compactRoot.isSimpleMode && !isMultiLine)
+            return compactRoot.multiLineItemsData.length * compactRoot.mlVertRowH + 4;
+            return compactRoot.mlVertIconSz + compactRoot.multiLines * compactRoot.mlVertRowH + 8;
+        if (!vertical)
             return -1;
-        if (!isSimpleMode)
-            return implicitHeight;
-        // Slot height is driven by vertIconPx / vertTempPx so the allocated
-        // height grows/shrinks with the scale factors.
-        var iH = compactRoot.vertIconPx;
-        var tH = compactRoot.vertTempPx;
-        if (simpleLayoutType === 1)
-            return iH + tH + 6;  // stacked: icon + gap + temp
-        if (simpleLayoutType === 2)
-            return iH + 4;        // compressed: square + badge
+        // Auto: slot = panel thickness (natural fit for any panel width).
+        // Manual: slot = icon size + optional temp size so content is never clipped.
+        var iH = compactRoot.simpleIconAuto
+                 ? Math.max(Kirigami.Units.gridUnit * 2, Math.round(compactRoot.width))
+                 : compactRoot.simpleIconPx;
+        var tH = compactRoot.simpleFontAuto ? Math.round(iH * 0.5) : compactRoot.simpleFontPx;
+        if (simpleLayoutType === 1) return iH + tH + 6;  // stacked: icon + gap + temp
+        if (simpleLayoutType === 2) return iH + 4;        // compressed: square + badge
         return Math.max(iH, tH) + 4;                      // side-by-side: one row
     }
     // For simple mode on a horizontal panel the widget must be at least
@@ -180,193 +190,418 @@ PlasmaCore.ToolTipArea {
     // ══════════════════════════════════════════════════════════════════════
     // SINGLE / SCROLL MODE
     // ══════════════════════════════════════════════════════════════════════
-    RowLayout {
-        id: compactRow
+    // ══════════════════════════════════════════════════════════════════════
+    // SINGLE LINE MODE — orientation aware
+    //   Horizontal panel: all items in one row (original behaviour)
+    //   Vertical panel:   each item on its own row, stacked top-to-bottom
+    // ══════════════════════════════════════════════════════════════════════
+    Item {
+        id: singleLineRoot
         visible: !compactRoot.isMultiLine && !compactRoot.isSimpleMode
         anchors.fill: parent
-        anchors.leftMargin: compactRoot.leftRightMargin
-        anchors.rightMargin: compactRoot.leftRightMargin
-        spacing: compactRoot.itemSpacing
-        clip: true
 
-        Repeater {
-            model: compactRoot.panelItemsData
-            delegate: RowLayout {
-                id: slRowItem
-                required property var modelData
-                spacing: slRowItem.modelData.isSep ? 0 : 5
+        // ── HORIZONTAL: all items in one scrolling row ────────────────
+        RowLayout {
+            id: compactRow
+            visible: !compactRoot.vertical
+            anchors.fill: parent
+            anchors.leftMargin: compactRoot.leftRightMargin
+            anchors.rightMargin: compactRoot.leftRightMargin
+            spacing: compactRoot.itemSpacing
+            clip: true
 
-                Text {
-                    visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "wi"
-                    text: slRowItem.modelData.glyph
-                    font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                    font.pixelSize: compactRoot.glyphSize
-                    color: Kirigami.Theme.textColor
-                    Layout.alignment: Qt.AlignVCenter
-                }
-                Kirigami.Icon {
-                    visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "kde" && slRowItem.modelData.glyph.length > 0
-                    source: slRowItem.modelData.glyph
-                    implicitWidth: compactRoot.svgIconPx
-                    implicitHeight: compactRoot.svgIconPx
-                }
-                Kirigami.Icon {
-                    visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "kirigami" && slRowItem.modelData.glyph.length > 0
-                    source: slRowItem.modelData.glyph
-                    implicitWidth: compactRoot.glyphSize
-                    implicitHeight: compactRoot.glyphSize
-                }
-                Item {
-                    visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "svg" && slRowItem.modelData.glyph.length > 0
-                    implicitWidth: compactRoot.svgIconPx
-                    implicitHeight: compactRoot.svgIconPx
-                    Kirigami.Icon {
-                        anchors.fill: parent
-                        source: slRowItem.modelData.glyphKdeFallback || ""
-                        visible: (slRowItem.modelData.glyphKdeFallback || "").length > 0
-                    }
-                    Kirigami.Icon {
-                        anchors.fill: parent
-                        source: slRowItem.modelData.glyph
-                        isMask: compactRoot.iconTheme === "symbolic"
+            Repeater {
+                model: compactRoot.panelItemsData
+                delegate: RowLayout {
+                    id: slRowItem
+                    required property var modelData
+                    spacing: 5
+
+                    Text {
+                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "wi"
+                        text: slRowItem.modelData.glyph
+                        font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                        font.pixelSize: compactRoot.glyphSize
                         color: Kirigami.Theme.textColor
+                        Layout.alignment: Qt.AlignVCenter
                     }
-                }
-                Label {
-                    text: slRowItem.modelData.text
-                    font: slRowItem.modelData.isSep ? Qt.font({
-                        pixelSize: compactRoot.panelFontPx,
-                        bold: false
-                    }) : compactRoot.weatherRoot ? compactRoot.weatherRoot.wpf(compactRoot.panelFontPx, false) : Qt.font({
-                        pixelSize: compactRoot.panelFontPx
-                    })
-                    color: Kirigami.Theme.textColor
-                    verticalAlignment: Text.AlignVCenter
-                    opacity: slRowItem.modelData.isSep ? 0.5 : 1.0
-                    elide: Text.ElideRight
-                    Layout.maximumWidth: {
-                        if (slRowItem.modelData.isSep)
-                            return implicitWidth;
-                        var w = Plasmoid.configuration.panelWidth || 0;
-                        return w > 0 ? w : 120;
+                    Kirigami.Icon {
+                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "kde" && slRowItem.modelData.glyph.length > 0
+                        source: slRowItem.modelData.glyph
+                        implicitWidth: compactRoot.svgIconPx
+                        implicitHeight: compactRoot.svgIconPx
+                    }
+                    Kirigami.Icon {
+                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "kirigami" && slRowItem.modelData.glyph.length > 0
+                        source: slRowItem.modelData.glyph
+                        implicitWidth: compactRoot.glyphSize
+                        implicitHeight: compactRoot.glyphSize
+                    }
+                    Item {
+                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "svg" && slRowItem.modelData.glyph.length > 0
+                        implicitWidth: compactRoot.svgIconPx
+                        implicitHeight: compactRoot.svgIconPx
+                        Kirigami.Icon {
+                            anchors.fill: parent
+                            source: slRowItem.modelData.glyphKdeFallback || ""
+                            visible: (slRowItem.modelData.glyphKdeFallback || "").length > 0
+                        }
+                        Kirigami.Icon {
+                            anchors.fill: parent
+                            source: slRowItem.modelData.glyph
+                            isMask: compactRoot.iconTheme === "symbolic"
+                            color: Kirigami.Theme.textColor
+                        }
+                    }
+                    Label {
+                        text: slRowItem.modelData.text
+                        font: compactRoot.weatherRoot
+                            ? compactRoot.weatherRoot.wpf(compactRoot.panelFontPx, false)
+                            : Qt.font({ pixelSize: compactRoot.panelFontPx })
+                        color: Kirigami.Theme.textColor
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
                     }
                 }
             }
-        }
-    }
+        } // RowLayout (horizontal)
+
+        // ── VERTICAL: each item on its own row ───────────────────────
+        Column {
+            visible: compactRoot.vertical
+            anchors.fill: parent
+            anchors.topMargin: 2
+            anchors.bottomMargin: 2
+            spacing: 0
+
+            Repeater {
+                model: compactRoot.multiLineItemsData
+                delegate: RowLayout {
+                    id: slVertItem
+                    required property var modelData
+                    width: parent.width
+                    height: compactRoot.mlVertRowH
+                    spacing: 4
+                    clip: true
+
+                    Text {
+                        visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "wi"
+                        text: slVertItem.modelData.glyph
+                        font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                        font.pixelSize: Math.round(compactRoot.mlVertRowH * 0.85)
+                        color: Kirigami.Theme.textColor
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    Kirigami.Icon {
+                        visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "kde" && slVertItem.modelData.glyph.length > 0
+                        source: slVertItem.modelData.glyph
+                        implicitWidth: compactRoot.svgIconPx
+                        implicitHeight: compactRoot.svgIconPx
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    Kirigami.Icon {
+                        visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "kirigami" && slVertItem.modelData.glyph.length > 0
+                        source: slVertItem.modelData.glyph
+                        implicitWidth: compactRoot.mlVertRowH
+                        implicitHeight: compactRoot.mlVertRowH
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    Item {
+                        visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "svg" && slVertItem.modelData.glyph.length > 0
+                        implicitWidth: compactRoot.svgIconPx
+                        implicitHeight: compactRoot.svgIconPx
+                        Layout.alignment: Qt.AlignVCenter
+                        Kirigami.Icon {
+                            anchors.fill: parent
+                            source: slVertItem.modelData.glyphKdeFallback || ""
+                            visible: (slVertItem.modelData.glyphKdeFallback || "").length > 0
+                        }
+                        Kirigami.Icon {
+                            anchors.fill: parent
+                            source: slVertItem.modelData.glyph
+                            isMask: compactRoot.iconTheme === "symbolic"
+                            color: Kirigami.Theme.textColor
+                        }
+                    }
+                    Label {
+                        text: slVertItem.modelData.text
+                        font: compactRoot.weatherRoot
+                            ? compactRoot.weatherRoot.wpf(compactRoot.mlVertRowH - 4, false)
+                            : Qt.font({ pixelSize: compactRoot.mlVertRowH - 4 })
+                        color: Kirigami.Theme.textColor
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                }
+            }
+        } // Column (vertical)
+    } // singleLineRoot
 
     // ══════════════════════════════════════════════════════════════════════
     // MULTILINE MODE
     // ══════════════════════════════════════════════════════════════════════
-    RowLayout {
-        id: multiLineRow
+    // ══════════════════════════════════════════════════════════════════════
+    // MULTILINE MODE — orientation aware
+    //   Horizontal panel: icon on the left, text rows on the right (RowLayout)
+    //   Vertical panel:   icon on top,      text rows below       (ColumnLayout)
+    // ══════════════════════════════════════════════════════════════════════
+    Item {
+        id: multiLineRoot
         visible: compactRoot.isMultiLine && !compactRoot.isSimpleMode
         anchors.fill: parent
-        anchors.leftMargin: compactRoot.leftRightMargin
-        anchors.rightMargin: compactRoot.leftRightMargin
-        spacing: 6
 
-        Kirigami.Icon {
-            id: weatherIconLarge
-            readonly property int iconSz: compactRoot.height > 8 ? Math.min(compactRoot.height - 4, 64) : compactRoot.mlIconSize
-            source: compactRoot.weatherRoot ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode, compactRoot.weatherRoot.isNightTime()) : "weather-none-available"
-            isMask: compactRoot.mlIconStyle === "symbolic"
-            color: compactRoot.mlIconStyle === "symbolic" ? Kirigami.Theme.textColor : "transparent"
-            Layout.preferredWidth: iconSz
-            Layout.preferredHeight: iconSz
-            Layout.alignment: Qt.AlignVCenter
-            smooth: true
-        }
+        // ── HORIZONTAL: icon left + scrolling rows right ──────────────────
+        RowLayout {
+            visible: !compactRoot.vertical
+            anchors.fill: parent
+            anchors.leftMargin: compactRoot.leftRightMargin
+            anchors.rightMargin: compactRoot.leftRightMargin
+            spacing: 6
 
-        Item {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            Column {
-                id: scrollCol
-                width: parent.width
-                readonly property real rowH: compactRoot.height > 0 ? Math.max(12, compactRoot.height / compactRoot.multiLines) : Math.max(12, compactRoot.panelFontPx + 8)
-                readonly property int rowFontPx: {
-                    var sys = Plasmoid.configuration.panelUseSystemFont;
-                    var savedP = Plasmoid.configuration.panelFontSize || 0;
-                    var maxR = Math.max(8, Math.floor(rowH * 0.72));
-                    if (!sys && savedP > 0)
-                        return Math.min(maxR, Math.round(savedP * 4 / 3));
-                    return Math.max(8, Math.floor(rowH * 0.65));
+            Item {
+                readonly property int iconSz: compactRoot.height > 8
+                    ? Math.min(compactRoot.height - 4, 64)
+                    : compactRoot.mlIconSize
+                Layout.preferredWidth: iconSz
+                Layout.preferredHeight: iconSz
+                Layout.alignment: Qt.AlignVCenter
+                Text {
+                    anchors.fill: parent
+                    visible: compactRoot.mlIconStyle === "symbolic"
+                    text: compactRoot.weatherRoot ? compactRoot.weatherRoot.getSimpleModeIconChar() : "?"
+                    font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                    font.pixelSize: 999
+                    font.pointSize: 0
+                    minimumPixelSize: 8
+                    fontSizeMode: Text.Fit
+                    color: Kirigami.Theme.textColor
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
-                Behavior on y {
-                    enabled: compactRoot.multiAnimate && compactRoot.mlScrollOffset !== 0
-                    NumberAnimation {
-                        duration: 350
-                        easing.type: Easing.InOutCubic
+                Kirigami.Icon {
+                    anchors.fill: parent
+                    visible: compactRoot.mlIconStyle !== "symbolic"
+                    source: compactRoot.weatherRoot
+                        ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode,
+                                              compactRoot.weatherRoot.isNightTime())
+                        : "weather-none-available"
+                    smooth: true
+                }
+            }
+
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                Column {
+                    id: scrollCol
+                    width: parent.width
+                    readonly property real rowH: compactRoot.height > 0
+                        ? Math.max(12, compactRoot.height / compactRoot.multiLines)
+                        : Math.max(12, compactRoot.panelFontPx + 8)
+                    readonly property int rowFontPx: {
+                        var sys = Plasmoid.configuration.panelUseSystemFont;
+                        var savedP = Plasmoid.configuration.panelFontSize || 0;
+                        var maxR = Math.max(8, Math.floor(rowH * 0.72));
+                        if (!sys && savedP > 0)
+                            return Math.min(maxR, Math.round(savedP * 4 / 3));
+                        return Math.max(8, Math.floor(rowH * 0.65));
                     }
-                }
-                y: -(compactRoot.mlScrollOffset * scrollCol.rowH)
+                    Behavior on y {
+                        enabled: compactRoot.multiAnimate && compactRoot.mlScrollOffset !== 0
+                        NumberAnimation { duration: 350; easing.type: Easing.InOutCubic }
+                    }
+                    y: -(compactRoot.mlScrollOffset * scrollCol.rowH)
 
-                Repeater {
-                    model: compactRoot.multiLineItemsData
-                    delegate: RowLayout {
-                        id: mlRowItem
-                        required property var modelData
-                        required property int index
-                        width: scrollCol.width
-                        height: scrollCol.rowH
-                        spacing: 6
-                        clip: true
-
-                        Text {
-                            visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "wi"
-                            text: mlRowItem.modelData.glyph
-                            font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                            font.pixelSize: Math.round(scrollCol.rowFontPx * 1.3)
-                            color: Kirigami.Theme.textColor
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                        Kirigami.Icon {
-                            visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "kde" && mlRowItem.modelData.glyph.length > 0
-                            source: mlRowItem.modelData.glyph
-                            implicitWidth: compactRoot.svgIconPx
-                            implicitHeight: compactRoot.svgIconPx
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Kirigami.Icon {
-                            visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "kirigami" && mlRowItem.modelData.glyph.length > 0
-                            source: mlRowItem.modelData.glyph
-                            implicitWidth: scrollCol.rowFontPx
-                            implicitHeight: scrollCol.rowFontPx
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Item {
-                            visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "svg" && mlRowItem.modelData.glyph.length > 0
-                            implicitWidth: compactRoot.svgIconPx
-                            implicitHeight: compactRoot.svgIconPx
-                            Layout.alignment: Qt.AlignVCenter
-                            Kirigami.Icon {
-                                anchors.fill: parent
-                                source: mlRowItem.modelData.glyphKdeFallback || ""
-                                visible: (mlRowItem.modelData.glyphKdeFallback || "").length > 0
-                            }
-                            Kirigami.Icon {
-                                anchors.fill: parent
-                                source: mlRowItem.modelData.glyph
-                                isMask: compactRoot.iconTheme === "symbolic"
+                    Repeater {
+                        model: compactRoot.multiLineItemsData
+                        delegate: RowLayout {
+                            id: mlRowItem
+                            required property var modelData
+                            required property int index
+                            width: scrollCol.width
+                            height: scrollCol.rowH
+                            spacing: 6
+                            clip: true
+                            Text {
+                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "wi"
+                                text: mlRowItem.modelData.glyph
+                                font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                                font.pixelSize: Math.round(scrollCol.rowFontPx * 1.3)
                                 color: Kirigami.Theme.textColor
+                                verticalAlignment: Text.AlignVCenter
                             }
-                        }
-                        Label {
-                            text: mlRowItem.modelData.text
-                            font: compactRoot.weatherRoot ? compactRoot.weatherRoot.wpf(scrollCol.rowFontPx, false) : Qt.font({
-                                pixelSize: scrollCol.rowFontPx
-                            })
-                            color: Kirigami.Theme.textColor
-                            verticalAlignment: Text.AlignVCenter
-                            Layout.fillWidth: true
+                            Kirigami.Icon {
+                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "kde" && mlRowItem.modelData.glyph.length > 0
+                                source: mlRowItem.modelData.glyph
+                                implicitWidth: compactRoot.svgIconPx
+                                implicitHeight: compactRoot.svgIconPx
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            Kirigami.Icon {
+                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "kirigami" && mlRowItem.modelData.glyph.length > 0
+                                source: mlRowItem.modelData.glyph
+                                implicitWidth: scrollCol.rowFontPx
+                                implicitHeight: scrollCol.rowFontPx
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            Item {
+                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "svg" && mlRowItem.modelData.glyph.length > 0
+                                implicitWidth: compactRoot.svgIconPx
+                                implicitHeight: compactRoot.svgIconPx
+                                Layout.alignment: Qt.AlignVCenter
+                                Kirigami.Icon {
+                                    anchors.fill: parent
+                                    source: mlRowItem.modelData.glyphKdeFallback || ""
+                                    visible: (mlRowItem.modelData.glyphKdeFallback || "").length > 0
+                                }
+                                Kirigami.Icon {
+                                    anchors.fill: parent
+                                    source: mlRowItem.modelData.glyph
+                                    isMask: compactRoot.iconTheme === "symbolic"
+                                    color: Kirigami.Theme.textColor
+                                }
+                            }
+                            Label {
+                                text: mlRowItem.modelData.text
+                                font: compactRoot.weatherRoot
+                                    ? compactRoot.weatherRoot.wpf(scrollCol.rowFontPx, false)
+                                    : Qt.font({ pixelSize: scrollCol.rowFontPx })
+                                color: Kirigami.Theme.textColor
+                                verticalAlignment: Text.AlignVCenter
+                                Layout.fillWidth: true
+                            }
                         }
                     }
                 }
             }
-        }
-    }
+        } // RowLayout (horizontal)
+
+        // ── VERTICAL: icon top + scrolling rows below ─────────────────────
+        ColumnLayout {
+            visible: compactRoot.vertical
+            anchors.fill: parent
+            anchors.topMargin: 2
+            anchors.bottomMargin: 2
+            spacing: 2
+
+            Item {
+                Layout.preferredWidth: compactRoot.mlVertIconSz
+                Layout.preferredHeight: compactRoot.mlVertIconSz
+                Layout.alignment: Qt.AlignHCenter
+                Text {
+                    anchors.fill: parent
+                    visible: compactRoot.mlIconStyle === "symbolic"
+                    text: compactRoot.weatherRoot ? compactRoot.weatherRoot.getSimpleModeIconChar() : "?"
+                    font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                    font.pixelSize: 999
+                    font.pointSize: 0
+                    minimumPixelSize: 8
+                    fontSizeMode: Text.Fit
+                    color: Kirigami.Theme.textColor
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                Kirigami.Icon {
+                    anchors.fill: parent
+                    visible: compactRoot.mlIconStyle !== "symbolic"
+                    source: compactRoot.weatherRoot
+                        ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode,
+                                              compactRoot.weatherRoot.isNightTime())
+                        : "weather-none-available"
+                    smooth: true
+                }
+            }
+
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: compactRoot.multiLines * compactRoot.mlVertRowH
+                clip: true
+                Column {
+                    id: scrollColV
+                    width: parent.width
+                    readonly property real rowH: compactRoot.mlVertRowH
+                    readonly property int rowFontPx: {
+                        var sys = Plasmoid.configuration.panelUseSystemFont;
+                        var savedP = Plasmoid.configuration.panelFontSize || 0;
+                        var maxR = Math.max(8, Math.floor(rowH * 0.72));
+                        if (!sys && savedP > 0)
+                            return Math.min(maxR, Math.round(savedP * 4 / 3));
+                        return Math.max(8, Math.floor(rowH * 0.65));
+                    }
+                    Behavior on y {
+                        enabled: compactRoot.multiAnimate && compactRoot.mlScrollOffset !== 0
+                        NumberAnimation { duration: 350; easing.type: Easing.InOutCubic }
+                    }
+                    y: -(compactRoot.mlScrollOffset * scrollColV.rowH)
+
+                    Repeater {
+                        model: compactRoot.multiLineItemsData
+                        delegate: RowLayout {
+                            id: mlRowItemV
+                            required property var modelData
+                            required property int index
+                            width: scrollColV.width
+                            height: scrollColV.rowH
+                            spacing: 4
+                            clip: true
+                            Text {
+                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "wi"
+                                text: mlRowItemV.modelData.glyph
+                                font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                                font.pixelSize: Math.round(scrollColV.rowFontPx * 1.3)
+                                color: Kirigami.Theme.textColor
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            Kirigami.Icon {
+                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "kde" && mlRowItemV.modelData.glyph.length > 0
+                                source: mlRowItemV.modelData.glyph
+                                implicitWidth: compactRoot.svgIconPx
+                                implicitHeight: compactRoot.svgIconPx
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            Kirigami.Icon {
+                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "kirigami" && mlRowItemV.modelData.glyph.length > 0
+                                source: mlRowItemV.modelData.glyph
+                                implicitWidth: scrollColV.rowFontPx
+                                implicitHeight: scrollColV.rowFontPx
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            Item {
+                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "svg" && mlRowItemV.modelData.glyph.length > 0
+                                implicitWidth: compactRoot.svgIconPx
+                                implicitHeight: compactRoot.svgIconPx
+                                Layout.alignment: Qt.AlignVCenter
+                                Kirigami.Icon {
+                                    anchors.fill: parent
+                                    source: mlRowItemV.modelData.glyphKdeFallback || ""
+                                    visible: (mlRowItemV.modelData.glyphKdeFallback || "").length > 0
+                                }
+                                Kirigami.Icon {
+                                    anchors.fill: parent
+                                    source: mlRowItemV.modelData.glyph
+                                    isMask: compactRoot.iconTheme === "symbolic"
+                                    color: Kirigami.Theme.textColor
+                                }
+                            }
+                            Label {
+                                text: mlRowItemV.modelData.text
+                                font: compactRoot.weatherRoot
+                                    ? compactRoot.weatherRoot.wpf(scrollColV.rowFontPx, false)
+                                    : Qt.font({ pixelSize: scrollColV.rowFontPx })
+                                color: Kirigami.Theme.textColor
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                        }
+                    }
+                }
+            }
+        } // ColumnLayout (vertical)
+    } // multiLineRoot
 
     // ══════════════════════════════════════════════════════════════════════
     // SIMPLE MODE — icon + temperature
@@ -412,7 +647,7 @@ PlasmaCore.ToolTipArea {
 
             // Centre in parent; size determined by axis.
             anchors.centerIn: parent
-            width: compactRoot.vertical ? (parent.width - 2 * compactRoot.leftRightMargin) : implicitWidth
+            width: compactRoot.vertical ? parent.width : implicitWidth
 
             // vertical + stacked (type 1): height = implicitHeight so the grid is exactly
             // 2×paintedHeight + rowSpacing and sits centred — no dead space above/below cells.
@@ -430,17 +665,18 @@ PlasmaCore.ToolTipArea {
             //   there is a visible gap at every panel size.
             // rowSpacing: for vertical + stacked scale with panel width so the gap
             //   shrinks proportionally as the panel gets narrower, never causes overlap.
-            columnSpacing: compactRoot.simpleLayoutType === 0 ? (compactRoot.vertical ? 4 : 10) : 0
-            rowSpacing: (compactRoot.vertical && compactRoot.simpleLayoutType === 1) ? Math.max(1, Math.min(4, Math.round(compactRoot.width * 0.08))) : 0
+            // ← EDIT: change the numbers below to adjust spacing between icon and temperature
+            //   columnSpacing controls horizontal-type (type 0) on vertical panels
+            //   rowSpacing    controls vertical-type   (type 1) on vertical panels
+            columnSpacing: compactRoot.simpleLayoutType === 0 ? (compactRoot.vertical ? 2 : 10) : 0
+            rowSpacing: (compactRoot.vertical && compactRoot.simpleLayoutType === 1) ? Math.max(0, Math.min(2, Math.round(compactRoot.width * 2.02))) : 0
 
             // ── Icon cell ─────────────────────────────────────────────────
             Item {
                 // Hide until the glyph has loaded to avoid mis-sized cells
                 visible: iconGlyph.text.length > 0 || compactRoot.simpleIconStyle === "colorful"
                 Layout.alignment: Qt.AlignCenter
-                // clip prevents the glyph from visually bleeding into the temp cell
-                // when the panel is very narrow and fontSizeMode hits minimumPixelSize
-                clip: true
+                // No clip needed: HorizontalFit never overflows its cell.
 
                 // vertical panel: fill width; height clamped to paintedHeight
                 // horizontal panel: fill height; width clamped to paintedWidth
@@ -461,13 +697,13 @@ PlasmaCore.ToolTipArea {
                     visible: compactRoot.simpleIconStyle !== "colorful"
                     text: compactRoot.weatherRoot ? compactRoot.weatherRoot.getSimpleModeIconChar() : "?"
                     font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                    // Vertical: FixedSize + vertIconPx so scale actually works.
-                    // HorizontalFit ignores font.pixelSize — it always shrinks to cell width.
-                    // Horizontal: keep HorizontalFit/VerticalFit (autoFontSizeMode).
-                    font.pixelSize: compactRoot.vertical ? compactRoot.vertIconPx : 999
-                    font.pointSize: 0        // must clear pointSize when pixelSize is set
+                    // font.pixelSize = upper cap for HorizontalFit on vertical panels.
+                    // Auto: 999 + autoFontSizeMode → fills cell (HorizontalFit/VerticalFit).
+                    // Manual: fixed pixel size from settings + FixedSize.
+                    font.pixelSize: compactRoot.simpleIconAuto ? 999 : compactRoot.simpleIconPx
+                    font.pointSize: 0
                     minimumPixelSize: Math.round(Kirigami.Units.gridUnit / 2)
-                    fontSizeMode: compactRoot.vertical ? Text.FixedSize : simpleRoot.autoFontSizeMode
+                    fontSizeMode: compactRoot.simpleIconAuto ? simpleRoot.autoFontSizeMode : Text.FixedSize
                     color: Kirigami.Theme.textColor
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -485,8 +721,6 @@ PlasmaCore.ToolTipArea {
             Item {
                 visible: tempText.text.length > 0
                 Layout.alignment: Qt.AlignCenter
-                clip: true
-
                 Layout.fillWidth: compactRoot.vertical
                 Layout.fillHeight: !compactRoot.vertical
                 Layout.minimumWidth: compactRoot.vertical ? 0 : tempText.paintedWidth
@@ -518,12 +752,16 @@ PlasmaCore.ToolTipArea {
                     // panelFontPx (~14px) as the floor prevented shrinking and caused overlap.
                     // temperature relative to the icon.  The upper cap is still derived from
                     // iconGlyph.paintedHeight so the two elements stay proportional.
-                    // Vertical: FixedSize + vertTempPx.
-                    // Horizontal: auto-fit with upper cap from icon painted height.
-                    font.pixelSize: compactRoot.vertical ? compactRoot.vertTempPx : Math.max(compactRoot.panelFontPx, Math.round(iconGlyph.paintedHeight * 0.5))
+                    // Same HorizontalFit cap approach as icon.
+                    // Auto: 50% of icon's actual painted height (reactive).
+                    // Manual: fixed pixel size from settings + FixedSize.
+                    font.pixelSize: compactRoot.simpleFontAuto
+                                    ? Math.max(compactRoot.panelFontPx,
+                                               Math.round(iconGlyph.paintedHeight * 0.5))
+                                    : compactRoot.simpleFontPx
                     font.pointSize: 0
                     minimumPixelSize: Math.round(Kirigami.Units.gridUnit / 2)
-                    fontSizeMode: compactRoot.vertical ? Text.FixedSize : simpleRoot.autoFontSizeMode
+                    fontSizeMode: compactRoot.simpleFontAuto ? simpleRoot.autoFontSizeMode : Text.FixedSize
                     color: Kirigami.Theme.textColor
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -547,7 +785,12 @@ PlasmaCore.ToolTipArea {
             //   vertical panel   → side = panel THICKNESS (= widget width)
             //   horizontal panel → side = panel HEIGHT (= widget height)
             // This ensures the compressed icon grows when the panel is resized.
-            readonly property int squareSide: compactRoot.vertical ? Math.max(16, compactRoot.vertIconPx) : Math.max(16, compactRoot.height - 2)
+            // Auto: size from panel thickness/height. Manual: use icon size setting.
+            readonly property int squareSide: compactRoot.simpleIconAuto
+                ? (compactRoot.vertical
+                   ? Math.max(16, compactRoot.width)
+                   : Math.max(16, compactRoot.height - 2))
+                : Math.max(16, compactRoot.simpleIconPx)
             Item {
                 id: compressedSquare
                 width: compressedWrapper.squareSide

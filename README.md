@@ -19,8 +19,8 @@ It delivers accurate forecasts, multiple weather provider support, adaptive fail
 Choose between:
 - Open-Meteo
 - met.no
-- WeatherAPI
-- OpenWeather
+- WeatherAPI (API key required)
+- OpenWeather (API key required)
 
 ### 🔄 Adaptive Mode
 

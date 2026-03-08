@@ -587,6 +587,7 @@ KCM.AbstractKCM {
     property int cfg_panelMultiLines: 2
     property bool cfg_panelMultiAnimate: true
     property string cfg_panelMultilineIconStyle: "colorful"  // "symbolic" | "colorful"
+    property int cfg_panelMultilineIconSize: 0      // 0 = auto; >0 = manual px
     property int cfg_panelIconSize: 22
     property int cfg_panelFontSize: 0
     property bool cfg_singlePanelRow: true
@@ -1233,6 +1234,15 @@ KCM.AbstractKCM {
                         onActivated: root.cfg_panelInfoMode = model[currentIndex].value
                     }
 
+                    // ── Vertical panel truncation warning ──
+                    Kirigami.InlineMessage {
+                        visible: root.cfg_panelInfoMode === "single" || root.cfg_panelInfoMode === "multiline"
+                        Layout.fillWidth: true
+                        type: Kirigami.MessageType.Information
+                        text: i18n("In a vertical panel, long item labels may be truncated. " + "Consider using \"Simple\" mode or increasing the panel width.")
+                        showCloseButton: false
+                    }
+
                     // ── Simple mode sub‑options ──
 
                     Kirigami.Separator {
@@ -1458,9 +1468,10 @@ KCM.AbstractKCM {
                     RowLayout {
                         Kirigami.FormData.label: i18n("Main icon style:")
                         visible: root.cfg_panelInfoMode === "multiline"
+                        spacing: 8
                         ComboBox {
                             id: mlIconStyleCombo
-                            Layout.preferredWidth: 210
+                            Layout.preferredWidth: 180
                             textRole: "text"
                             model: [
                                 {
@@ -1481,6 +1492,21 @@ KCM.AbstractKCM {
                             }
                             onActivated: root.cfg_panelMultilineIconStyle = model[currentIndex].value
                         }
+                        SpinBox {
+                            id: mlIconSizeSpinBox
+                            from: 0
+                            to: 128
+                            value: root.cfg_panelMultilineIconSize
+                            onValueModified: root.cfg_panelMultilineIconSize = value
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Icon size in px. 0 = auto.")
+                        }
+                        Label {
+                            text: root.cfg_panelMultilineIconSize === 0
+                                ? i18n("px  (auto)")
+                                : i18n("px")
+                            opacity: 0.65
+                        }
                     }
                     RowLayout {
                         Kirigami.FormData.label: i18n("Item width:")
@@ -1496,7 +1522,9 @@ KCM.AbstractKCM {
                             opacity: 0.65
                         }
                         Label {
-                            text: root.cfg_panelInfoMode === "multiline" ? i18n("0 = auto. Increase if items are cut off.") : i18n("0 = auto (120 px per chip). Increase if values are truncated.")
+                            text: root.cfg_panelInfoMode === "multiline"
+                                ? i18n("0 = auto. Increase if items are cut off.")
+                                : i18n("0 = auto (120 px per chip). Increase if values are truncated.")
                             opacity: 0.65
                             font: Kirigami.Theme.smallFont
                             wrapMode: Text.WordWrap
