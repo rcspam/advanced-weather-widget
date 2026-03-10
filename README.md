@@ -19,8 +19,8 @@ It delivers accurate forecasts, multiple weather provider support, adaptive fail
 Choose between:
 - Open-Meteo
 - met.no
-- WeatherAPI
-- OpenWeather
+- WeatherAPI (API key required)
+- OpenWeather (API key required)
 
 ### 🔄 Adaptive Mode
 
@@ -105,6 +105,67 @@ rm -rf ~/.cache/plasmashell/qmlcache
 systemctl --user restart plasma-plasmashell
 ```
 
+## 🌐 Translation
+
+Translations are welcome! If you would like to help translate the widget into your language, please follow the instructions below.
+
+1. Download the translation template:
+
+https://github.com/pnedyalkov91/advanced-weather-widget/blob/main/translate/template.pot
+
+2. Rename the file using your locale code. You can find a list of locale codes here:
+
+https://help.sap.com/docs/SAP_BUSINESSOBJECTS_BUSINESS_INTELLIGENCE_PLATFORM/09382741061c40a989fae01e61d54202/46758c5e6e041014910aba7db0e91070.html
+
+For example:
+```
+pt_BR.po
+de_DE.po
+fr_FR.po
+```
+
+3. Open the `.po` file in a translation editor such as:
+
+- Poedit  
+- Lokalize (KDE)  
+- Kate/Kwrite  
+- VS Code
+
+4. Translate all strings by filling the `msgstr ""` fields.
+
+Example:
+
+```po
+msgid "Configure icon…"
+msgstr "Configurar ícone…"
+```
+
+5. When the translation is ready:
+
+- open a **GitHub Issue** and attach the `.po` file (you may need to compress it as `.zip` because GitHub blocks `.po` attachments).
+- open a **Pull Request** with the `.po` and `.mo` files  
+
+### Translators
+
+Thank you to everyone who contributed translations to this project ❤️
+
+- **German** - [HolySoap](https://github.com/HolySoap)
+- **Brazilian Portuguese** - [PauloAlbqrq](https://github.com/PauloAlbqrq)
+- **Bulgarian** - Petar Nedyalkov (Author)
+
+
 ## 🎨 Icons & Fonts
+
 This project uses weather icons and font resources from:
-https://github.com/erikflowers/weather-icons
+https://github.com/erikflowers/weather-icons 
+Licensed under SIL OFL 1.1 (http://scripts.sil.org/OFL)
+
+## ❤️ Support the project
+
+Advanced Weather Widget is developed in my free time.
+
+If you enjoy using it, you can supporting the project:
+
+- Liberapay: https://liberapay.com/pnedyalkov
+- PayPal: https://paypal.me/pnedyalkov91
+- Revolut: https://revolut.me/petarnedyalkov91

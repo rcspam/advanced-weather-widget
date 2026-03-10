@@ -587,6 +587,7 @@ KCM.AbstractKCM {
     property int cfg_panelMultiLines: 2
     property bool cfg_panelMultiAnimate: true
     property string cfg_panelMultilineIconStyle: "colorful"  // "symbolic" | "colorful"
+    property int cfg_panelMultilineIconSize: 0      // 0 = auto; >0 = manual px
     property int cfg_panelIconSize: 22
     property int cfg_panelFontSize: 0
     property bool cfg_singlePanelRow: true
@@ -647,6 +648,11 @@ KCM.AbstractKCM {
     property bool cfg_tooltipEnabled: true
     property bool cfg_tooltipUseIcons: true
     property string cfg_tooltipSunTimesMode: "both" // "both" | "sunrise" | "sunset" | "upcoming"
+    property string cfg_tooltipLocationWrap: "truncate"  // "truncate" | "wrap"
+    property string cfg_tooltipWidthMode: "auto"
+    property int cfg_tooltipWidthManual: 320
+    property string cfg_tooltipHeightMode: "auto"
+    property int cfg_tooltipHeightManual: 300
 
     // ── Units config aliases (Issue #8) ──────────────────────────────────
     property string cfg_unitsMode: "metric"
@@ -1233,6 +1239,15 @@ KCM.AbstractKCM {
                         onActivated: root.cfg_panelInfoMode = model[currentIndex].value
                     }
 
+                    // ── Vertical panel truncation warning ──
+                    Kirigami.InlineMessage {
+                        visible: root.cfg_panelInfoMode === "single" || root.cfg_panelInfoMode === "multiline"
+                        Layout.fillWidth: true
+                        type: Kirigami.MessageType.Information
+                        text: i18n("In a vertical panel, long item labels may be truncated. " + "Consider using \"Simple\" mode, increasing the panel width, or reducing the font size.")
+                        showCloseButton: false
+                    }
+
                     // ── Simple mode sub‑options ──
 
                     Kirigami.Separator {
@@ -1458,9 +1473,10 @@ KCM.AbstractKCM {
                     RowLayout {
                         Kirigami.FormData.label: i18n("Main icon style:")
                         visible: root.cfg_panelInfoMode === "multiline"
+                        spacing: 8
                         ComboBox {
                             id: mlIconStyleCombo
-                            Layout.preferredWidth: 210
+                            Layout.preferredWidth: 180
                             textRole: "text"
                             model: [
                                 {
@@ -1480,6 +1496,19 @@ KCM.AbstractKCM {
                                     }
                             }
                             onActivated: root.cfg_panelMultilineIconStyle = model[currentIndex].value
+                        }
+                        SpinBox {
+                            id: mlIconSizeSpinBox
+                            from: 0
+                            to: 128
+                            value: root.cfg_panelMultilineIconSize
+                            onValueModified: root.cfg_panelMultilineIconSize = value
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Icon size in px. 0 = auto.")
+                        }
+                        Label {
+                            text: root.cfg_panelMultilineIconSize === 0 ? i18n("px  (auto)") : i18n("px")
+                            opacity: 0.65
                         }
                     }
                     RowLayout {
@@ -1579,9 +1608,9 @@ KCM.AbstractKCM {
                         }
                     }
                     CheckBox {
-                        visible: root.cfg_panelInfoMode !== "multiline" && root.cfg_panelInfoMode !== "simple"
+                        visible: root.cfg_panelInfoMode === "single"
                         Kirigami.FormData.label: i18n("Fill panel:")
-                        text: i18n("Expand widget to fill available panel width")
+                        text: i18n("Expand widget to fill available panel space")
                         checked: root.cfg_panelFillWidth
                         onToggled: root.cfg_panelFillWidth = checked
                     }
@@ -2051,7 +2080,124 @@ KCM.AbstractKCM {
                         Kirigami.FormData.isSection: true
                     }
 
+                    // ── Location name style ──────────────────────────
+                    RowLayout {
+                        visible: root.cfg_tooltipEnabled
+                        Kirigami.FormData.label: i18n("Location name:")
+                        ComboBox {
+                            id: ttLocationWrapCombo
+                            Layout.preferredWidth: 200
+                            textRole: "text"
+                            model: [
+                                {
+                                    text: i18n("Truncate (single line)"),
+                                    value: "truncate"
+                                },
+                                {
+                                    text: i18n("Wrap to next line"),
+                                    value: "wrap"
+                                }
+                            ]
+                            Component.onCompleted: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].value === root.cfg_tooltipLocationWrap) {
+                                        currentIndex = i;
+                                        break;
+                                    }
+                            }
+                            onActivated: root.cfg_tooltipLocationWrap = model[currentIndex].value
+                        }
+                    }
+
                     // ── Icons / Text switch ───────────────────────────────
+
+                    // ── Tooltip size ─────────────────────────────────
+
+                    // Width
+                    RowLayout {
+                        visible: root.cfg_tooltipEnabled
+                        Kirigami.FormData.label: i18n("Tooltip width:")
+                        spacing: Kirigami.Units.smallSpacing
+                        ComboBox {
+                            id: ttWidthModeCombo
+                            Layout.preferredWidth: 120
+                            textRole: "text"
+                            model: [
+                                {
+                                    text: i18n("Auto"),
+                                    value: "auto"
+                                },
+                                {
+                                    text: i18n("Manual"),
+                                    value: "manual"
+                                }
+                            ]
+                            Component.onCompleted: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].value === root.cfg_tooltipWidthMode) {
+                                        currentIndex = i;
+                                        break;
+                                    }
+                            }
+                            onActivated: root.cfg_tooltipWidthMode = model[currentIndex].value
+                        }
+                        SpinBox {
+                            visible: root.cfg_tooltipWidthMode === "manual"
+                            from: 200
+                            to: 800
+                            stepSize: 10
+                            value: root.cfg_tooltipWidthManual
+                            onValueModified: root.cfg_tooltipWidthManual = value
+                        }
+                        Label {
+                            visible: root.cfg_tooltipWidthMode === "manual"
+                            text: i18n("px")
+                            opacity: 0.7
+                        }
+                    }
+
+                    // Height
+                    RowLayout {
+                        visible: root.cfg_tooltipEnabled
+                        Kirigami.FormData.label: i18n("Tooltip height:")
+                        spacing: Kirigami.Units.smallSpacing
+                        ComboBox {
+                            id: ttHeightModeCombo
+                            Layout.preferredWidth: 120
+                            textRole: "text"
+                            model: [
+                                {
+                                    text: i18n("Auto"),
+                                    value: "auto"
+                                },
+                                {
+                                    text: i18n("Manual"),
+                                    value: "manual"
+                                }
+                            ]
+                            Component.onCompleted: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].value === root.cfg_tooltipHeightMode) {
+                                        currentIndex = i;
+                                        break;
+                                    }
+                            }
+                            onActivated: root.cfg_tooltipHeightMode = model[currentIndex].value
+                        }
+                        SpinBox {
+                            visible: root.cfg_tooltipHeightMode === "manual"
+                            from: 100
+                            to: 800
+                            stepSize: 10
+                            value: root.cfg_tooltipHeightManual
+                            onValueModified: root.cfg_tooltipHeightManual = value
+                        }
+                        Label {
+                            visible: root.cfg_tooltipHeightMode === "manual"
+                            text: i18n("px")
+                            opacity: 0.7
+                        }
+                    }
                     RowLayout {
                         visible: root.cfg_tooltipEnabled
                         Kirigami.FormData.label: i18n("Prefix style:")
@@ -2228,7 +2374,6 @@ KCM.AbstractKCM {
                 // TAB 3 — MISC (renamed from Units; includes Round Values)
                 // ════════════════════════════════════════════════════════
                 Kirigami.FormLayout {
-                    // Fix 3: Round values moved here as Switch (matching Font source style)
                     Kirigami.Separator {
                         Kirigami.FormData.label: i18n("Display")
                         Kirigami.FormData.isSection: true
@@ -2609,7 +2754,7 @@ KCM.AbstractKCM {
                                                 if (id === "suntimes")
                                                     return b + "sunrise.svg";
                                                 if (id === "moonphase")
-                                                    return b + "moon-full.svg";
+                                                    return b + "wi-moon-alt-full.svg";
                                                 if (id === "condition")
                                                     return b + "day-cloudy.svg";
                                                 if (id === "location")
@@ -3047,7 +3192,7 @@ KCM.AbstractKCM {
                                                 if (id === "suntimes")
                                                     return b + "sunrise.svg";
                                                 if (id === "moonphase")
-                                                    return b + "moon-full.svg";
+                                                    return b + "wi-moon-alt-full.svg";
                                                 if (id === "visibility")
                                                     return b + "fog.svg";
                                                 return "";
@@ -3334,7 +3479,7 @@ KCM.AbstractKCM {
                                                 if (id === "suntimes")
                                                     return b + "sunrise.svg";
                                                 if (id === "moonphase")
-                                                    return b + "moon-full.svg";
+                                                    return b + "wi-moon-alt-full.svg";
                                                 if (id === "condition")
                                                     return b + "day-cloudy.svg";
                                                 if (id === "location")
