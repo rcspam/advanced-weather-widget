@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: advanced-weather-widget\n"
 "Report-Msgid-Bugs-To: https://github.com/pnedyalkov91/advanced-weather-widget/issues\n"
-"POT-Creation-Date: 2026-03-09 15:08+0200\n"
+"POT-Creation-Date: 2026-03-14 20:03+0200\n"
 "PO-Revision-Date: 2026-03-05 18:00+0200\n"
 "Last-Translator: Petar Nedyalkov\n"
 "Language-Team: Bulgarian <kde-i18n-bg@kde.org>\n"
@@ -16,34 +16,33 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: contents/ui/configAppearance.qml:1698 contents/ui/test.qml:1693
+#: contents/ui/configAppearance.qml:1728
 msgctxt "@info %1 size %2 family"
 msgid "%1pt %2"
 msgstr "%1pt %2"
 
-#: contents/ui/configAppearance.qml:1528 contents/ui/test.qml:1523
+#: contents/ui/configAppearance.qml:1558
 msgid "0 = auto (120 px per chip). Increase if values are truncated."
 msgstr "0 = автоматично (120 px на елемент). Увеличете, ако стойностите се скъсяват."
 
-#: contents/ui/configAppearance.qml:1528 contents/ui/test.qml:1523
+#: contents/ui/configAppearance.qml:1558
 msgid "0 = auto. Increase if items are cut off."
 msgstr "0 = автоматично. Увеличете, ако елементите се отрязват."
 
-#: contents/ui/configAppearance.qml:1732 contents/ui/configAppearance.qml:1909
-#: contents/ui/configAppearance.qml:2239 contents/ui/test.qml:1727
-#: contents/ui/test.qml:1904 contents/ui/test.qml:2117
+#: contents/ui/configAppearance.qml:1762 contents/ui/configAppearance.qml:1939
+#: contents/ui/configAppearance.qml:2269
 msgid "3D Oxygen (SVG)"
 msgstr "3D Oxygen (SVG)"
 
-#: contents/ui/configGeneral.qml:87
+#: contents/ui/configGeneral.qml:108
 msgid "Adaptive (auto-fallback)"
 msgstr "Адаптивен (автоматично резервен)"
 
-#: ⁨contents/ui/CompactView copy.qml⁩:920 contents/ui/CompactView.qml:923
+#: contents/ui/CompactView.qml:947 contents/ui/test.qml:934
 msgid "Add a location"
 msgstr "Добавяне на местоположение"
 
-#: contents/ui/configGeneral.qml:134
+#: contents/ui/configGeneral.qml:162
 msgid "Alternative provider. API key required below."
 msgstr "Алтернативен доставчик. Изисква API ключ по-долу."
 
@@ -51,16 +50,15 @@ msgstr "Алтернативен доставчик. Изисква API ключ
 msgid "Altitude:"
 msgstr "Надморска височина:"
 
-#: contents/ui/configAppearance.qml:1468 contents/ui/test.qml:1463
+#: contents/ui/configAppearance.qml:1498
 msgid "Animate row scrolling"
 msgstr "Анимация при превъртане на редове"
 
-#: contents/ui/configAppearance.qml:768 contents/ui/test.qml:763
+#: contents/ui/configAppearance.qml:769
 msgid "Apparent (feels-like) temperature"
 msgstr "Усеща се като температура"
 
-#: contents/ui/configAppearance.qml:808 contents/ui/configAppearance.qml:882
-#: contents/ui/test.qml:803 contents/ui/test.qml:877
+#: contents/ui/configAppearance.qml:809 contents/ui/configAppearance.qml:883
 msgid "Apparent temperature"
 msgstr "Усеща се като температура"
 
@@ -68,9 +66,8 @@ msgstr "Усеща се като температура"
 msgid "Appearance"
 msgstr "Външен вид"
 
-#: contents/ui/configAppearance.qml:2595 contents/ui/configAppearance.qml:3040
-#: contents/ui/configAppearance.qml:3323 contents/ui/test.qml:2473
-#: contents/ui/test.qml:2918 contents/ui/test.qml:3201
+#: contents/ui/configAppearance.qml:2624 contents/ui/configAppearance.qml:3069
+#: contents/ui/configAppearance.qml:3352
 msgid "Apply Settings?"
 msgstr "Прилагане на настройките?"
 
@@ -78,16 +75,14 @@ msgstr "Прилагане на настройките?"
 msgid "Apply detected location"
 msgstr "Прилагане на откритото местоположение"
 
-#: contents/ui/configAppearance.qml:782 contents/ui/configAppearance.qml:822
-#: contents/ui/configAppearance.qml:903 contents/ui/test.qml:777
-#: contents/ui/test.qml:817 contents/ui/test.qml:898
+#: contents/ui/configAppearance.qml:783 contents/ui/configAppearance.qml:823
+#: contents/ui/configAppearance.qml:904
 msgid "Atmospheric pressure"
 msgstr "Атмосферно налягане"
 
-#: contents/ui/configAppearance.qml:1361 contents/ui/configAppearance.qml:1409
-#: contents/ui/configAppearance.qml:1979 contents/ui/configAppearance.qml:2127
-#: contents/ui/configAppearance.qml:2170 contents/ui/test.qml:1356
-#: contents/ui/test.qml:1404 contents/ui/test.qml:1974
+#: contents/ui/configAppearance.qml:1390 contents/ui/configAppearance.qml:1439
+#: contents/ui/configAppearance.qml:2009 contents/ui/configAppearance.qml:2157
+#: contents/ui/configAppearance.qml:2200
 msgid "Auto"
 msgstr "Автоматично"
 
@@ -99,7 +94,7 @@ msgstr "Автоматично открито чрез GeoClue2."
 msgid "Auto-detection updated coordinates."
 msgstr "Координатите са обновени при автоматично откриване."
 
-#: contents/ui/configAppearance.qml:1665 contents/ui/test.qml:1660
+#: contents/ui/configAppearance.qml:1695
 msgid "Automatic"
 msgstr "Автоматично"
 
@@ -107,53 +102,44 @@ msgstr "Автоматично"
 msgid "Automatically detect location"
 msgstr "Автоматично откриване на местоположение"
 
-#: contents/ui/configAppearance.qml:2682 contents/ui/configAppearance.qml:3409
-#: contents/ui/test.qml:2560 contents/ui/test.qml:3287
+#: contents/ui/configAppearance.qml:2711 contents/ui/configAppearance.qml:3438
 msgid "Available"
 msgstr "Налични"
 
-#: contents/ui/configAppearance.qml:2640 contents/ui/configAppearance.qml:3083
-#: contents/ui/configAppearance.qml:3368 contents/ui/configLocation.qml:730
-#: contents/ui/test.qml:2518 contents/ui/test.qml:2961
-#: contents/ui/test.qml:3246
+#: contents/ui/configAppearance.qml:2669 contents/ui/configAppearance.qml:3112
+#: contents/ui/configAppearance.qml:3397 contents/ui/configLocation.qml:730
 msgid "Back"
 msgstr "Назад"
 
-#: contents/ui/configAppearance.qml:471 contents/ui/configAppearance.qml:2912
-#: contents/ui/configAppearance.qml:3631 contents/ui/test.qml:471
-#: contents/ui/test.qml:2790 contents/ui/test.qml:3509
+#: contents/ui/configAppearance.qml:471 contents/ui/configAppearance.qml:2941
+#: contents/ui/configAppearance.qml:3660
 msgid "Both  07:17 / 18:03"
 msgstr "И двете  07:17 / 18:03"
 
 #: contents/ui/configAppearance.qml:305 contents/ui/configAppearance.qml:423
 #: contents/ui/configAppearance.qml:520 contents/ui/configAppearance.qml:561
-#: contents/ui/test.qml:305 contents/ui/test.qml:423 contents/ui/test.qml:520
-#: contents/ui/test.qml:561
 msgid "Browse…"
 msgstr "Разглеждане…"
 
-#: contents/ui/configAppearance.qml:1545 contents/ui/test.qml:1540
+#: contents/ui/configAppearance.qml:1575
 msgid "Bullet  •"
 msgstr "Точка  •"
 
-#: contents/ui/configAppearance.qml:2955 contents/ui/configAppearance.qml:3272
-#: contents/ui/configAppearance.qml:3675 contents/ui/test.qml:2833
-#: contents/ui/test.qml:3150 contents/ui/test.qml:3553
+#: contents/ui/configAppearance.qml:2984 contents/ui/configAppearance.qml:3301
+#: contents/ui/configAppearance.qml:3704
 msgid "Button guide"
 msgstr "Ръководство за бутоните"
 
-#: contents/ui/configAppearance.qml:353 contents/ui/configAppearance.qml:2624
-#: contents/ui/configAppearance.qml:3068 contents/ui/configAppearance.qml:3352
-#: contents/ui/test.qml:353 contents/ui/test.qml:2502 contents/ui/test.qml:2946
-#: contents/ui/test.qml:3230
+#: contents/ui/configAppearance.qml:353 contents/ui/configAppearance.qml:2653
+#: contents/ui/configAppearance.qml:3097 contents/ui/configAppearance.qml:3381
 msgid "Cancel"
 msgstr "Отказ"
 
-#: contents/ui/configAppearance.qml:1971 contents/ui/test.qml:1966
+#: contents/ui/configAppearance.qml:2001
 msgid "Cards height:"
 msgstr "Височина на картите:"
 
-#: contents/ui/configAppearance.qml:2483 contents/ui/test.qml:2361
+#: contents/ui/configAppearance.qml:2512
 msgid "Celsius (°C)"
 msgstr "Целзий (°C)"
 
@@ -161,33 +147,32 @@ msgstr "Целзий (°C)"
 msgid "Change Location"
 msgstr "Промяна на местоположението"
 
-#: contents/ui/configAppearance.qml:1683 contents/ui/test.qml:1678
+#: contents/ui/configAppearance.qml:1713
 msgctxt "@action:button"
 msgid "Choose Style…"
 msgstr "Избор на стил…"
 
-#: contents/ui/configAppearance.qml:1625 contents/ui/test.qml:1620
+#: contents/ui/configAppearance.qml:1655
 msgid "Choose a Panel Font"
 msgstr "Избор на шрифт за панела"
 
-#: contents/ui/configAppearance.qml:2989 contents/ui/configAppearance.qml:3704
-#: contents/ui/test.qml:2867 contents/ui/test.qml:3582
+#: contents/ui/configAppearance.qml:3018 contents/ui/configAppearance.qml:3733
 msgid "Choose a custom icon for this item"
 msgstr "Избор на персонализирана икона за този елемент"
 
-#: contents/ui/configAppearance.qml:789 contents/ui/test.qml:784
+#: contents/ui/configAppearance.qml:790
 msgid "City / location name"
 msgstr "Име на град / местоположение"
 
-#: contents/ui/configGeneral.qml:183
+#: contents/ui/configGeneral.qml:211
 msgid "Clear"
 msgstr "Изчистване"
 
-#: contents/ui/configAppearance.qml:97 contents/ui/test.qml:97
+#: contents/ui/configAppearance.qml:97
 msgid "Clear (day)"
 msgstr "Ясно (ден)"
 
-#: contents/ui/configAppearance.qml:102 contents/ui/test.qml:102
+#: contents/ui/configAppearance.qml:102
 msgid "Clear (night)"
 msgstr "Ясно (нощ)"
 
@@ -203,48 +188,45 @@ msgstr "Ясно небе"
 msgid "Click 'Change Location' to search and set your location manually."
 msgstr "Щракнете върху „Промяна на местоположението“, за да търсите и зададете местоположението ръчно."
 
-#: contents/ui/TooltipContent.qml:241
+#: contents/ui/TooltipContent.qml:239
 msgid "Click to configure a location"
 msgstr "Щракнете, за да конфигурирате местоположение"
 
-#: contents/ui/configAppearance.qml:1331 contents/ui/test.qml:1326
+#: contents/ui/configAppearance.qml:1359
 msgid "Colorful"
 msgstr "Цветен"
 
-#: contents/ui/configAppearance.qml:1483 contents/ui/test.qml:1478
+#: contents/ui/configAppearance.qml:1513
 msgid "Colorful (KDE color icons)"
 msgstr "Цветен (цветни икони на KDE)"
 
-#: contents/ui/configAppearance.qml:1277 contents/ui/test.qml:1272
+#: contents/ui/configAppearance.qml:1278
 msgid "Compressed"
 msgstr "Компресирано"
 
-#: contents/ui/configAppearance.qml:738 contents/ui/configAppearance.qml:874
-#: contents/ui/DetailsView.qml:123 contents/ui/test.qml:733
-#: contents/ui/test.qml:869
+#: contents/ui/configAppearance.qml:739 contents/ui/configAppearance.qml:875
+#: contents/ui/DetailsView.qml:123
 msgid "Condition"
 msgstr "Състояние"
 
-#: contents/ui/configAppearance.qml:207 contents/ui/test.qml:207
+#: contents/ui/configAppearance.qml:207
 msgid "Condition Icons"
 msgstr "Икони за състояние"
 
-#: contents/ui/TooltipContent.qml:435
+#: contents/ui/TooltipContent.qml:437
 msgid "Condition:"
 msgstr "Състояние:"
 
-#: contents/ui/configAppearance.qml:384 contents/ui/test.qml:384
+#: contents/ui/configAppearance.qml:384
 msgid "Configure icon — %1"
 msgstr "Конфигуриране на икона — %1"
 
-#: contents/ui/configAppearance.qml:2825 contents/ui/configAppearance.qml:3549
-#: contents/ui/test.qml:2703 contents/ui/test.qml:3427
+#: contents/ui/configAppearance.qml:2854 contents/ui/configAppearance.qml:3578
 msgid "Configure icon…"
 msgstr "Конфигуриране на икона…"
 
-#: contents/ui/configAppearance.qml:1852 contents/ui/configAppearance.qml:2047
-#: contents/ui/configAppearance.qml:2363 contents/ui/test.qml:1847
-#: contents/ui/test.qml:2042 contents/ui/test.qml:2241
+#: contents/ui/configAppearance.qml:1882 contents/ui/configAppearance.qml:2077
+#: contents/ui/configAppearance.qml:2393
 msgid "Configure…"
 msgstr "Конфигуриране…"
 
@@ -252,55 +234,52 @@ msgstr "Конфигуриране…"
 msgid "Confirm your location"
 msgstr "Потвърдете вашето местоположение"
 
-#: contents/ui/configAppearance.qml:796 contents/ui/configAppearance.qml:857
-#: contents/ui/configAppearance.qml:917 contents/ui/test.qml:791
-#: contents/ui/test.qml:852 contents/ui/test.qml:912
+#: contents/ui/configAppearance.qml:797 contents/ui/configAppearance.qml:858
+#: contents/ui/configAppearance.qml:918
 msgid "Current moon phase"
 msgstr "Текуща фаза на луната"
 
-#: contents/ui/configAppearance.qml:746 contents/ui/configAppearance.qml:868
-#: contents/ui/test.qml:741 contents/ui/test.qml:863
+#: contents/ui/configAppearance.qml:747 contents/ui/configAppearance.qml:869
 msgid "Current temperature"
 msgstr "Текуща температура"
 
-#: contents/ui/configAppearance.qml:1736 contents/ui/configAppearance.qml:2243
-#: contents/ui/test.qml:1731 contents/ui/test.qml:2121
+#: contents/ui/configAppearance.qml:1766 contents/ui/configAppearance.qml:2273
 msgid "Custom"
 msgstr "Персонализиран"
 
-#: contents/ui/configAppearance.qml:2418 contents/ui/test.qml:2296
+#: contents/ui/configAppearance.qml:2447
 msgid "Custom (set each unit manually)"
 msgstr "Персонализиран (задаване на всяка единица ръчно)"
 
-#: contents/ui/configAppearance.qml:234 contents/ui/test.qml:234
+#: contents/ui/configAppearance.qml:234
 msgid "Custom per-condition icons"
 msgstr "Персонализирани икони за всяко състояние"
 
-#: contents/ui/configAppearance.qml:1565 contents/ui/test.qml:1560
+#: contents/ui/configAppearance.qml:1595
 msgid "Custom…"
 msgstr "Персонализиран…"
 
-#: contents/ui/configAppearance.qml:1553 contents/ui/test.qml:1548
+#: contents/ui/configAppearance.qml:1583
 msgid "Dash  –"
 msgstr "Тире  –"
 
-#: contents/ui/configGeneral.qml:205
+#: contents/ui/configGeneral.qml:236
 msgid "Data Refresh"
 msgstr "Обновяване на данните"
 
-#: contents/ui/FullView.qml:300
+#: contents/ui/FullView.qml:283
 msgid "Details"
 msgstr "Подробности"
 
-#: contents/ui/configAppearance.qml:3094 contents/ui/test.qml:2972
+#: contents/ui/configAppearance.qml:3123
 msgid "Details Items"
 msgstr "Елементи за подробности"
 
-#: contents/ui/configAppearance.qml:2012 contents/ui/test.qml:2007
+#: contents/ui/configAppearance.qml:2042
 msgid "Details items:"
 msgstr "Елементи за подробности:"
 
-#: contents/ui/FullView.qml:141
+#: contents/ui/FullView.qml:124
 msgid "Detect / change location…"
 msgstr "Откриване / промяна на местоположение…"
 
@@ -308,49 +287,44 @@ msgstr "Откриване / промяна на местоположение…
 msgid "Detecting…"
 msgstr "Откриване…"
 
-#: contents/ui/configAppearance.qml:842 contents/ui/DetailsView.qml:120
-#: contents/ui/test.qml:837
+#: contents/ui/configAppearance.qml:843 contents/ui/DetailsView.qml:120
 msgid "Dew Point"
 msgstr "Точка на оросяване"
 
-#: contents/ui/configAppearance.qml:843 contents/ui/test.qml:838
+#: contents/ui/configAppearance.qml:844
 msgid "Dew point temperature"
 msgstr "Температура на точката на оросяване"
 
-#: contents/ui/TooltipContent.qml:471
+#: contents/ui/TooltipContent.qml:473
 msgid "Dew point:"
 msgstr "Точка на оросяване:"
 
-#: contents/ui/configAppearance.qml:2864 contents/ui/configAppearance.qml:3588
-#: contents/ui/test.qml:2742 contents/ui/test.qml:3466
+#: contents/ui/configAppearance.qml:2893 contents/ui/configAppearance.qml:3617
 msgid "Disable item"
 msgstr "Деактивиране на елемент"
 
-#: contents/ui/configAppearance.qml:2072 contents/ui/test.qml:2067
+#: contents/ui/configAppearance.qml:2102
 msgid "Disabled"
 msgstr "Деактивирана"
 
-#: contents/ui/configAppearance.qml:2614 contents/ui/configAppearance.qml:3059
-#: contents/ui/configAppearance.qml:3342 contents/ui/test.qml:2492
-#: contents/ui/test.qml:2937 contents/ui/test.qml:3220
+#: contents/ui/configAppearance.qml:2643 contents/ui/configAppearance.qml:3088
+#: contents/ui/configAppearance.qml:3371
 msgid "Discard"
 msgstr "Отхвърляне"
 
-#: contents/ui/configAppearance.qml:2379 contents/ui/test.qml:2257
+#: contents/ui/configAppearance.qml:2408
 msgid "Display"
 msgstr "Показване"
 
-#: contents/ui/configAppearance.qml:457 contents/ui/configAppearance.qml:1215
-#: contents/ui/test.qml:457 contents/ui/test.qml:1210
+#: contents/ui/configAppearance.qml:457 contents/ui/configAppearance.qml:1216
 msgid "Display mode:"
 msgstr "Режим на показване:"
 
-#: contents/ui/configAppearance.qml:2973 contents/ui/configAppearance.qml:3690
-#: contents/ui/test.qml:2851 contents/ui/test.qml:3568
+#: contents/ui/configAppearance.qml:3002 contents/ui/configAppearance.qml:3719
 msgid "Drag to reorder enabled items"
 msgstr "Влачете, за да пренаредите активираните елементи"
 
-#: contents/ui/configAppearance.qml:3287 contents/ui/test.qml:3165
+#: contents/ui/configAppearance.qml:3316
 msgid "Drag to reorder shown items"
 msgstr "Влачете, за да пренаредите показаните елементи"
 
@@ -358,22 +332,20 @@ msgstr "Влачете, за да пренаредите показаните е
 msgid "Drizzle"
 msgstr "Ръмеж"
 
-#: contents/ui/configAppearance.qml:2864 contents/ui/configAppearance.qml:3588
-#: contents/ui/test.qml:2742 contents/ui/test.qml:3466
+#: contents/ui/configAppearance.qml:2893 contents/ui/configAppearance.qml:3617
 msgid "Enable item"
 msgstr "Активиране на елемент"
 
-#: contents/ui/configAppearance.qml:3730 contents/ui/test.qml:3608
+#: contents/ui/configAppearance.qml:3759
 msgid "Enable or disable this item"
 msgstr "Активиране или деактивиране на този елемент"
 
-#: contents/ui/configAppearance.qml:3019 contents/ui/test.qml:2897
+#: contents/ui/configAppearance.qml:3048
 msgid "Enable or disable this item on the panel"
 msgstr "Активиране или деактивиране на този елемент в панела"
 
-#: contents/ui/configAppearance.qml:2072 contents/ui/configAppearance.qml:2682
-#: contents/ui/configAppearance.qml:3409 contents/ui/test.qml:2067
-#: contents/ui/test.qml:2560 contents/ui/test.qml:3287
+#: contents/ui/configAppearance.qml:2102 contents/ui/configAppearance.qml:2711
+#: contents/ui/configAppearance.qml:3438
 msgid "Enabled"
 msgstr "Активирана"
 
@@ -381,41 +353,40 @@ msgstr "Активирана"
 msgid "Enter Location"
 msgstr "Въведете местоположение"
 
-#: contents/ui/configGeneral.qml:162
+#: contents/ui/configGeneral.qml:190
 msgid "Enter your OpenWeatherMap API key"
 msgstr "Въведете вашия OpenWeatherMap API ключ"
 
-#: contents/ui/configGeneral.qml:163
+#: contents/ui/configGeneral.qml:190
 msgid "Enter your WeatherAPI.com key"
 msgstr "Въведете вашия WeatherAPI.com ключ"
 
-#: contents/ui/configAppearance.qml:1613 contents/ui/test.qml:1608
+#: contents/ui/configAppearance.qml:1643
 msgid "Expand widget to fill available panel space"
 msgstr "Разширяване на приспособлението, за да запълни наличната ширина на панела"
 
-#: contents/ui/configAppearance.qml:2487 contents/ui/test.qml:2365
+#: contents/ui/configAppearance.qml:2516
 msgid "Fahrenheit (°F)"
 msgstr "Фаренхайт (°F)"
 
-#: contents/ui/WeatherService.qml:136
+#: contents/ui/WeatherService.qml:132
 msgid "Failed: %1"
 msgstr "Неуспешно: %1"
 
-#: contents/ui/configAppearance.qml:767 contents/ui/configAppearance.qml:807
-#: contents/ui/configAppearance.qml:881 contents/ui/DetailsView.qml:115
-#: contents/ui/test.qml:762 contents/ui/test.qml:802 contents/ui/test.qml:876
+#: contents/ui/configAppearance.qml:768 contents/ui/configAppearance.qml:808
+#: contents/ui/configAppearance.qml:882 contents/ui/DetailsView.qml:115
 msgid "Feels Like"
 msgstr "Усеща се като"
 
-#: contents/ui/TooltipContent.qml:432
+#: contents/ui/TooltipContent.qml:434
 msgid "Feels like:"
 msgstr "Усеща се като:"
 
-#: contents/ui/FullView.qml:212
+#: contents/ui/FullView.qml:195
 msgid "Feels like: %1"
 msgstr "Усеща се като: %1"
 
-#: contents/ui/configAppearance.qml:1612 contents/ui/test.qml:1607
+#: contents/ui/configAppearance.qml:1642
 msgid "Fill panel:"
 msgstr "Запълване на панела:"
 
@@ -423,43 +394,40 @@ msgstr "Запълване на панела:"
 msgid "First Quarter"
 msgstr "Първа четвърт"
 
-#: contents/ui/configAppearance.qml:1728 contents/ui/configAppearance.qml:1905
-#: contents/ui/configAppearance.qml:2235 contents/ui/test.qml:1723
-#: contents/ui/test.qml:1900 contents/ui/test.qml:2113
+#: contents/ui/configAppearance.qml:1758 contents/ui/configAppearance.qml:1935
+#: contents/ui/configAppearance.qml:2265
 msgid "Flat Color (SVG)"
 msgstr "Плосък цвят (SVG)"
 
 #: contents/ui/configAppearance.qml:122 contents/ui/main.qml:244
-#: contents/ui/test.qml:122
 msgid "Fog"
 msgstr "Мъгла"
 
-#: contents/ui/configAppearance.qml:1720 contents/ui/configAppearance.qml:2227
-#: contents/ui/test.qml:1715 contents/ui/test.qml:2105
+#: contents/ui/configAppearance.qml:1750 contents/ui/configAppearance.qml:2257
 msgid "Font icons (default)"
 msgstr "Шрифтови икони (по подразбиране)"
 
-#: contents/ui/configAppearance.qml:1401 contents/ui/test.qml:1396
+#: contents/ui/configAppearance.qml:1431
 msgid "Font size:"
 msgstr "Размер на шрифта:"
 
-#: contents/ui/configAppearance.qml:1879 contents/ui/test.qml:1874
+#: contents/ui/configAppearance.qml:1909
 msgid "Footer:"
 msgstr "Долен колонтитул:"
 
-#: contents/ui/FullView.qml:300
+#: contents/ui/FullView.qml:283
 msgid "Forecast"
 msgstr "Прогноза"
 
-#: contents/ui/configAppearance.qml:1872 contents/ui/test.qml:1867
+#: contents/ui/configAppearance.qml:1902
 msgid "Forecast days:"
 msgstr "Дни за прогноза:"
 
-#: contents/ui/configGeneral.qml:135
+#: contents/ui/configGeneral.qml:164
 msgid "Free Norwegian Meteorological Institute service. No API key needed."
 msgstr "Безплатна услуга на Норвежкия метеорологичен институт. Не изисква API ключ."
 
-#: contents/ui/configGeneral.qml:136
+#: contents/ui/configGeneral.qml:165
 msgid "Free and open-source. No API key needed. Recommended."
 msgstr "Безплатен и с отворен код. Не изисква API ключ. Препоръчва се."
 
@@ -507,69 +475,74 @@ msgstr "Силен сняг"
 msgid "Heavy thunderstorm with hail"
 msgstr "Силна гръмотевична буря с градушка"
 
-#: contents/ui/configAppearance.qml:3124 contents/ui/test.qml:3002
+#: contents/ui/configAppearance.qml:3153
 msgid "Hidden"
 msgstr "Скрити"
 
-#: contents/ui/configAppearance.qml:3229 contents/ui/test.qml:3107
+#: contents/ui/configAppearance.qml:3258
 msgid "Hide from details"
 msgstr "Скриване от подробности"
 
-#: contents/ui/configAppearance.qml:2852 contents/ui/configAppearance.qml:3576
-#: contents/ui/test.qml:2730 contents/ui/test.qml:3454
+#: contents/ui/configAppearance.qml:2881 contents/ui/configAppearance.qml:3605
 msgid "Hide prefix icon"
 msgstr "Скриване на префикс иконата"
 
-#: contents/ui/FullView.qml:242
+#: contents/ui/FullView.qml:225
 msgid "High"
 msgstr "Макс."
 
-#: contents/ui/configAppearance.qml:1269 contents/ui/test.qml:1264
+#: contents/ui/configAppearance.qml:1270
 msgid "Horizontal"
 msgstr "Хоризонтално"
 
-#: contents/ui/configAppearance.qml:1452 contents/ui/test.qml:1447
+#: contents/ui/configAppearance.qml:1482
 msgid "How often the rows scroll to reveal the next item"
 msgstr "Колко често редовете се превъртат, за да покажат следващия елемент"
 
-#: contents/ui/configAppearance.qml:774 contents/ui/configAppearance.qml:814
-#: contents/ui/configAppearance.qml:895 contents/ui/DetailsView.qml:116
-#: contents/ui/test.qml:769 contents/ui/test.qml:809 contents/ui/test.qml:890
+#: contents/ui/configAppearance.qml:775 contents/ui/configAppearance.qml:815
+#: contents/ui/configAppearance.qml:896 contents/ui/DetailsView.qml:116
 msgid "Humidity"
 msgstr "Влажност"
 
-#: contents/ui/TooltipContent.qml:465
+#: contents/ui/TooltipContent.qml:467
 msgid "Humidity:"
 msgstr "Влажност:"
 
-#: contents/ui/configAppearance.qml:1302 contents/ui/test.qml:1297
+#: contents/ui/configAppearance.qml:1303
+#, fuzzy
+msgid "Icon and temperature"
+msgstr "Усеща се като температура"
+
+#: contents/ui/configAppearance.qml:1329
 msgid "Icon first"
 msgstr "Първо икона"
 
-#: contents/ui/configAppearance.qml:1507 contents/ui/test.qml:1502
+#: contents/ui/configAppearance.qml:1305
+msgid "Icon only"
+msgstr ""
+
+#: contents/ui/configAppearance.qml:1537
 msgid "Icon size in px. 0 = auto."
 msgstr "Размер на иконата в px. 0 = автоматично."
 
-#: contents/ui/configAppearance.qml:1353 contents/ui/configAppearance.qml:1931
-#: contents/ui/test.qml:1348 contents/ui/test.qml:1926
+#: contents/ui/configAppearance.qml:1382 contents/ui/configAppearance.qml:1961
 msgid "Icon size:"
 msgstr "Размер на иконата:"
 
-#: contents/ui/configAppearance.qml:223 contents/ui/test.qml:223
+#: contents/ui/configAppearance.qml:223
 msgid "Icon source:"
 msgstr "Източник на икона:"
 
-#: contents/ui/configAppearance.qml:1712 contents/ui/configAppearance.qml:1893
-#: contents/ui/configAppearance.qml:2218 contents/ui/test.qml:1707
-#: contents/ui/test.qml:1888 contents/ui/test.qml:2096
+#: contents/ui/configAppearance.qml:1742 contents/ui/configAppearance.qml:1923
+#: contents/ui/configAppearance.qml:2248
 msgid "Icon theme:"
 msgstr "Тема на иконите:"
 
-#: contents/ui/configAppearance.qml:401 contents/ui/test.qml:401
+#: contents/ui/configAppearance.qml:401
 msgid "Icon:"
 msgstr "Икона:"
 
-#: contents/ui/configAppearance.qml:2211 contents/ui/test.qml:2089
+#: contents/ui/configAppearance.qml:2241
 msgid "Icons"
 msgstr "Икони"
 
@@ -577,19 +550,15 @@ msgstr "Икони"
 msgid "If this looks correct, apply it. Otherwise, choose your location manually."
 msgstr "Ако изглежда правилно, го приложете. В противен случай изберете местоположението ръчно."
 
-#: contents/ui/configAppearance.qml:2410 contents/ui/test.qml:2288
+#: contents/ui/configAppearance.qml:2439
 msgid "Imperial (°F, mph, inHg, in)"
 msgstr "Имперски (°F, mph, inHg, in)"
 
-#: contents/ui/test.qml:1242
-msgid "In a vertical panel, long item labels may be truncated. Consider using \"Simple\" mode or increasing the panel width."
-msgstr ""
-
-#: contents/ui/configAppearance.qml:1247
+#: contents/ui/configAppearance.qml:1248
 msgid "In a vertical panel, long item labels may be truncated. Consider using \"Simple\" mode, increasing the panel width, or reducing the font size."
 msgstr "Във вертикален панел дългите имена на елементите може да бъдат съкратени. Помислете за използване на режим \"Опростен\", увеличаване ширината на панела или намаляване размера на шрифта."
 
-#: contents/ui/configAppearance.qml:2570 contents/ui/test.qml:2448
+#: contents/ui/configAppearance.qml:2599
 msgid ""
 "Individual dropdowns are editable only in Custom mode.\n"
 "Other presets set units automatically."
@@ -597,49 +566,48 @@ msgstr ""
 "Индивидуалните падащи менюта са редактируеми само в персонализиран режим.\n"
 "Другите предварителни настройки задават единиците автоматично."
 
-#: contents/ui/configAppearance.qml:2472 contents/ui/test.qml:2350
+#: contents/ui/configAppearance.qml:2501
 msgid "Individual units"
 msgstr "Индивидуални единици"
 
-#: contents/ui/configGeneral.qml:225
+#: contents/ui/configGeneral.qml:263
 msgid "Interval:"
 msgstr "Интервал:"
 
-#: contents/ui/configAppearance.qml:1597 contents/ui/test.qml:1592
+#: contents/ui/configAppearance.qml:1627
 msgid "Item spacing:"
 msgstr "Разстояние между елементите:"
 
-#: contents/ui/configAppearance.qml:1515 contents/ui/test.qml:1510
+#: contents/ui/configAppearance.qml:1545
 msgid "Item width:"
 msgstr "Ширина на елемента:"
 
-#: contents/ui/configAppearance.qml:1294 contents/ui/test.qml:1289
+#: contents/ui/configAppearance.qml:1321
 msgid "Items Order:"
 msgstr "Ред на елементите:"
 
-#: contents/ui/configAppearance.qml:229 contents/ui/test.qml:229
+#: contents/ui/configAppearance.qml:229
 msgid "KDE System Icons (automatic, follows weather code)"
 msgstr "Системни икони на KDE (автоматично, следват кода за времето)"
 
-#: contents/ui/configAppearance.qml:2606 contents/ui/configAppearance.qml:3051
-#: contents/ui/configAppearance.qml:3334 contents/ui/test.qml:2484
-#: contents/ui/test.qml:2929 contents/ui/test.qml:3212
+#: contents/ui/configAppearance.qml:2635 contents/ui/configAppearance.qml:3080
+#: contents/ui/configAppearance.qml:3363
 msgid "Keep Changes"
 msgstr "Запазване на промените"
 
-#: contents/ui/configAppearance.qml:3046 contents/ui/test.qml:2924
+#: contents/ui/configAppearance.qml:3075
 msgid "Keep the changes you made to Details Items?"
 msgstr "Да се запазят ли направените промени в елементите за подробности?"
 
-#: contents/ui/configAppearance.qml:2601 contents/ui/test.qml:2479
+#: contents/ui/configAppearance.qml:2630
 msgid "Keep the changes you made to Panel Items?"
 msgstr "Да се запазят ли направените промени в елементите на панела?"
 
-#: contents/ui/configAppearance.qml:3329 contents/ui/test.qml:3207
+#: contents/ui/configAppearance.qml:3358
 msgid "Keep the changes you made to Tooltip Items?"
 msgstr "Да се запазят ли направените промени в елементите на подсказката?"
 
-#: contents/ui/configAppearance.qml:2522 contents/ui/test.qml:2400
+#: contents/ui/configAppearance.qml:2551
 msgid "Knots (kn)"
 msgstr "Възли (kn)"
 
@@ -651,7 +619,7 @@ msgstr "Последна четвърт"
 msgid "Latitude:"
 msgstr "Географска ширина:"
 
-#: contents/ui/configAppearance.qml:1261 contents/ui/test.qml:1256
+#: contents/ui/configAppearance.qml:1262
 msgid "Layout type:"
 msgstr "Тип оформление:"
 
@@ -683,7 +651,7 @@ msgstr "Лек сняг"
 msgid "Light snow showers"
 msgstr "Леки снежни превалявания"
 
-#: contents/ui/configAppearance.qml:1456 contents/ui/test.qml:1451
+#: contents/ui/configAppearance.qml:1486
 msgid "Lines:"
 msgstr "Редове:"
 
@@ -691,11 +659,11 @@ msgstr "Редове:"
 msgid "Loading details…"
 msgstr "Зареждане на подробности…"
 
-#: contents/ui/ForecastView.qml:43
+#: contents/ui/ForecastView.qml:39
 msgid "Loading forecast…"
 msgstr "Зареждане на прогноза…"
 
-#: contents/ui/ForecastView.qml:214
+#: contents/ui/ForecastView.qml:210
 msgid "Loading hourly data…"
 msgstr "Зареждане на почасови данни…"
 
@@ -707,7 +675,7 @@ msgstr "Зареждане на местоположения…"
 msgid "Location"
 msgstr "Местоположение"
 
-#: contents/ui/configAppearance.qml:788 contents/ui/test.qml:783
+#: contents/ui/configAppearance.qml:789
 msgid "Location Name"
 msgstr "Име на местоположение"
 
@@ -719,7 +687,7 @@ msgstr "Откриването на местоположение зависи о
 msgid "Location information"
 msgstr "Информация за местоположение"
 
-#: contents/ui/configAppearance.qml:2086 contents/ui/configLocation.qml:635
+#: contents/ui/configAppearance.qml:2116 contents/ui/configLocation.qml:635
 msgid "Location name:"
 msgstr "Име на местоположение:"
 
@@ -731,11 +699,11 @@ msgstr "Местоположение:"
 msgid "Longitude:"
 msgstr "Географска дължина:"
 
-#: contents/ui/FullView.qml:263
+#: contents/ui/FullView.qml:246
 msgid "Low"
 msgstr "Мин."
 
-#: contents/ui/configAppearance.qml:1474 contents/ui/test.qml:1469
+#: contents/ui/configAppearance.qml:1504
 msgid "Main icon style:"
 msgstr "Стил на основната икона:"
 
@@ -743,33 +711,30 @@ msgstr "Стил на основната икона:"
 msgid "Mainly clear"
 msgstr "Предимно ясно"
 
-#: contents/ui/configAppearance.qml:1365 contents/ui/configAppearance.qml:1413
-#: contents/ui/configAppearance.qml:1665 contents/ui/configAppearance.qml:1983
-#: contents/ui/configAppearance.qml:2131 contents/ui/configAppearance.qml:2174
-#: contents/ui/test.qml:1360 contents/ui/test.qml:1408
-#: contents/ui/test.qml:1660 contents/ui/test.qml:1978
+#: contents/ui/configAppearance.qml:1394 contents/ui/configAppearance.qml:1443
+#: contents/ui/configAppearance.qml:1695 contents/ui/configAppearance.qml:2013
+#: contents/ui/configAppearance.qml:2161 contents/ui/configAppearance.qml:2204
 msgid "Manual"
 msgstr "Ръчно"
 
-#: contents/ui/configAppearance.qml:2406 contents/ui/test.qml:2284
+#: contents/ui/configAppearance.qml:2435
 msgid "Metric (°C, km/h, hPa, mm)"
 msgstr "Метрични (°C, km/h, hPa, mm)"
 
-#: contents/ui/configAppearance.qml:1186 contents/ui/test.qml:1181
+#: contents/ui/configAppearance.qml:1187
 msgid "Misc"
 msgstr "Разни"
 
-#: contents/ui/configAppearance.qml:795 contents/ui/configAppearance.qml:856
-#: contents/ui/configAppearance.qml:916 contents/ui/DetailsView.qml:122
-#: contents/ui/test.qml:790 contents/ui/test.qml:851 contents/ui/test.qml:911
+#: contents/ui/configAppearance.qml:796 contents/ui/configAppearance.qml:857
+#: contents/ui/configAppearance.qml:917 contents/ui/DetailsView.qml:122
 msgid "Moon Phase"
 msgstr "Фаза на луната"
 
-#: contents/ui/TooltipContent.qml:479
+#: contents/ui/TooltipContent.qml:481
 msgid "Moon:"
 msgstr "Луна:"
 
-#: contents/ui/configAppearance.qml:1223 contents/ui/test.qml:1218
+#: contents/ui/configAppearance.qml:1224
 msgid "Multiple lines (tall panel)"
 msgstr "Множество редове (висок панел)"
 
@@ -781,11 +746,11 @@ msgstr "Новолуние"
 msgid "No details data"
 msgstr "Няма данни за подробности"
 
-#: contents/ui/ForecastView.qml:43
+#: contents/ui/ForecastView.qml:39
 msgid "No forecast data"
 msgstr "Няма данни за прогноза"
 
-#: contents/ui/FullView.qml:79
+#: contents/ui/FullView.qml:62
 msgid "No location set"
 msgstr "Няма зададено местоположение"
 
@@ -797,56 +762,55 @@ msgstr "Не са открити метеорологични станции з�
 msgid "None Selected"
 msgstr "Няма избрано"
 
-#: contents/ui/configAppearance.qml:1702 contents/ui/test.qml:1697
+#: contents/ui/configAppearance.qml:1732
 msgid "Note: size may be reduced if the panel is not thick enough."
 msgstr "Забележка: размерът може да бъде намален, ако панелът не е достатъчно дебел."
 
-#: contents/ui/configAppearance.qml:1462 contents/ui/test.qml:1457
+#: contents/ui/configAppearance.qml:1492
 msgid "Number of item rows visible at once. Resize the panel height in KDE settings to match."
 msgstr "Брой редове с елементи, видими наведнъж. Променете височината на панела в настройките на KDE, за да съответства."
 
-#: contents/ui/configAppearance.qml:345 contents/ui/test.qml:345
+#: contents/ui/configAppearance.qml:345
 msgid "OK"
 msgstr "OK"
 
-#: contents/ui/configGeneral.qml:31
+#: contents/ui/configGeneral.qml:32
 msgid "Open-Meteo (recommended, free)"
 msgstr "Open-Meteo (препоръчва се, безплатно)"
 
-#: contents/ui/configGeneral.qml:33
+#: contents/ui/configGeneral.qml:40
 msgid "OpenWeatherMap (Key Required)"
 msgstr "OpenWeatherMap (изисква ключ)"
 
-#: contents/ui/configGeneral.qml:150
+#: contents/ui/configGeneral.qml:179
 msgid "OpenWeatherMap API Key:"
 msgstr "OpenWeatherMap API ключ:"
 
 #: contents/ui/configAppearance.qml:117 contents/ui/main.qml:242
-#: contents/ui/test.qml:117
 msgid "Overcast"
 msgstr "Облачно"
 
-#: contents/ui/configAppearance.qml:1174 contents/ui/test.qml:1169
+#: contents/ui/configAppearance.qml:1175
 msgid "Panel"
 msgstr "Панел"
 
-#: contents/ui/configAppearance.qml:2652 contents/ui/test.qml:2530
+#: contents/ui/configAppearance.qml:2681
 msgid "Panel Items"
 msgstr "Елементи на панела"
 
-#: contents/ui/configAppearance.qml:1210 contents/ui/test.qml:1205
+#: contents/ui/configAppearance.qml:1211
 msgid "Panel display settings"
 msgstr "Настройки за показване в панела"
 
-#: contents/ui/configAppearance.qml:1645 contents/ui/test.qml:1640
+#: contents/ui/configAppearance.qml:1675
 msgid "Panel font:"
 msgstr "Шрифт за панела:"
 
-#: contents/ui/configAppearance.qml:1619 contents/ui/test.qml:1614
+#: contents/ui/configAppearance.qml:1649
 msgid "Panel items settings"
 msgstr "Настройки на елементите в панела"
 
-#: contents/ui/configAppearance.qml:1817 contents/ui/test.qml:1812
+#: contents/ui/configAppearance.qml:1847
 msgid "Panel items:"
 msgstr "Елементи на панела:"
 
@@ -854,38 +818,36 @@ msgstr "Елементи на панела:"
 msgid "Partly cloudy"
 msgstr "Променлива облачност"
 
-#: contents/ui/configAppearance.qml:107 contents/ui/test.qml:107
+#: contents/ui/configAppearance.qml:107
 msgid "Partly cloudy (day)"
 msgstr "Променлива облачност (ден)"
 
-#: contents/ui/configAppearance.qml:112 contents/ui/test.qml:112
+#: contents/ui/configAppearance.qml:112
 msgid "Partly cloudy (night)"
 msgstr "Променлива облачност (нощ)"
 
-#: contents/ui/configAppearance.qml:1549 contents/ui/test.qml:1544
+#: contents/ui/configAppearance.qml:1579
 msgid "Pipe  |"
 msgstr "Вертикална черта  |"
 
-#: contents/ui/configAppearance.qml:2203 contents/ui/test.qml:2081
+#: contents/ui/configAppearance.qml:2233
 msgid "Prefix style:"
 msgstr "Стил на префикса:"
 
-#: contents/ui/configAppearance.qml:781 contents/ui/configAppearance.qml:821
-#: contents/ui/configAppearance.qml:902 contents/ui/DetailsView.qml:117
-#: contents/ui/test.qml:776 contents/ui/test.qml:816 contents/ui/test.qml:897
+#: contents/ui/configAppearance.qml:782 contents/ui/configAppearance.qml:822
+#: contents/ui/configAppearance.qml:903 contents/ui/DetailsView.qml:117
 msgid "Pressure"
 msgstr "Налягане"
 
-#: contents/ui/configAppearance.qml:2539 contents/ui/test.qml:2417
-#: contents/ui/TooltipContent.qml:468
+#: contents/ui/configAppearance.qml:2568 contents/ui/TooltipContent.qml:470
 msgid "Pressure:"
 msgstr "Налягане:"
 
-#: contents/ui/configGeneral.qml:114
+#: contents/ui/configGeneral.qml:138
 msgid "Provider:"
 msgstr "Доставчик:"
 
-#: contents/ui/configGeneral.qml:103
+#: contents/ui/configGeneral.qml:124
 msgid ""
 "Providers are tried in order until one succeeds:\n"
 "Open-Meteo  →  met.no  →  OpenWeatherMap  →  WeatherAPI.com\n"
@@ -896,24 +858,22 @@ msgstr ""
 "Open-Meteo винаги се опитва първи – той е безплатен и не изисква API ключ."
 
 #: contents/ui/configAppearance.qml:127 contents/ui/main.qml:260
-#: contents/ui/test.qml:127
 msgid "Rain"
 msgstr "Дъжд"
 
-#: contents/ui/configLocation.qml:584 contents/ui/FullView.qml:164
+#: contents/ui/configLocation.qml:584 contents/ui/FullView.qml:147
 msgid "Refresh"
 msgstr "Обновяване"
 
-#: contents/ui/configGeneral.qml:215
+#: contents/ui/configGeneral.qml:252
 msgid "Refresh weather automatically"
 msgstr "Автоматично обновяване на времето"
 
-#: contents/ui/configAppearance.qml:815 contents/ui/configAppearance.qml:896
-#: contents/ui/test.qml:810 contents/ui/test.qml:891
+#: contents/ui/configAppearance.qml:816 contents/ui/configAppearance.qml:897
 msgid "Relative humidity %"
 msgstr "Относителна влажност %"
 
-#: contents/ui/configAppearance.qml:775 contents/ui/test.qml:770
+#: contents/ui/configAppearance.qml:776
 msgid "Relative humidity percentage"
 msgstr "Процент относителна влажност"
 
@@ -922,16 +882,15 @@ msgid "Requesting location from GeoClue2…"
 msgstr "Заявка за местоположение от GeoClue2…"
 
 #: contents/ui/configAppearance.qml:315 contents/ui/configAppearance.qml:530
-#: contents/ui/configAppearance.qml:571 contents/ui/test.qml:315
-#: contents/ui/test.qml:530 contents/ui/test.qml:571
+#: contents/ui/configAppearance.qml:571
 msgid "Reset"
 msgstr "Нулиране"
 
-#: contents/ui/configAppearance.qml:332 contents/ui/test.qml:332
+#: contents/ui/configAppearance.qml:332
 msgid "Reset All to Defaults"
 msgstr "Нулиране на всички към стойности по подразбиране"
 
-#: contents/ui/configAppearance.qml:437 contents/ui/test.qml:437
+#: contents/ui/configAppearance.qml:437
 msgid "Reset to default"
 msgstr "Възстановяване на стойността по подразбиране"
 
@@ -939,15 +898,15 @@ msgstr "Възстановяване на стойността по подраз
 msgid "Rime fog"
 msgstr "Замръзваща мъгла"
 
-#: contents/ui/configAppearance.qml:2383 contents/ui/test.qml:2261
+#: contents/ui/configAppearance.qml:2412
 msgid "Round values:"
 msgstr "Закръгляване на стойности:"
 
-#: contents/ui/configAppearance.qml:1466 contents/ui/test.qml:1461
+#: contents/ui/configAppearance.qml:1496
 msgid "Scroll animation:"
 msgstr "Анимация при превъртане:"
 
-#: contents/ui/configAppearance.qml:1446 contents/ui/test.qml:1441
+#: contents/ui/configAppearance.qml:1476
 msgid "Scroll interval (sec):"
 msgstr "Интервал на превъртане (сек):"
 
@@ -955,11 +914,11 @@ msgstr "Интервал на превъртане (сек):"
 msgid "Search a weather station to set your location"
 msgstr "Търсене на метеорологична станция, за да зададете местоположението си"
 
-#: contents/ui/configAppearance.qml:1538 contents/ui/test.qml:1533
+#: contents/ui/configAppearance.qml:1568
 msgid "Separator:"
 msgstr "Разделител:"
 
-#: contents/ui/FullView.qml:89
+#: contents/ui/FullView.qml:72
 msgid "Set Location…"
 msgstr "Задаване на местоположение…"
 
@@ -967,71 +926,72 @@ msgstr "Задаване на местоположение…"
 msgid "Set manually"
 msgstr "Задаване ръчно"
 
-#: contents/ui/configAppearance.qml:1806 contents/ui/configAppearance.qml:2312
-#: contents/ui/test.qml:1801 contents/ui/test.qml:2190
+#: contents/ui/configAppearance.qml:1836 contents/ui/configAppearance.qml:2342
 msgid "Set your own icons…"
 msgstr "Задаване на ваши собствени икони…"
 
-#: contents/ui/configAppearance.qml:3717 contents/ui/test.qml:3595
+#: contents/ui/configAppearance.qml:3746
 msgid "Show / hide the prefix icon"
 msgstr "Показване / скриване на префикс иконата"
 
-#: contents/ui/configAppearance.qml:3004 contents/ui/test.qml:2882
+#: contents/ui/configAppearance.qml:3033
 msgid "Show / hide the prefix icon on the panel"
 msgstr "Показване / скриване на префикс иконата в панела"
 
-#: contents/ui/configAppearance.qml:3229 contents/ui/test.qml:3107
+#: contents/ui/configAppearance.qml:3258
 msgid "Show in details"
 msgstr "Показване в подробности"
 
-#: contents/ui/configAppearance.qml:3300 contents/ui/test.qml:3178
+#: contents/ui/configAppearance.qml:3329
 msgid "Show or hide this detail item"
 msgstr "Показване или скриване на този детайл"
 
-#: contents/ui/configAppearance.qml:2852 contents/ui/configAppearance.qml:3576
-#: contents/ui/test.qml:2730 contents/ui/test.qml:3454
+#: contents/ui/configAppearance.qml:2881 contents/ui/configAppearance.qml:3605
 msgid "Show prefix icon"
 msgstr "Показване на префикс иконата"
 
-#: contents/ui/configAppearance.qml:1880 contents/ui/test.qml:1875
+#: contents/ui/configAppearance.qml:1910
 msgid "Show update time and provider"
 msgstr "Показване на часа на обновяване и доставчика"
 
-#: contents/ui/configGeneral.qml:178
+#: contents/ui/configGeneral.qml:206
 msgid "Show/hide key"
 msgstr "Показване/скриване на ключа"
+
+#: contents/ui/configAppearance.qml:1296
+#, fuzzy
+msgid "Show:"
+msgstr "Показани"
 
 #: contents/ui/main.qml:278
 msgid "Showers"
 msgstr "Превалявания"
 
-#: contents/ui/configAppearance.qml:3124 contents/ui/test.qml:3002
+#: contents/ui/configAppearance.qml:3153
 msgid "Shown"
 msgstr "Показани"
 
-#: contents/ui/configAppearance.qml:1227 contents/ui/test.qml:1222
+#: contents/ui/configAppearance.qml:1228
 msgid "Simple (icon + temperature)"
 msgstr "Опростен (икона + температура)"
 
-#: contents/ui/configAppearance.qml:1255 contents/ui/test.qml:1250
+#: contents/ui/configAppearance.qml:1256
 msgid "Simple display mode settings"
 msgstr "Настройки за опростен режим на показване"
 
-#: contents/ui/configAppearance.qml:1219 contents/ui/test.qml:1214
+#: contents/ui/configAppearance.qml:1220
 msgid "Single line (all items at once)"
 msgstr "Единичен ред (всички елементи наведнъж)"
 
-#: contents/ui/configAppearance.qml:1751 contents/ui/configAppearance.qml:2257
-#: contents/ui/test.qml:1746 contents/ui/test.qml:2135
+#: contents/ui/configAppearance.qml:1781 contents/ui/configAppearance.qml:2287
 msgid "Size:"
 msgstr "Размер:"
 
-#: contents/ui/configAppearance.qml:1561 contents/ui/test.qml:1556
+#: contents/ui/configAppearance.qml:1591
 msgid "Small circle  ⚬"
 msgstr "Малко кръгче  ⚬"
 
 #: contents/ui/configAppearance.qml:132 contents/ui/main.qml:270
-#: contents/ui/test.qml:132
 msgid "Snow"
 msgstr "Сняг"
 
@@ -1043,110 +1003,106 @@ msgstr "Снежни зърна"
 msgid "Snow showers"
 msgstr "Снежни превалявания"
 
-#: contents/ui/configAppearance.qml:1557 contents/ui/test.qml:1552
+#: contents/ui/configAppearance.qml:1587
 msgid "Space"
 msgstr "Интервал"
 
-#: contents/ui/configGeneral.qml:133
+#: contents/ui/configGeneral.qml:160
 msgid "Standard provider. API key required below."
 msgstr "Стандартен доставчик. Изисква API ключ по-долу."
 
-#: contents/ui/configAppearance.qml:137 contents/ui/test.qml:137
+#: contents/ui/configAppearance.qml:137
 msgid "Storm / Thunderstorm"
 msgstr "Буря / Гръмотевична буря"
 
-#: contents/ui/configAppearance.qml:836 contents/ui/configAppearance.qml:910
-#: contents/ui/test.qml:831 contents/ui/test.qml:905
+#: contents/ui/configAppearance.qml:837 contents/ui/configAppearance.qml:911
 msgid "Sun rise & set times"
 msgstr "Часове на изгрев и залез"
 
-#: contents/ui/configAppearance.qml:2899 contents/ui/configAppearance.qml:3623
-#: contents/ui/test.qml:2777 contents/ui/test.qml:3501
+#: contents/ui/configAppearance.qml:2928 contents/ui/configAppearance.qml:3652
 msgid "Sun times mode:"
 msgstr "Режим за слънцето:"
 
-#: contents/ui/configAppearance.qml:2813 contents/ui/configAppearance.qml:3537
-#: contents/ui/test.qml:2691 contents/ui/test.qml:3415
+#: contents/ui/configAppearance.qml:2842 contents/ui/configAppearance.qml:3566
 msgid "Sun times options"
 msgstr "Опции за слънцето"
 
-#: contents/ui/configAppearance.qml:753 contents/ui/test.qml:748
+#: contents/ui/configAppearance.qml:754
 msgid "Sunrise and sunset times"
 msgstr "Часове на изгрев и залез"
 
-#: contents/ui/configAppearance.qml:501 contents/ui/test.qml:501
+#: contents/ui/configAppearance.qml:501
 msgid "Sunrise icon:"
 msgstr "Икона за изгрев:"
 
-#: contents/ui/configAppearance.qml:475 contents/ui/configAppearance.qml:2916
-#: contents/ui/configAppearance.qml:3639 contents/ui/test.qml:475
-#: contents/ui/test.qml:2794 contents/ui/test.qml:3517
+#: contents/ui/configAppearance.qml:475 contents/ui/configAppearance.qml:2945
+#: contents/ui/configAppearance.qml:3668
 msgid "Sunrise only  07:17"
 msgstr "Само изгрев  07:17"
 
-#: contents/ui/configAppearance.qml:752 contents/ui/configAppearance.qml:835
-#: contents/ui/configAppearance.qml:909 contents/ui/DetailsView.qml:119
-#: contents/ui/test.qml:747 contents/ui/test.qml:830 contents/ui/test.qml:904
+#: contents/ui/configAppearance.qml:753 contents/ui/configAppearance.qml:836
+#: contents/ui/configAppearance.qml:910 contents/ui/DetailsView.qml:119
 msgid "Sunrise/Sunset"
 msgstr "Изгрев/Залез"
 
-#: contents/ui/TooltipContent.qml:497 contents/ui/TooltipContent.qml:534
-#: contents/ui/TooltipContent.qml:546
+#: contents/ui/TooltipContent.qml:499 contents/ui/TooltipContent.qml:536
+#: contents/ui/TooltipContent.qml:548
 msgid "Sunrise:"
 msgstr "Изгрев:"
 
-#: contents/ui/configAppearance.qml:542 contents/ui/test.qml:542
+#: contents/ui/configAppearance.qml:542
 msgid "Sunset icon:"
 msgstr "Икона за залез:"
 
-#: contents/ui/configAppearance.qml:479 contents/ui/configAppearance.qml:2920
-#: contents/ui/configAppearance.qml:3643 contents/ui/test.qml:479
-#: contents/ui/test.qml:2798 contents/ui/test.qml:3521
+#: contents/ui/configAppearance.qml:479 contents/ui/configAppearance.qml:2949
+#: contents/ui/configAppearance.qml:3672
 msgid "Sunset only   18:03"
 msgstr "Само залез   18:03"
 
-#: contents/ui/TooltipContent.qml:508 contents/ui/TooltipContent.qml:524
-#: contents/ui/TooltipContent.qml:546
+#: contents/ui/TooltipContent.qml:510 contents/ui/TooltipContent.qml:526
+#: contents/ui/TooltipContent.qml:548
 msgid "Sunset:"
 msgstr "Залез:"
 
-#: contents/ui/configAppearance.qml:1335 contents/ui/test.qml:1330
+#: contents/ui/configAppearance.qml:1363
 msgid "Symbolic"
 msgstr "Символичен"
 
-#: contents/ui/configAppearance.qml:1724 contents/ui/configAppearance.qml:1901
-#: contents/ui/configAppearance.qml:2231 contents/ui/test.qml:1719
-#: contents/ui/test.qml:1896 contents/ui/test.qml:2109
+#: contents/ui/configAppearance.qml:1754 contents/ui/configAppearance.qml:1931
+#: contents/ui/configAppearance.qml:2261
 msgid "Symbolic (SVG)"
 msgstr "Символичен (SVG)"
 
-#: contents/ui/configAppearance.qml:1487 contents/ui/test.qml:1482
+#: contents/ui/configAppearance.qml:1517
 msgid "Symbolic (follows theme colour)"
 msgstr "Символичен (следва цвета на темата)"
 
-#: contents/ui/configAppearance.qml:745 contents/ui/configAppearance.qml:867
-#: contents/ui/test.qml:740 contents/ui/test.qml:862
+#: contents/ui/configAppearance.qml:746 contents/ui/configAppearance.qml:868
 msgid "Temperature"
 msgstr "Температура"
 
-#: contents/ui/configAppearance.qml:1306 contents/ui/test.qml:1301
+#: contents/ui/configAppearance.qml:1333
 msgid "Temperature first"
 msgstr "Първо температура"
 
-#: contents/ui/configAppearance.qml:2477 contents/ui/test.qml:2355
-#: contents/ui/TooltipContent.qml:429
+#: contents/ui/configAppearance.qml:1304
+#, fuzzy
+msgid "Temperature only"
+msgstr "Температура"
+
+#: contents/ui/configAppearance.qml:2506 contents/ui/TooltipContent.qml:431
 msgid "Temperature:"
 msgstr "Температура:"
 
-#: contents/ui/configAppearance.qml:2211 contents/ui/test.qml:2089
+#: contents/ui/configAppearance.qml:2241
 msgid "Text labels (Temperature, Wind…)"
 msgstr "Текстови етикети (Температура, Вятър…)"
 
-#: contents/ui/configAppearance.qml:1672 contents/ui/test.qml:1667
+#: contents/ui/configAppearance.qml:1702
 msgid "Text will follow the system font and expand to fill the available space."
 msgstr "Текстът ще следва системния шрифт и ще се разшири, за да запълни наличното пространство."
 
-#: contents/ui/configAppearance.qml:248 contents/ui/test.qml:248
+#: contents/ui/configAppearance.qml:248
 msgid "The condition icon will automatically reflect the current weather using your KDE system icon theme. No customisation is needed."
 msgstr "Иконата за състоянието автоматично ще отразява текущото време, използвайки темата на иконите на KDE. Не се изисква персонализация."
 
@@ -1162,43 +1118,43 @@ msgstr "Гръмотевична буря с градушка"
 msgid "Timezone:"
 msgstr "Часова зона:"
 
-#: contents/ui/ForecastView.qml:104
+#: contents/ui/ForecastView.qml:100
 msgid "Today"
 msgstr "Днес"
 
-#: contents/ui/configAppearance.qml:1182 contents/ui/test.qml:1177
+#: contents/ui/configAppearance.qml:1183
 msgid "Tooltip"
 msgstr "Подсказка"
 
-#: contents/ui/configAppearance.qml:3379 contents/ui/test.qml:3257
+#: contents/ui/configAppearance.qml:3408
 msgid "Tooltip Items"
 msgstr "Елементи на подсказката"
 
-#: contents/ui/configAppearance.qml:2162
+#: contents/ui/configAppearance.qml:2192
 msgid "Tooltip height:"
 msgstr "Височина на подсказката:"
 
-#: contents/ui/configAppearance.qml:2323 contents/ui/test.qml:2201
+#: contents/ui/configAppearance.qml:2353
 msgid "Tooltip items"
 msgstr "Елементи на подсказката"
 
-#: contents/ui/configAppearance.qml:2079 contents/ui/test.qml:2074
+#: contents/ui/configAppearance.qml:2109
 msgid "Tooltip items settings"
 msgstr "Настройки на елементите на подсказката"
 
-#: contents/ui/configAppearance.qml:2328 contents/ui/test.qml:2206
+#: contents/ui/configAppearance.qml:2358
 msgid "Tooltip items:"
 msgstr "Елементи на подсказката:"
 
-#: contents/ui/configAppearance.qml:2119
+#: contents/ui/configAppearance.qml:2149
 msgid "Tooltip width:"
 msgstr "Ширина на подсказката:"
 
-#: contents/ui/configAppearance.qml:2064 contents/ui/test.qml:2059
+#: contents/ui/configAppearance.qml:2094
 msgid "Tooltip:"
 msgstr "Подсказка:"
 
-#: contents/ui/configAppearance.qml:2093
+#: contents/ui/configAppearance.qml:2123
 msgid "Truncate (single line)"
 msgstr "Съкращаване (един ред)"
 
@@ -1206,41 +1162,40 @@ msgstr "Съкращаване (един ред)"
 msgid "Unable to get valid position from GeoClue2."
 msgstr "Не може да се получи валидна позиция от GeoClue2."
 
-#: contents/ui/configAppearance.qml:2402 contents/ui/test.qml:2280
+#: contents/ui/configAppearance.qml:2431
 msgid "Unit preset:"
 msgstr "Предварителна настройка за единици:"
 
-#: contents/ui/configAppearance.qml:2397 contents/ui/test.qml:2275
+#: contents/ui/configAppearance.qml:2426
 msgid "Units"
 msgstr "Единици"
 
-#: contents/ui/configAppearance.qml:467 contents/ui/configAppearance.qml:2908
-#: contents/ui/configAppearance.qml:3635 contents/ui/test.qml:467
-#: contents/ui/test.qml:2786 contents/ui/test.qml:3513
+#: contents/ui/configAppearance.qml:467 contents/ui/configAppearance.qml:2937
+#: contents/ui/configAppearance.qml:3664
 msgid "Upcoming (next sunrise or sunset)"
 msgstr "Предстоящ (следващ изгрев или залез)"
 
-#: contents/ui/WeatherService.qml:204
+#: contents/ui/WeatherService.qml:200
 msgid "Updated %1 (Open-Meteo)"
 msgstr "Обновено %1 (Open-Meteo)"
 
-#: contents/ui/WeatherService.qml:285
+#: contents/ui/WeatherService.qml:281
 msgid "Updated %1 (OpenWeather)"
 msgstr "Обновено %1 (OpenWeather)"
 
-#: contents/ui/WeatherService.qml:352
+#: contents/ui/WeatherService.qml:348
 msgid "Updated %1 (WeatherAPI.com)"
 msgstr "Обновено %1 (WeatherAPI.com)"
 
-#: contents/ui/WeatherService.qml:436
+#: contents/ui/WeatherService.qml:432
 msgid "Updated %1 (met.no)"
 msgstr "Обновено %1 (met.no)"
 
-#: contents/ui/FullView.qml:148
+#: contents/ui/FullView.qml:131
 msgid "Updating…"
 msgstr "Обновяване…"
 
-#: contents/ui/configAppearance.qml:2414 contents/ui/test.qml:2292
+#: contents/ui/configAppearance.qml:2443
 msgid "Use KDE locale settings"
 msgstr "Използване на настройките за локал на KDE"
 
@@ -1248,36 +1203,35 @@ msgstr "Използване на настройките за локал на KD
 msgid "Use manual location"
 msgstr "Използване на ръчно местоположение"
 
-#: contents/ui/configAppearance.qml:1798 contents/ui/test.qml:1793
+#: contents/ui/configAppearance.qml:1828
 msgid "Uses KDE system icons by default. Click the button to customise each item's icon."
 msgstr "Използва системни икони на KDE по подразбиране. Щракнете върху бутона, за да персонализирате иконата на всеки елемент."
 
-#: contents/ui/configAppearance.qml:2304 contents/ui/test.qml:2182
+#: contents/ui/configAppearance.qml:2334
 msgid "Uses KDE system icons by default. Click the button to customise each item’s icon."
 msgstr "Използва системни икони на KDE по подразбиране. Щракнете върху бутона, за да персонализирате иконата на всеки елемент."
 
-#: contents/ui/configAppearance.qml:2391 contents/ui/test.qml:2269
+#: contents/ui/configAppearance.qml:2420
 msgid "Values are rounded to whole numbers"
 msgstr "Стойностите се закръгляват до цели числа"
 
-#: contents/ui/configAppearance.qml:2391 contents/ui/test.qml:2269
+#: contents/ui/configAppearance.qml:2420
 msgid "Values show decimal places"
 msgstr "Стойностите показват десетични знаци"
 
-#: contents/ui/configAppearance.qml:1273 contents/ui/test.qml:1268
+#: contents/ui/configAppearance.qml:1274
 msgid "Vertical"
 msgstr "Вертикално"
 
-#: contents/ui/configAppearance.qml:849 contents/ui/DetailsView.qml:121
-#: contents/ui/test.qml:844
+#: contents/ui/configAppearance.qml:850 contents/ui/DetailsView.qml:121
 msgid "Visibility"
 msgstr "Видимост"
 
-#: contents/ui/configAppearance.qml:850 contents/ui/test.qml:845
+#: contents/ui/configAppearance.qml:851
 msgid "Visibility distance"
 msgstr "Разстояние на видимост"
 
-#: contents/ui/TooltipContent.qml:475
+#: contents/ui/TooltipContent.qml:477
 msgid "Visibility:"
 msgstr "Видимост:"
 
@@ -1305,88 +1259,85 @@ msgstr "Открихме вашите координати: <b>%1°, %2°</b>."
 msgid "We detected your location as: <b>%1</b>."
 msgstr "Открихме вашето местоположение като: <b>%1</b>."
 
-#: contents/ui/configGeneral.qml:61
+#: contents/ui/configGeneral.qml:75
 msgid "Weather Provider"
 msgstr "Доставчик на времето"
 
-#: contents/ui/TooltipContent.qml:219
+#: contents/ui/TooltipContent.qml:217
 msgid "Weather Widget"
 msgstr "Приспособление за времето"
 
-#: contents/ui/configAppearance.qml:875 contents/ui/test.qml:870
+#: contents/ui/configAppearance.qml:876
 msgid "Weather condition text"
 msgstr "Текст за състоянието на времето"
 
-#: contents/ui/configAppearance.qml:739 contents/ui/test.qml:734
+#: contents/ui/configAppearance.qml:740
 msgid "Weather icon + condition text"
 msgstr "Икона за времето + текст за състоянието"
 
-#: contents/ui/configAppearance.qml:1323 contents/ui/test.qml:1318
+#: contents/ui/configAppearance.qml:1351
 msgid "Weather icon style:"
 msgstr "Стил на иконата за времето:"
 
-#: contents/ui/configGeneral.qml:34
+#: contents/ui/configGeneral.qml:44
 msgid "WeatherAPI.com (Key Required)"
 msgstr "WeatherAPI.com (изисква ключ)"
 
-#: contents/ui/configGeneral.qml:150
+#: contents/ui/configGeneral.qml:179
 msgid "WeatherAPI.com API Key:"
 msgstr "WeatherAPI.com API ключ:"
 
-#: contents/ui/configAppearance.qml:1178 contents/ui/test.qml:1173
+#: contents/ui/configAppearance.qml:1179
 msgid "Widget"
 msgstr "Приспособление"
 
-#: contents/ui/configAppearance.qml:1887 contents/ui/test.qml:1882
+#: contents/ui/configAppearance.qml:1917
 msgid "Widget items"
 msgstr "Елементи на приспособлението"
 
-#: contents/ui/configAppearance.qml:1868 contents/ui/test.qml:1863
+#: contents/ui/configAppearance.qml:1898
 msgid "Widget settings"
 msgstr "Настройки на приспособлението"
 
-#: contents/ui/configAppearance.qml:759 contents/ui/configAppearance.qml:828
-#: contents/ui/configAppearance.qml:888 contents/ui/DetailsView.qml:118
-#: contents/ui/test.qml:754 contents/ui/test.qml:823 contents/ui/test.qml:883
+#: contents/ui/configAppearance.qml:760 contents/ui/configAppearance.qml:829
+#: contents/ui/configAppearance.qml:889 contents/ui/DetailsView.qml:118
 msgid "Wind"
 msgstr "Вятър"
 
-#: contents/ui/configAppearance.qml:829 contents/ui/configAppearance.qml:889
-#: contents/ui/test.qml:824 contents/ui/test.qml:884
+#: contents/ui/configAppearance.qml:830 contents/ui/configAppearance.qml:890
 msgid "Wind speed + direction"
 msgstr "Скорост на вятъра + посока"
 
-#: contents/ui/configAppearance.qml:760 contents/ui/test.qml:755
+#: contents/ui/configAppearance.qml:761
 msgid "Wind speed and direction"
 msgstr "Скорост и посока на вятъра"
 
-#: contents/ui/configAppearance.qml:2504 contents/ui/test.qml:2382
+#: contents/ui/configAppearance.qml:2533
 msgid "Wind speed:"
 msgstr "Скорост на вятъра:"
 
-#: contents/ui/TooltipContent.qml:440
+#: contents/ui/TooltipContent.qml:442
 msgid "Wind:"
 msgstr "Вятър:"
 
-#: contents/ui/configAppearance.qml:2097
+#: contents/ui/configAppearance.qml:2127
 msgid "Wrap to next line"
 msgstr "Пренасяне на следващ ред"
 
-#: contents/ui/configGeneral.qml:32
+#: contents/ui/configGeneral.qml:36
 msgid "met.no (free)"
 msgstr "met.no (безплатно)"
 
-#: contents/ui/configGeneral.qml:231
+#: contents/ui/configGeneral.qml:272
 msgid "minutes"
 msgstr "минути"
 
-#: contents/ui/configAppearance.qml:1510 contents/ui/configAppearance.qml:1524
-#: contents/ui/configAppearance.qml:2154 contents/ui/configAppearance.qml:2197
-#: contents/ui/test.qml:1505 contents/ui/test.qml:1519
+#: contents/ui/configAppearance.qml:1540 contents/ui/configAppearance.qml:1554
+#: contents/ui/configAppearance.qml:2184 contents/ui/configAppearance.qml:2227
 msgid "px"
 msgstr "px"
 
-#: contents/ui/configAppearance.qml:1510 contents/ui/test.qml:1505
+#: contents/ui/configAppearance.qml:1540
 msgid "px  (auto)"
 msgstr ""
 

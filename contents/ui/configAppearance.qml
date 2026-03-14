@@ -610,6 +610,7 @@ KCM.AbstractKCM {
 
     // Simple mode sub‑options
     property int cfg_panelSimpleLayoutType: 0
+    property string cfg_panelSimpleHorizontalContent: "both"
     property int cfg_panelSimpleWidgetOrder: 0
     property string cfg_panelSimpleIconStyle: "symbolic"
 
@@ -1289,8 +1290,34 @@ KCM.AbstractKCM {
                         }
                     }
 
+                    // ── Horizontal-layout content filter ──────────────────
                     RowLayout {
-                        visible: root.cfg_panelInfoMode === "simple" && root.cfg_panelSimpleLayoutType !== 2
+                        visible: root.cfg_panelInfoMode === "simple" && root.cfg_panelSimpleLayoutType === 0
+                        Kirigami.FormData.label: i18n("Show:")
+                        spacing: Kirigami.Units.largeSpacing
+                        ComboBox {
+                            id: simpleHorizContentCombo
+                            Layout.preferredWidth: 200
+                            textRole: "text"
+                            model: [
+                                { text: i18n("Icon and temperature"), value: "both"      },
+                                { text: i18n("Temperature only"),     value: "temp_only" },
+                                { text: i18n("Icon only"),            value: "icon_only" }
+                            ]
+                            Component.onCompleted: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].value === root.cfg_panelSimpleHorizontalContent) {
+                                        currentIndex = i; break;
+                                    }
+                            }
+                            onActivated: root.cfg_panelSimpleHorizontalContent = model[currentIndex].value
+                        }
+                    }
+
+                    RowLayout {
+                        visible: root.cfg_panelInfoMode === "simple"
+                            && root.cfg_panelSimpleLayoutType !== 2
+                            && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent === "both")
                         Kirigami.FormData.label: i18n("Items Order:")
                         spacing: Kirigami.Units.largeSpacing
                         ComboBox {
@@ -1320,6 +1347,7 @@ KCM.AbstractKCM {
 
                     RowLayout {
                         visible: root.cfg_panelInfoMode === "simple"
+                            && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent !== "temp_only")
                         Kirigami.FormData.label: i18n("Weather icon style:")
                         spacing: Kirigami.Units.largeSpacing
                         ComboBox {
@@ -1350,6 +1378,7 @@ KCM.AbstractKCM {
                     // Icon size mode
                     RowLayout {
                         visible: root.cfg_panelInfoMode === "simple"
+                            && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent !== "temp_only")
                         Kirigami.FormData.label: i18n("Icon size:")
                         spacing: Kirigami.Units.largeSpacing
                         ComboBox {
@@ -1398,6 +1427,7 @@ KCM.AbstractKCM {
                     // Font size mode
                     RowLayout {
                         visible: root.cfg_panelInfoMode === "simple"
+                            && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent !== "icon_only")
                         Kirigami.FormData.label: i18n("Font size:")
                         spacing: Kirigami.Units.largeSpacing
                         ComboBox {
