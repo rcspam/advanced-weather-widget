@@ -65,6 +65,8 @@
 
     <!-- Simple mode (panel) options – new -->
     <entry name="panelSimpleLayoutType" type="Int"><default>0</default></entry>
+    <!-- Horizontal layout type content: "both" | "icon_only" | "temp_only" -->
+    <entry name="panelSimpleHorizontalContent" type="String"><default>both</default></entry>
     <entry name="panelSimpleWidgetOrder" type="Int"><default>0</default></entry>
     <entry name="panelSimpleIconStyle" type="String"><default>symbolic</default></entry>
         <!-- Simple mode manual sizing -->

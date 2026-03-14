@@ -69,6 +69,14 @@ PlasmaCore.ToolTipArea {
     readonly property int simpleWidgetOrder: Plasmoid.configuration.panelSimpleWidgetOrder || 0
     readonly property string simpleIconStyle: Plasmoid.configuration.panelSimpleIconStyle || "symbolic"
 
+    // ── Horizontal layout content filter ──────────────────────────────
+    // Controls what is shown in simple mode horizontal layout (type 0):
+    //   "both"      — icon + temperature (default)
+    //   "icon_only" — weather icon only, temperature hidden
+    //   "temp_only" — temperature only, icon hidden
+    // Has no effect on vertical / compressed layouts.
+    readonly property string simpleHorizContent: Plasmoid.configuration.panelSimpleHorizontalContent || "both"
+
     // ── Vertical-panel size scale factors ────────────────────────────────
     // Change these two values to resize icon and temperature in vertical panels.
     // 1.0 = natural size (auto-fits panel thickness).  > 1.0 = larger, < 1.0 = smaller.
@@ -81,6 +89,39 @@ PlasmaCore.ToolTipArea {
     readonly property int simpleIconPx: Plasmoid.configuration.simpleIconSizeManual || 32
     readonly property bool simpleFontAuto: (Plasmoid.configuration.simpleFontSizeMode || "auto") === "auto"
     readonly property int simpleFontPx: Plasmoid.configuration.simpleFontSizeManual || 14
+
+    // ── Symbolic-icon scale for simple mode ───────────────────────────────
+    // ↓↓ EDIT THIS LINE to resize symbolic (wi-font) icons in simple mode ↓↓
+    // 1.0 = same cell size as colorful icon  |  0.75 = 75 % (recommended)
+    // Values below 0.5 may look too small; above 1.0 has no effect in auto mode.
+    readonly property real simpleSymbolicScale: 0.75
+    // Derived cell size for symbolic icons only — colorful always uses simpleIconSz.
+    readonly property int simpleSymbolicIconSz: Math.max(12, Math.round(compactRoot.simpleIconSz * compactRoot.simpleSymbolicScale))
+
+    // ── Simple-mode computed sizes ─────────────────────────────────────────
+    // simpleIconSz: auto horizontal type0   = full panel height
+    //               auto horizontal type1   = panel height / 2 (stacked)
+    //               auto vertical   type0   = panel width / 2  (side-by-side)
+    //               auto vertical   type1   = panel width / 1.5 (stacked)
+    //                 e.g. 64 px panel → icon 42 px
+    //               manual = user value (no cap — let KDE clip if needed).
+    readonly property int simpleIconSz: compactRoot.simpleIconAuto ? (compactRoot.vertical ? (compactRoot.simpleLayoutType === 1 ? Math.max(16, Math.round(compactRoot.width / 1.4)) : Math.max(16, Math.round(compactRoot.width / 2))) : (compactRoot.simpleLayoutType === 1 ? Math.max(16, Math.round(compactRoot.height / 2)) : Math.max(16, compactRoot.height))) : compactRoot.simpleIconPx
+
+    // simpleFontSz auto sizing:
+    //
+    //   horizontal type 0  (side-by-side) → height / 2
+    //     e.g. 64 px panel: icon = 64 px, font = 32 px
+    //
+    //   horizontal type 1  (stacked)      → height / 4   (icon = height/2, font = icon/2)
+    //     e.g. 64 px panel: icon = 32 px, font = 16 px
+    //
+    //   horizontal type 2  (compressed)   → height / 2   (same as type 0)
+    //
+    //   vertical (auto)                   → panel width / 3
+    //     e.g. 64 px panel: icon = 32 px, font = 21 px
+    //
+    // manual = user value.
+    readonly property int simpleFontSz: compactRoot.simpleFontAuto ? (!compactRoot.vertical ? (compactRoot.simpleLayoutType === 1 ? Math.max(8, Math.round(compactRoot.height / 4)) : Math.max(8, Math.round(compactRoot.height / 2))) : Math.max(8, Math.round(compactRoot.width / 3))) : compactRoot.simpleFontPx
 
     // ── Multiline options ─────────────────────────────────────────────────
     readonly property string mlIconStyle: Plasmoid.configuration.panelMultilineIconStyle || "colorful"
@@ -95,16 +136,16 @@ PlasmaCore.ToolTipArea {
     readonly property int mlVertRowH: Math.max(14, panelFontPx + 6, glyphSize + 4, svgIconPx + 4)
 
     // ── Root implicit sizes ───────────────────────────────────────────────
-    // For vertical panels + stacked simple mode, reserve double the usual
-    // height so KDE allocates enough room for two stacked cells.
-    // side-by-side (type 0) on horizontal panel needs room for icon + temp
-    // Simple mode on a horizontal panel: track panel height so the widget
-    // stays exactly as wide as its content regardless of how tall the panel gets.
-    //   type 0 side-by-side → icon (≈h) + gap (10) + temp (≈h*0.5) + margins
-    //   type 1 stacked / type 2 compressed → one square ≈ h + margins
-    implicitWidth: isMultiLine ? mlIconSize + 6 + 110 + 2 * leftRightMargin : isSimpleMode ? (vertical ? Kirigami.Units.gridUnit * 2 : (simpleLayoutType === 0 ? Math.max(Kirigami.Units.gridUnit * 4, Math.round(compactRoot.height * 1.8) + 10 + 2 * leftRightMargin) : Math.max(Kirigami.Units.gridUnit * 2, compactRoot.height + 2 * leftRightMargin))) : compactRow.implicitWidth + 2 * leftRightMargin
+    // Simple mode horizontal: width is driven by simpleGrid.implicitWidth so the
+    // click area hugs icon + gap + temperature text with no dead space.
+    // Compressed (type 2) uses a standalone Item — fall back to icon square + margins.
+    implicitWidth: isMultiLine ? mlIconSize + 6 + 110 + 2 * leftRightMargin : isSimpleMode ? (vertical ? Kirigami.Units.gridUnit * 2 : (simpleLayoutType === 2 ?
+            // compressed: just the icon square + margins
+            Math.max(Kirigami.Units.gridUnit * 2, simpleIconSz + 2 * leftRightMargin) :
+            // side-by-side / stacked: track actual GridLayout content width
+            Math.max(Kirigami.Units.gridUnit * 2, simpleGrid.implicitWidth + 2 * leftRightMargin))) : compactRow.implicitWidth + 2 * leftRightMargin
 
-    implicitHeight: isMultiLine ? Math.max(multiLines * (panelFontPx + 8), 32) : Kirigami.Units.gridUnit * 2
+    implicitHeight: isMultiLine ? Math.max(multiLines * (panelFontPx + 8), 32) : (isSimpleMode && vertical) ? Math.max(Kirigami.Units.gridUnit * 2, simpleIconSz + 4) : Kirigami.Units.gridUnit * 2
 
     // ── Layout hints to the panel ─────────────────────────────────────────
     // vertical panels: fillHeight=false keeps the widget from consuming all
@@ -140,8 +181,8 @@ PlasmaCore.ToolTipArea {
         }
         if (!vertical)
             return -1;
-        var iH = compactRoot.simpleIconAuto ? Math.max(Kirigami.Units.gridUnit * 2, Math.round(compactRoot.width)) : compactRoot.simpleIconPx;
-        var tH = compactRoot.simpleFontAuto ? Math.round(iH * 0.5) : compactRoot.simpleFontPx;
+        var iH = compactRoot.simpleIconSz;
+        var tH = compactRoot.simpleFontSz;
         if (simpleLayoutType === 1)
             return iH + tH + 6;
         if (simpleLayoutType === 2)
@@ -685,10 +726,13 @@ PlasmaCore.ToolTipArea {
             anchors.centerIn: parent
             width: compactRoot.vertical ? parent.width : implicitWidth
 
-            // vertical + stacked (type 1): height = implicitHeight so the grid is exactly
-            // 2×paintedHeight + rowSpacing and sits centred — no dead space above/below cells.
-            // All other cases: fill the available widget height.
-            height: (compactRoot.vertical && compactRoot.simpleLayoutType === 1) ? implicitHeight : parent.height - 2
+            // Vertical panels and horizontal stacked (type 1): collapse the grid to
+            // exactly its content height so anchors.centerIn centres the icon+temp
+            // pair cleanly.
+            //
+            // Horizontal type 0 (side-by-side): fill the full parent height so the
+            // icon row gets the maximum available space without any shrinkage.
+            height: (compactRoot.vertical || compactRoot.simpleLayoutType === 1) ? implicitHeight : parent.height
 
             // type 1 → 2 rows × 1 col; type 0 → 1 row × 2 cols
             rows: compactRoot.simpleLayoutType === 1 ? 2 : 1
@@ -704,24 +748,45 @@ PlasmaCore.ToolTipArea {
             // ← EDIT: change the numbers below to adjust spacing between icon and temperature
             //   columnSpacing controls horizontal-type (type 0) on vertical panels
             //   rowSpacing    controls vertical-type   (type 1) on vertical panels
-            columnSpacing: compactRoot.simpleLayoutType === 0 ? (compactRoot.vertical ? 2 : 10) : 0
-            rowSpacing: (compactRoot.vertical && compactRoot.simpleLayoutType === 1) ? Math.max(0, Math.min(2, Math.round(compactRoot.width * 2.02))) : 0
+            // Horizontal type 0 spacing between icon and temperature:
+            //   colorful icons fill their cell edge-to-edge → 6 px looks tight but right
+            //   symbolic (wi-font) glyphs have internal padding → need more gap
+            // ↓↓ EDIT the two numbers below to tune spacing for each icon style ↓↓
+            //      first number  = colorful icon gap (px)
+            //      second number = symbolic icon gap (px)
+            columnSpacing: compactRoot.simpleLayoutType === 0 ? (compactRoot.vertical ? 2 : (compactRoot.simpleIconStyle === "colorful" ? 6 : 14)) : 0
+
+            // ↓↓ EDIT the two numbers below to adjust the gap between icon and temperature
+            //    in stacked (type 1) simple mode layout:
+            //      first number  = vertical panels gap (px)
+            //      second number = horizontal panels gap (px)
+            rowSpacing: compactRoot.simpleLayoutType === 1 ? (compactRoot.vertical ? 6 : 8) : 0
 
             // ── Icon cell ─────────────────────────────────────────────────
             Item {
                 // Hide until the glyph has loaded to avoid mis-sized cells
-                visible: iconGlyph.text.length > 0 || compactRoot.simpleIconStyle === "colorful"
+                // In horizontal layout (type 0), hide when content filter is "temp_only"
+                visible: (iconGlyph.text.length > 0 || compactRoot.simpleIconStyle === "colorful")
+                    && (compactRoot.simpleLayoutType !== 0 || compactRoot.simpleHorizContent !== "temp_only")
                 Layout.alignment: Qt.AlignCenter
                 // No clip needed: HorizontalFit never overflows its cell.
 
-                // vertical panel: fill width; height clamped to paintedHeight
-                // horizontal panel: fill height; width clamped to paintedWidth
-                Layout.fillWidth: compactRoot.vertical
-                Layout.fillHeight: !compactRoot.vertical
-                Layout.minimumWidth: compactRoot.vertical ? 0 : iconGlyph.paintedWidth
-                Layout.maximumWidth: compactRoot.vertical ? Infinity : iconGlyph.paintedWidth
-                Layout.minimumHeight: compactRoot.vertical ? iconGlyph.paintedHeight : 0
-                Layout.maximumHeight: compactRoot.vertical ? iconGlyph.paintedHeight : Infinity
+                // Cell sizing:
+                //   colorful → always simpleIconSz (icon fills the cell completely)
+                //   symbolic → simpleSymbolicIconSz (scaled-down cell; scale set by
+                //              simpleSymbolicScale property above)
+                //
+                // vertical auto  → fill available width up to the computed icon size
+                // vertical manual / horizontal → fixed square
+                readonly property int _cellSz: compactRoot.simpleIconStyle === "colorful" ? compactRoot.simpleIconSz : compactRoot.simpleSymbolicIconSz
+                Layout.fillWidth: compactRoot.vertical && compactRoot.simpleIconAuto
+                Layout.fillHeight: false
+                Layout.preferredWidth: (compactRoot.vertical && compactRoot.simpleIconAuto) ? -1 : _cellSz
+                Layout.minimumWidth: (compactRoot.vertical && compactRoot.simpleIconAuto) ? 0 : _cellSz
+                Layout.maximumWidth: (compactRoot.vertical && compactRoot.simpleIconAuto) ? Infinity : _cellSz
+                Layout.preferredHeight: _cellSz
+                Layout.minimumHeight: _cellSz
+                Layout.maximumHeight: _cellSz
 
                 // Widget order: 0 = icon first, 1 = temp first
                 Layout.row: compactRoot.simpleLayoutType === 1 ? (compactRoot.simpleWidgetOrder === 0 ? 0 : 1) : 0
@@ -733,13 +798,11 @@ PlasmaCore.ToolTipArea {
                     visible: compactRoot.simpleIconStyle !== "colorful"
                     text: compactRoot.weatherRoot ? compactRoot.weatherRoot.getSimpleModeIconChar() : "?"
                     font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                    // font.pixelSize = upper cap for HorizontalFit on vertical panels.
-                    // Auto: 999 + autoFontSizeMode → fills cell (HorizontalFit/VerticalFit).
-                    // Manual: fixed pixel size from settings + FixedSize.
-                    font.pixelSize: compactRoot.simpleIconAuto ? 999 : compactRoot.simpleIconPx
-                    font.pointSize: 0
-                    minimumPixelSize: Math.round(Kirigami.Units.gridUnit / 2)
-                    fontSizeMode: compactRoot.simpleIconAuto ? simpleRoot.autoFontSizeMode : Text.FixedSize
+                    // Symbolic glyph rendered at simpleSymbolicIconSz (= simpleIconSz * scale).
+                    // To fine-tune symbolic icon size: edit simpleSymbolicScale near the top
+                    // of this file (search for "EDIT THIS LINE to resize symbolic").
+                    font.pixelSize: compactRoot.simpleSymbolicIconSz
+                    fontSizeMode: Text.FixedSize
                     color: Kirigami.Theme.textColor
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -755,14 +818,21 @@ PlasmaCore.ToolTipArea {
 
             // ── Temperature cell ──────────────────────────────────────────
             Item {
+                // In horizontal layout (type 0), hide when content filter is "icon_only"
                 visible: tempText.text.length > 0
+                    && (compactRoot.simpleLayoutType !== 0 || compactRoot.simpleHorizContent !== "icon_only")
                 Layout.alignment: Qt.AlignCenter
                 Layout.fillWidth: compactRoot.vertical
-                Layout.fillHeight: !compactRoot.vertical
+                // fillHeight intentionally omitted: height is fully pinned by
+                // preferred/min/max below.  Setting fillHeight:true with a pinned
+                // maximumHeight can cause Qt's GridLayout to shrink the icon row
+                // in the surplus-redistribution pass, making the colorful icon
+                // render smaller than simpleIconSz in auto mode.
                 Layout.minimumWidth: compactRoot.vertical ? 0 : tempText.paintedWidth
                 Layout.maximumWidth: compactRoot.vertical ? Infinity : tempText.paintedWidth
-                Layout.minimumHeight: compactRoot.vertical ? tempText.paintedHeight : 0
-                Layout.maximumHeight: compactRoot.vertical ? tempText.paintedHeight : Infinity
+                Layout.preferredHeight: compactRoot.simpleFontSz
+                Layout.minimumHeight: compactRoot.simpleFontSz
+                Layout.maximumHeight: compactRoot.simpleFontSz
 
                 Layout.row: compactRoot.simpleLayoutType === 1 ? (compactRoot.simpleWidgetOrder === 0 ? 1 : 0) : 0
                 Layout.column: compactRoot.simpleLayoutType === 1 ? 0 : (compactRoot.simpleWidgetOrder === 0 ? 1 : 0)
@@ -772,10 +842,8 @@ PlasmaCore.ToolTipArea {
                     anchors.fill: parent
                     text: compactRoot.weatherRoot ? compactRoot.weatherRoot.tempValue(compactRoot.weatherRoot.temperatureC) : "--"
                     font.family: Kirigami.Theme.defaultFont.family
-                    font.pixelSize: compactRoot.simpleFontAuto ? Math.max(compactRoot.panelFontPx, Math.round(iconGlyph.paintedHeight * 0.5)) : compactRoot.simpleFontPx
-                    font.pointSize: 0
-                    minimumPixelSize: Math.round(Kirigami.Units.gridUnit / 2)
-                    fontSizeMode: compactRoot.simpleFontAuto ? simpleRoot.autoFontSizeMode : Text.FixedSize
+                    font.pixelSize: compactRoot.simpleFontSz
+                    fontSizeMode: Text.FixedSize
                     color: Kirigami.Theme.textColor
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
