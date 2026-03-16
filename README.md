@@ -122,6 +122,7 @@ For example:
 pt_BR.po
 de_DE.po
 fr_FR.po
+ru_RU.po
 ```
 
 3. Open the `.po` file in a translation editor such as:
@@ -152,7 +153,7 @@ Thank you to everyone who contributed translations to this project ❤️
 - **German** - [HolySoap](https://github.com/HolySoap)
 - **Brazilian Portuguese** - [PauloAlbqrq](https://github.com/PauloAlbqrq)
 - **Bulgarian** - Petar Nedyalkov (Author)
-
+- **Russian** - Dmaliog
 
 ## 🎨 Icons & Fonts
 
