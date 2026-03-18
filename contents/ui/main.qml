@@ -29,6 +29,7 @@ PlasmoidItem {
     implicitHeight: 550
     switchWidth: 200
     switchHeight: 100
+
     preferredRepresentation: fullRepresentation
 
     // ══════════════════════════════════════════════════════════════════════
@@ -71,6 +72,12 @@ PlasmoidItem {
 
     fullRepresentation: FullView {
         weatherRoot: root
+        // ── Minimum popup size ───────────────────────────────────────────
+        // Plasma reads Layout.minimumWidth/Height from the fullRepresentation
+        // item — NOT from PlasmoidItem — to enforce resize limits.
+
+        Layout.minimumWidth: 540
+        Layout.minimumHeight: 550
     }
 
     // And update it when the full representation is created:
@@ -761,6 +768,10 @@ PlasmoidItem {
             type: "svg",
             source: ""
         };
+    }
+
+    function getSimpleModeIconSourceSvg() {
+        return "image://icon/" + getSimpleModeIconSource();
     }
 
     /** Returns the display text for a panel chip */

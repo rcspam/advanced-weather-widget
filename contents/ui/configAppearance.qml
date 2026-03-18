@@ -684,6 +684,32 @@ KCM.AbstractKCM {
     property int cfg_simpleIconSizeManual: 32
     property string cfg_simpleFontSizeMode: "auto"
     property int cfg_simpleFontSizeManual: 14
+    property int cfg_simpleIconAutoSz: 0   // written by CompactView; read-only here
+    property int cfg_simpleFontAutoSz: 0   // written by CompactView; read-only here
+    // Panel geometry written back by CompactView so the config page can
+    // recompute auto sizes for the CURRENTLY SELECTED layout type even
+    // before the user clicks Apply (config dialog buffers cfg_* values).
+    property int cfg_simplePanelDim: 48        // _fullPanelW (vertical) or _fullPanelH (horizontal)
+    property bool cfg_simplePanelIsVertical: false
+
+    // Compute auto icon size for a given layout type using the live panel dim.
+    // Mirrors CompactView simpleIconSz formula exactly.
+    function _autoIconSz(lt) {
+        var dim = root.cfg_simplePanelDim > 0 ? root.cfg_simplePanelDim : 48;
+        if (root.cfg_simplePanelIsVertical)
+            return lt === 0 ? Math.max(16, Math.round(dim / 2)) : Math.max(16, dim);
+        else
+            return lt === 1 ? Math.max(16, Math.round(dim / 2)) : Math.max(16, dim);
+    }
+    // Compute auto font size for a given layout type using the live panel dim.
+    // Mirrors CompactView simpleFontSz formula exactly.
+    function _autoFontSz(lt) {
+        var dim = root.cfg_simplePanelDim > 0 ? root.cfg_simplePanelDim : 48;
+        if (root.cfg_simplePanelIsVertical)
+            return Math.max(8, Math.round(dim / 3));
+        else
+            return lt === 1 ? Math.max(8, Math.round(dim / 3)) : Math.max(8, Math.round(dim * 11 / 24));
+    }
 
     // ── Custom icon map helpers ──────────────────────────────────────────
     function parseCustomIcons(raw) {
@@ -1300,14 +1326,24 @@ KCM.AbstractKCM {
                             Layout.preferredWidth: 200
                             textRole: "text"
                             model: [
-                                { text: i18n("Icon and temperature"), value: "both"      },
-                                { text: i18n("Temperature only"),     value: "temp_only" },
-                                { text: i18n("Icon only"),            value: "icon_only" }
+                                {
+                                    text: i18n("Icon and temperature"),
+                                    value: "both"
+                                },
+                                {
+                                    text: i18n("Temperature only"),
+                                    value: "temp_only"
+                                },
+                                {
+                                    text: i18n("Icon only"),
+                                    value: "icon_only"
+                                }
                             ]
                             Component.onCompleted: {
                                 for (var i = 0; i < model.length; ++i)
                                     if (model[i].value === root.cfg_panelSimpleHorizontalContent) {
-                                        currentIndex = i; break;
+                                        currentIndex = i;
+                                        break;
                                     }
                             }
                             onActivated: root.cfg_panelSimpleHorizontalContent = model[currentIndex].value
@@ -1315,9 +1351,7 @@ KCM.AbstractKCM {
                     }
 
                     RowLayout {
-                        visible: root.cfg_panelInfoMode === "simple"
-                            && root.cfg_panelSimpleLayoutType !== 2
-                            && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent === "both")
+                        visible: root.cfg_panelInfoMode === "simple" && root.cfg_panelSimpleLayoutType !== 2 && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent === "both")
                         Kirigami.FormData.label: i18n("Items Order:")
                         spacing: Kirigami.Units.largeSpacing
                         ComboBox {
@@ -1346,8 +1380,7 @@ KCM.AbstractKCM {
                     }
 
                     RowLayout {
-                        visible: root.cfg_panelInfoMode === "simple"
-                            && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent !== "temp_only")
+                        visible: root.cfg_panelInfoMode === "simple" && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent !== "temp_only")
                         Kirigami.FormData.label: i18n("Weather icon style:")
                         spacing: Kirigami.Units.largeSpacing
                         ComboBox {
@@ -1377,8 +1410,7 @@ KCM.AbstractKCM {
 
                     // Icon size mode
                     RowLayout {
-                        visible: root.cfg_panelInfoMode === "simple"
-                            && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent !== "temp_only")
+                        visible: root.cfg_panelInfoMode === "simple" && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent !== "temp_only")
                         Kirigami.FormData.label: i18n("Icon size:")
                         spacing: Kirigami.Units.largeSpacing
                         ComboBox {
@@ -1395,39 +1427,66 @@ KCM.AbstractKCM {
                                     value: "manual"
                                 }
                             ]
-                            // Bind current index to the config value
                             currentIndex: root.cfg_simpleIconSizeMode === "auto" ? 0 : 1
                             onCurrentIndexChanged: {
                                 var newMode = model[currentIndex].value;
                                 if (root.cfg_simpleIconSizeMode !== newMode) {
                                     root.cfg_simpleIconSizeMode = newMode;
-                                    // When switching to manual, set a sensible default if empty
-                                    if (newMode === "manual" && root.cfg_simpleIconSizeManual === 0) {
+                                    if (newMode === "manual" && root.cfg_simpleIconSizeManual === 0)
                                         root.cfg_simpleIconSizeManual = 32;
-                                    }
                                 }
                             }
                         }
-                        SpinBox {
+                        // Auto: read-only ComboBox showing the live computed px value.
+                        // Manual: ComboBox with preset sizes (colorful capped at 48 px).
+                        ComboBox {
                             id: iconSizeSpin
                             enabled: root.cfg_simpleIconSizeMode === "manual"
-                            from: 16
-                            to: 120
-                            value: root.cfg_simpleIconSizeManual
-                            onValueModified: root.cfg_simpleIconSizeManual = value
-                            Layout.preferredWidth: 80
-                        }
-                        Label {
-                            text: "px"
-                            opacity: 0.65
-                            visible: enabled
+                            Layout.preferredWidth: 90
+                            textRole: "text"
+                            property var allSizes: [
+                                { text: "16 px", value: 16 },
+                                { text: "24 px", value: 24 },
+                                { text: "32 px", value: 32 },
+                                { text: "48 px", value: 48 },
+                                { text: "64 px", value: 64 }
+                            ]
+                            // 64 px only for symbolic — colorful is capped at 48 px
+                            // (KDE icon theme raster limit; above 48 px gets upscaled)
+                            model: root.cfg_panelSimpleIconStyle === "colorful"
+                                ? allSizes.filter(function(s) { return s.value <= 48; })
+                                : allSizes
+                            currentIndex: {
+                                if (root.cfg_simpleIconSizeMode === "auto") {
+                                    // Compute the correct auto value for the CURRENTLY
+                                    // SELECTED layout type (may differ from applied type).
+                                    var target = root.cfg_simplePanelDim > 0
+                                        ? root._autoIconSz(root.cfg_panelSimpleLayoutType)
+                                        : (root.cfg_simpleIconAutoSz > 0 ? root.cfg_simpleIconAutoSz : 24);
+                                    var best = 0;
+                                    for (var i = 0; i < model.length; i++) {
+                                        if (Math.abs(model[i].value - target) < Math.abs(model[best].value - target))
+                                            best = i;
+                                    }
+                                    return best;
+                                }
+                                // Manual: find index of the saved value
+                                for (var j = 0; j < model.length; j++) {
+                                    if (model[j].value === root.cfg_simpleIconSizeManual)
+                                        return j;
+                                }
+                                return 2; // default to 32 px
+                            }
+                            onActivated: {
+                                if (root.cfg_simpleIconSizeMode === "manual")
+                                    root.cfg_simpleIconSizeManual = model[currentIndex].value;
+                            }
                         }
                     }
 
                     // Font size mode
                     RowLayout {
-                        visible: root.cfg_panelInfoMode === "simple"
-                            && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent !== "icon_only")
+                        visible: root.cfg_panelInfoMode === "simple" && (root.cfg_panelSimpleLayoutType !== 0 || root.cfg_panelSimpleHorizontalContent !== "icon_only")
                         Kirigami.FormData.label: i18n("Font size:")
                         spacing: Kirigami.Units.largeSpacing
                         ComboBox {
@@ -1449,24 +1508,34 @@ KCM.AbstractKCM {
                                 var newMode = model[currentIndex].value;
                                 if (root.cfg_simpleFontSizeMode !== newMode) {
                                     root.cfg_simpleFontSizeMode = newMode;
-                                    if (newMode === "manual" && root.cfg_simpleFontSizeManual === 0) {
+                                    if (newMode === "manual" && root.cfg_simpleFontSizeManual === 0)
                                         root.cfg_simpleFontSizeManual = 14;
-                                    }
                                 }
                             }
                         }
+                        // Auto: read-only SpinBox showing the live computed value.
+                        // Manual: editable SpinBox for the user-set value.
                         SpinBox {
                             enabled: root.cfg_simpleFontSizeMode === "manual"
                             from: 8
                             to: 72
-                            value: root.cfg_simpleFontSizeManual
-                            onValueModified: root.cfg_simpleFontSizeManual = value
+                            // Compute the correct auto font for the CURRENTLY SELECTED
+                            // layout type using the live panel dim from CompactView.
+                            // Falls back to cfg_simpleFontAutoSz if dim not yet stored.
+                            value: root.cfg_simpleFontSizeMode === "auto"
+                                ? (root.cfg_simplePanelDim > 0
+                                    ? root._autoFontSz(root.cfg_panelSimpleLayoutType)
+                                    : (root.cfg_simpleFontAutoSz > 0 ? root.cfg_simpleFontAutoSz : root.cfg_simpleFontSizeManual))
+                                : root.cfg_simpleFontSizeManual
+                            onValueModified: {
+                                if (root.cfg_simpleFontSizeMode === "manual")
+                                    root.cfg_simpleFontSizeManual = value;
+                            }
                             Layout.preferredWidth: 80
                         }
                         Label {
                             text: "px"
                             opacity: 0.65
-                            visible: enabled
                         }
                     }
                     // ... (rest of the file unchanged)
@@ -1527,21 +1596,30 @@ KCM.AbstractKCM {
                             }
                             onActivated: root.cfg_panelMultilineIconStyle = model[currentIndex].value
                         }
-                        SpinBox {
-                            id: mlIconSizeSpinBox
-                            from: 0
-                            to: 128
-                            value: root.cfg_panelMultilineIconSize
-                            onValueModified: root.cfg_panelMultilineIconSize = value
-                            ToolTip.visible: hovered
-                            ToolTip.text: i18n("Icon size in px. 0 = auto.")
-                        }
-                        Label {
-                            text: root.cfg_panelMultilineIconSize === 0 ? i18n("px  (auto)") : i18n("px")
-                            opacity: 0.65
+                        ComboBox {
+                            id: mlIconSizeCombo
+                            Layout.preferredWidth: 100
+                            textRole: "text"
+                            property var sizeModel: [
+                                { text: i18n("Auto"),  value: 0  },
+                                { text: "16 px",       value: 16 },
+                                { text: "24 px",       value: 24 },
+                                { text: "32 px",       value: 32 },
+                                { text: "48 px",       value: 48 },
+                                { text: "64 px",       value: 64 }
+                            ]
+                            model: sizeModel
+                            currentIndex: {
+                                for (var i = 0; i < sizeModel.length; i++)
+                                    if (sizeModel[i].value === root.cfg_panelMultilineIconSize)
+                                        return i;
+                                return 0;
+                            }
+                            onActivated: root.cfg_panelMultilineIconSize = sizeModel[currentIndex].value
                         }
                     }
                     RowLayout {
+                        visible: root.cfg_panelInfoMode !== "simple"
                         Kirigami.FormData.label: i18n("Item width:")
                         spacing: 8
                         SpinBox {

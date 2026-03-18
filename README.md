@@ -153,7 +153,9 @@ Thank you to everyone who contributed translations to this project ❤️
 - **German** - [HolySoap](https://github.com/HolySoap)
 - **Brazilian Portuguese** - [PauloAlbqrq](https://github.com/PauloAlbqrq)
 - **Bulgarian** - Petar Nedyalkov (Author)
-- **Russian** - Dmaliog
+- **Dutch** - Heimen Stoffels (<vistausss@fastmail.com>)
+- **Russian** - [Dmaliog](https://github.com/dmaliog)
+- **French** - [LAZER-TY](https://github.com/LAZER-TY)
 
 ## 🎨 Icons & Fonts
 
