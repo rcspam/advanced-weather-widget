@@ -15,6 +15,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 
 import "js/moonphase.js" as Moon
+import "js/suncalc.js" as SC
 import "js/weather.js" as W
 
 ColumnLayout {
@@ -97,7 +98,7 @@ ColumnLayout {
                 pressure: "\uF079",
                 dewpoint: "\uF078",
                 visibility: "\uF0B6",
-                moonphase: Moon.moonPhaseFontIcon(),
+                moonphase: Moon.moonPhaseFontIcon(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)),
                 "suntimes-sunrise": "\uF051",
                 "suntimes-sunset": "\uF052"
             };
@@ -169,7 +170,7 @@ ColumnLayout {
             wind: "strong-wind",
             dewpoint: "raindrop",
             visibility: "thermometer",
-            moonphase: Moon.moonPhaseSvgStem(),
+            moonphase: Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)),
             "suntimes-sunrise": "sunrise",
             "suntimes-sunset": "sunset"
         };
@@ -478,7 +479,8 @@ ColumnLayout {
         }
 
         if (tok === "moonphase")
-            return [row("moonphase", i18n(Moon.moonPhaseNameKey()), i18n("Moon:") + " " + i18n(Moon.moonPhaseNameKey()))];
+            var _age = Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase);
+            return [row("moonphase", i18n(Moon.moonPhaseNameKey(_age)), i18n("Moon:") + " " + i18n(Moon.moonPhaseNameKey(_age)))];
 
         if (tok === "suntimes") {
             var mode = ttSunTimesMode;

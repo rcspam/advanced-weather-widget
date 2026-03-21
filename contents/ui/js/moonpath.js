@@ -1,10 +1,8 @@
 /**
  * moonpath.js — Moon arc geometry, progress, rise/set calculation and canvas drawing
  *
- * MOONRISE / MOONSET — computed astronomically from lat/lon (no API needed).
- * Algorithm: Jean Meeus "Astronomical Algorithms" Ch.47 (low-precision moon position)
- * + Ch.15 (rise/set/transit).  Accurate to within a few minutes for most dates
- * and latitudes — more than enough for a weather widget.
+ * MOONRISE / MOONSET — delegated to suncalc.js (getMoonTimes).
+ * This file retains only canvas drawing helpers and arc-progress functions.
  *
  * The moon arc mirrors the sun arc from sunpath.js:
  *   Clockwise: left (moonrise) → top (transit) → right (moonset)
@@ -123,111 +121,6 @@ function _moonPos(jd) {
 // Moonrise / Moonset calculation
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Compute moonrise and moonset times for today at the given location.
- *
- *   latDeg       — observer latitude in decimal degrees (+N, -S)
- *   lonDeg       — observer longitude in decimal degrees (+E, -W)
- *   utcOffsetMins — location UTC offset in minutes (e.g. -420 for UTC-7)
- *
- * Returns { rise: "HH:mm", set: "HH:mm" } in location-local time.
- * Returns "--" for either time if the moon doesn't rise or set that day.
- *
- * Method: sample the moon's altitude every 10 minutes, find sign-changes
- * (horizon crossings), then interpolate linearly to the crossing minute.
- * Accurate to ±2 min for mid-latitudes.
- */
-function computeMoonTimes(latDeg, lonDeg, utcOffsetMins) {
-    if (latDeg === undefined || latDeg === null || isNaN(latDeg) ||
-        lonDeg === undefined || lonDeg === null || isNaN(lonDeg)) {
-        return { rise: "--", set: "--" };
-    }
-
-    var offset = (utcOffsetMins || 0);
-
-    // Julian Day at local midnight (= start of today in location time)
-    // We need "today" in location-local calendar:
-    var nowUTC     = new Date();
-    var localMsNow = nowUTC.getTime() + offset * 60000;
-    var localNow   = new Date(localMsNow);
-    var localYear  = localNow.getUTCFullYear();
-    var localMonth = localNow.getUTCMonth() + 1;   // 1-12
-    var localDay   = localNow.getUTCDate();
-
-    // Julian Day for local noon (used as reference)
-    function julianDay(year, month, day, hourFrac) {
-        if (month <= 2) { year -= 1; month += 12; }
-        var A = Math.floor(year / 100);
-        var B = 2 - A + Math.floor(A / 4);
-        return Math.floor(365.25 * (year + 4716))
-             + Math.floor(30.6001 * (month + 1))
-             + day + B - 1524.5 + (hourFrac / 24.0);
-    }
-
-    // Greenwich Mean Sidereal Time at UT0 (degrees)
-    function gmst(jd) {
-        var T = (jd - 2451545.0) / 36525.0;
-        var theta = 280.46061837 + 360.98564736629 * (jd - 2451545.0)
-                  + 0.000387933 * T * T;
-        return _rev(theta);
-    }
-
-    // Moon altitude at a given UT hour today
-    function moonAlt(utHour) {
-        var jd  = julianDay(localYear, localMonth, localDay, utHour);
-        var pos = _moonPos(jd);
-        var lst = _rev(gmst(jd) + lonDeg);     // Local Sidereal Time (deg)
-        var ha  = _rev(lst - pos.ra + 180) - 180;  // hour angle, -180..180
-        var latr = _rad(latDeg);
-        var decr = _rad(pos.dec);
-        var har  = _rad(ha);
-        var alt = _deg(Math.asin(
-            Math.sin(latr) * Math.sin(decr) +
-            Math.cos(latr) * Math.cos(decr) * Math.cos(har)
-        ));
-        return alt;
-    }
-
-    // UT hour of local midnight (start of today in location-local time)
-    // local midnight UTC = 0:00 local = -offset minutes UTC
-    var midnightUT = -offset / 60.0;   // may be negative → wraps
-    // Normalise to 0–24 range; also note we want to scan a full 24 h window
-    // so we go from midnightUT to midnightUT+24 in UT space.
-
-    var step = 10 / 60.0;   // 10-minute step in hours
-    var riseUT = -1, setUT = -1;
-    var prevAlt = moonAlt(midnightUT);
-
-    for (var i = 1; i <= 144; i++) {   // 144 × 10 min = 1440 min = 24 h
-        var utH   = midnightUT + i * step;
-        var curAlt = moonAlt(utH);
-
-        if (prevAlt < 0 && curAlt >= 0 && riseUT < 0) {
-            // Rising zero-crossing → interpolate
-            var frac  = (-prevAlt) / (curAlt - prevAlt);
-            riseUT    = midnightUT + (i - 1 + frac) * step;
-        }
-        if (prevAlt >= 0 && curAlt < 0 && setUT < 0) {
-            // Setting zero-crossing → interpolate
-            var frac2 = (prevAlt) / (prevAlt - curAlt);
-            setUT     = midnightUT + (i - 1 + frac2) * step;
-        }
-
-        prevAlt = curAlt;
-    }
-
-    // Convert UT hours → location-local minutes-since-midnight
-    function utToLocalMins(utH) {
-        var localH = utH + offset / 60.0;
-        return ((localH % 24) + 24) % 24 * 60;
-    }
-
-    return {
-        rise: riseUT >= 0 ? _minsToHHMM(utToLocalMins(riseUT)) : "--",
-        set:  setUT  >= 0 ? _minsToHHMM(utToLocalMins(setUT))  : "--"
-    };
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Moon arc progress (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -262,18 +155,7 @@ function formatDuration(totalMins) {
 // Moon illumination / age (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function moonAge() {
-    var refNewMoon = new Date(Date.UTC(2000, 0, 6, 18, 14, 0));
-    var lunarCycle = 29.530588853;
-    var diffDays   = (Date.now() - refNewMoon.getTime()) / 86400000;
-    return ((diffDays % lunarCycle) + lunarCycle) % lunarCycle;
-}
-
-function illuminationPercent() {
-    var age = moonAge();
-    var frac = (1 - Math.cos((age / 29.530588853) * 2 * Math.PI)) / 2;
-    return Math.round(frac * 100);
-}
+// moonAge() and illuminationPercent() removed — use SC.getMoonIllumination() from suncalc.js
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Canvas drawing (all unchanged from previous version)

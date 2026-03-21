@@ -3,19 +3,22 @@
  *
  * .pragma library: pure JS math only, no Qt APIs, no i18n.
  * Import via: import "js/moonphase.js" as Moon
+ *
+ * Moon age must now be supplied by the caller via SunCalc:
+ *   import "js/suncalc.js" as SC
+ *   var age = Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)
  */
 .pragma library
 
 /**
- * Returns the current moon age in days.
- * 0.0 = new moon,  ~7.38 = first quarter,
- * ~14.77 = full moon, ~22.15 = third quarter
+ * Converts a SunCalc phase value (0..1) to moon age in days (0..29.53).
+ * Call as: Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)
+ *
+ * The old getMoonAge() self-contained calculation has been removed in favour
+ * of SunCalc for accuracy and maintainability.
  */
-function getMoonAge() {
-    var refNewMoon  = new Date(Date.UTC(2000, 0, 6, 18, 14, 0));
-    var lunarCycle  = 29.530588853;
-    var diffDays    = (Date.now() - refNewMoon.getTime()) / 86400000;
-    return ((diffDays % lunarCycle) + lunarCycle) % lunarCycle;
+function moonAgeFromPhase(phase) {
+    return phase * 29.530588853;
 }
 
 /**
@@ -23,7 +26,7 @@ function getMoonAge() {
  * If age is omitted the current age is computed automatically.
  */
 function moonPhaseGlyph(age) {
-    var a = (age !== undefined) ? age : getMoonAge();
+    var a = (age !== undefined) ? age : 0; // age must be supplied by caller via SC.getMoonIllumination()
     var offsets = [0x00, 0x02, 0x05, 0x08, 0x0C, 0x10, 0x14, 0x17];
     var idx = Math.round((a / 29.53) * 7) % 8;
     return String.fromCodePoint(0xF0D0 + offsets[idx]);
@@ -34,7 +37,7 @@ function moonPhaseGlyph(age) {
  * Full URL: Qt.resolvedUrl("../icons/wi-" + Moon.moonPhaseSvgStem(age) + ".svg")
  */
 function moonPhaseSvgStem(age) {
-    var a = (age !== undefined) ? age : getMoonAge();
+    var a = (age !== undefined) ? age : 0; // age must be supplied by caller via SC.getMoonIllumination()
     if (a < 1.85)  return "moon-alt-new";
     if (a < 5.0)   return "moon-alt-waxing-crescent-2";
     if (a < 7.38)  return "moon-alt-waxing-crescent-5";
@@ -50,7 +53,7 @@ function moonPhaseSvgStem(age) {
 }
 
 function moonPhaseFontIcon(age) {
-    var a = (age !== undefined) ? age : getMoonAge();
+    var a = (age !== undefined) ? age : 0; // age must be supplied by caller via SC.getMoonIllumination()
     if (a < 1.85)  return "\uF0EB";  // moon-alt-new
     if (a < 5.0)   return "\uF0D2";  // moon-alt-waxing-crescent-2
     if (a < 7.38)  return "\uF0D5";  // moon-alt-waxing-crescent-5
@@ -70,7 +73,7 @@ function moonPhaseFontIcon(age) {
  * e.g.: i18n(Moon.moonPhaseNameKey())
  */
 function moonPhaseNameKey(age) {
-    var a = (age !== undefined) ? age : getMoonAge();
+    var a = (age !== undefined) ? age : 0; // age must be supplied by caller via SC.getMoonIllumination()
     if (a < 1.85)  return "New Moon";
     if (a < 7.38)  return "Waxing Crescent";
     if (a < 9.23)  return "First Quarter";

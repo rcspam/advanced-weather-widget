@@ -21,6 +21,7 @@ import org.kde.kirigami as Kirigami
 
 import "js/weather.js" as W
 import "js/moonphase.js" as Moon
+import "js/suncalc.js" as SC
 
 PlasmoidItem {
     id: root
@@ -391,7 +392,7 @@ PlasmoidItem {
     function moonPhaseLabel() {
         // Each string is a literal so xgettext can extract all 8 translations.
         // moonPhaseNameKey() returns the English key; we map it here.
-        var key = Moon.moonPhaseNameKey();
+        var key = Moon.moonPhaseNameKey(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
         if (key === "New Moon")
             return i18n("New Moon");
         if (key === "Waxing Crescent")
@@ -412,10 +413,10 @@ PlasmoidItem {
     }
 
     function moonPhaseGlyph() {
-        return Moon.moonPhaseFontIcon();
+        return Moon.moonPhaseFontIcon(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
     }
     function moonPhaseSvgUrl() {
-        return Qt.resolvedUrl("../icons/wi-" + Moon.moonPhaseSvgStem() + ".svg");
+        return Qt.resolvedUrl("../icons/wi-" + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg");
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -767,7 +768,7 @@ PlasmoidItem {
             // moonPhaseSvgStem() returns e.g. "moon-new" → wi-moon-new.svg
             return {
                 type: "svg",
-                source: base + Moon.moonPhaseSvgStem() + ".svg"
+                source: base + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg"
             };
 
         return {
@@ -901,7 +902,7 @@ PlasmoidItem {
         running: true
         repeat: true
         onTriggered: {
-            var dummy = Moon.getMoonAge();
+            var dummy = SC.getMoonIllumination(new Date()).phase;
         }
     }
 

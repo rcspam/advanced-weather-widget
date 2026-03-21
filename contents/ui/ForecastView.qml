@@ -230,24 +230,82 @@ Item {
                                 spacing: 6
                                 height: parent.height
 
+                                // Build combined model: hourly entries + sunrise/sunset marker cards
+                                // inserted between the hour that precedes each event.
+                                property var _hourlyWithSun: {
+                                    if (!weatherRoot || !weatherRoot.hourlyData.length) return [];
+                                    function toMins(t) {
+                                        if (!t || t === "--") return -1;
+                                        var p = t.split(":"); return p.length < 2 ? -1 : parseInt(p[0],10)*60+parseInt(p[1],10);
+                                    }
+                                    var rise = toMins(weatherRoot.sunriseTimeText);
+                                    var set_ = toMins(weatherRoot.sunsetTimeText);
+                                    var riseInserted = rise < 0, setInserted = set_ < 0;
+                                    var result = [];
+                                    weatherRoot.hourlyData.forEach(function(h) {
+                                        var hm = toMins(h.hour);
+                                        if (!riseInserted && hm >= 0 && hm > rise) {
+                                            result.push({ isSunrise: true,  isSunset: false, time: weatherRoot.sunriseTimeText });
+                                            riseInserted = true;
+                                        }
+                                        if (!setInserted && hm >= 0 && hm > set_) {
+                                            result.push({ isSunrise: false, isSunset: true,  time: weatherRoot.sunsetTimeText });
+                                            setInserted = true;
+                                        }
+                                        result.push(h);
+                                    });
+                                    return result;
+                                }
+
                                 Repeater {
-                                    model: weatherRoot ? weatherRoot.hourlyData : []
+                                    model: parent._hourlyWithSun
 
                                     delegate: Rectangle {
                                         required property var modelData
-                                        width: 100
+                                        // Sunrise/sunset cards are slim; hourly cards are full height
+                                        width: (modelData.isSunrise || modelData.isSunset) ? 70 : 100
                                         height: 200
                                         radius: 8
-                                        color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.08)
+                                        color: (modelData.isSunrise || modelData.isSunset)
+                                            ? Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.04)
+                                            : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.08)
                                         border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.12)
                                         border.width: 1
 
+                                        // ── Sunrise / Sunset card ─────────────────────────────
                                         ColumnLayout {
+                                            visible: modelData.isSunrise === true || modelData.isSunset === true
+                                            anchors.centerIn: parent
+                                            spacing: 6
+                                            Kirigami.Icon {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                source: {
+                                                    var th = forecastRoot.widgetIconTheme === "wi-font" ? "symbolic" : forecastRoot.widgetIconTheme;
+                                                    if (th === "kde") return modelData.isSunrise ? "weather-sunrise" : "weather-sunset";
+                                                    return forecastRoot.iconsBaseDir + th + "/" + forecastRoot.iconSz + "/wi-" + (modelData.isSunrise ? "sunrise" : "sunset") + ".svg";
+                                                }
+                                                isMask: forecastRoot.widgetIconTheme !== "kde"
+                                                color: modelData.isSunrise ? "#ffcf63" : "#ff8c52"
+                                                Layout.preferredWidth: 32
+                                                Layout.preferredHeight: 32
+                                            }
+                                            Label {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: weatherRoot ? weatherRoot.formatTimeForDisplay(modelData.time) : "--"
+                                                color: modelData.isSunrise ? "#ffcf63" : "#ff8c52"
+                                                font: weatherRoot ? weatherRoot.wf(10, true) : Qt.font({ bold: true })
+                                            }
+                                        }
+
+                                        // ── Regular hourly card ───────────────────────────────
+                                        ColumnLayout {
+                                            visible: !(modelData.isSunrise === true || modelData.isSunset === true)
                                             anchors {
                                                 fill: parent
                                                 margins: 6
                                             }
                                             spacing: 4
+
 
                                             // Fix bug with time formatting – formatted according to system locale (12h/24h)
                                             Label {
@@ -355,11 +413,12 @@ Item {
                                                     font: weatherRoot ? weatherRoot.wf(9, false) : Qt.font({})
                                                 }
                                             }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+
+                                        } // ColumnLayout (regular)
+                                    } // Rectangle delegate
+                                } // Repeater
+                            } // ScrollView content Row
+                        } // ScrollView
                     }
 
                     Rectangle {

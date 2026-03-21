@@ -624,6 +624,8 @@ KCM.AbstractKCM {
     // Issue #7: widgetDetailsOrder replaces individual booleans
     property string cfg_widgetDetailsOrder: "feelslike;humidity;pressure;wind;dewpoint;visibility;moonphase;suntimes"
     property string cfg_widgetDetailsLayout: "cards2"  // "cards2" | "list"
+    property string cfg_widgetSunTimesMode: "both"   // "both" | "sunrise" | "sunset" | "upcoming"
+    property string cfg_widgetMoonMode: "full"        // "full" | "upcoming" | "times"
     property int cfg_widgetIconSize: 16
     property string cfg_widgetIconTheme: "symbolic"   // "kde" | "wi-font" | "flat-color" | "symbolic" | "3d-oxygen"
     property int cfg_widgetWidth: 0       // 0 = default 540 px
@@ -1044,9 +1046,11 @@ KCM.AbstractKCM {
     // ─────────────────────────────────────────────────────────────────────
     function initDetailsModel() {
         detailsWorkingModel.clear();
-        var enabled = cfg_widgetDetailsOrder.split(";").filter(function (t) {
-            return t.trim().length > 0;
-        });
+        // Ensure arc cards are always in the order (migrate old configs)
+        var raw = cfg_widgetDetailsOrder.split(";").map(function(t){return t.trim();}).filter(function(t){return t.length>0;});
+        if (raw.indexOf("suntimes") < 0)  raw.push("suntimes");
+        if (raw.indexOf("moonphase") < 0) raw.push("moonphase");
+        var enabled = raw;
         enabled.forEach(function (tok) {
             tok = tok.trim();
             for (var j = 0; j < allDetailsDefs.length; ++j) {
@@ -2073,6 +2077,22 @@ KCM.AbstractKCM {
                         }
                     }
 
+                    // ── Details layout: Cards (2-col) or List (1-col flat) ──
+                    RowLayout {
+                        Kirigami.FormData.label: i18n("Details layout:")
+                        ComboBox {
+                            id: detailsLayoutCombo
+                            Layout.preferredWidth: 160
+                            textRole: "text"
+                            model: [
+                                { text: i18n("Cards (2 columns)"), value: "cards2" },
+                                { text: i18n("List"),              value: "list"   }
+                            ]
+                            currentIndex: root.cfg_widgetDetailsLayout === "list" ? 1 : 0
+                            onActivated: root.cfg_widgetDetailsLayout = model[currentIndex].value
+                        }
+                    }
+
                     // ── Cards height (hidden in list mode) ────────────────
                     RowLayout {
                         visible: root.cfg_widgetDetailsLayout !== "list"
@@ -2862,7 +2882,7 @@ KCM.AbstractKCM {
                                                 if (id === "suntimes")
                                                     return b + "sunrise.svg";
                                                 if (id === "moonphase")
-                                                    return b + "wi-moon-alt-full.svg";
+                                                    return b + "moon-alt-full.svg";
                                                 if (id === "condition")
                                                     return b + "day-cloudy.svg";
                                                 if (id === "location")
@@ -3205,6 +3225,103 @@ KCM.AbstractKCM {
             Kirigami.Separator {
                 Layout.fillWidth: true
             }
+            // ── Per-item configure dialog (suntimes / moonphase) ─────────────
+            Dialog {
+                id: itemCfgDialog
+                property string _itemId: ""
+                title: _itemId === "suntimes" ? i18n("Sunrise/Sunset options") : i18n("Moon Phase options")
+                modal: true
+                parent: Overlay.overlay
+                anchors.centerIn: parent
+                width: Math.min(420, parent ? parent.width * 0.92 : 420)
+                standardButtons: Dialog.Close
+
+                ColumnLayout {
+                    width: parent.width
+                    spacing: Kirigami.Units.largeSpacing
+
+                    // ── Blue info banner ─────────────────────────────────────
+                    Rectangle {
+                        Layout.fillWidth: true
+                        radius: 4
+                        color: Qt.rgba(0.18, 0.52, 1.0, 0.14)
+                        border.color: Qt.rgba(0.18, 0.52, 1.0, 0.40)
+                        border.width: 1
+                        implicitHeight: infoBannerRow.implicitHeight + 14
+                        RowLayout {
+                            id: infoBannerRow
+                            anchors {
+                                left: parent.left; right: parent.right
+                                verticalCenter: parent.verticalCenter
+                                margins: 10
+                            }
+                            spacing: 8
+                            Kirigami.Icon {
+                                source: "dialog-information"
+                                implicitWidth: 16; implicitHeight: 16
+                                color: "#4a8fe8"
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                text: i18n("This option affects the item when it's collapsed.")
+                                color: "#4a8fe8"
+                                wrapMode: Text.WordWrap
+                                font: Kirigami.Theme.smallFont
+                            }
+                        }
+                    }
+
+                    // ── Sunrise/Sunset options ───────────────────────────────
+                    ColumnLayout {
+                        visible: itemCfgDialog._itemId === "suntimes"
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+                        Label { text: i18n("Show:"); opacity: 0.75 }
+                        ComboBox {
+                            id: sunModeCfgCombo
+                            Layout.fillWidth: true
+                            textRole: "text"
+                            model: [
+                                { text: i18n("Both (sunrise & sunset)"), value: "both" },
+                                { text: i18n("Sunrise only"),            value: "sunrise" },
+                                { text: i18n("Sunset only"),             value: "sunset" },
+                                { text: i18n("Upcoming (auto)"),         value: "upcoming" }
+                            ]
+                            currentIndex: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].value === root.cfg_widgetSunTimesMode) return i;
+                                return 0;
+                            }
+                            onActivated: root.cfg_widgetSunTimesMode = model[currentIndex].value
+                        }
+                    }
+
+                    // ── Moon Phase options ───────────────────────────────────
+                    ColumnLayout {
+                        visible: itemCfgDialog._itemId === "moonphase"
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+                        Label { text: i18n("Show:"); opacity: 0.75 }
+                        ComboBox {
+                            id: moonModeCfgCombo
+                            Layout.fillWidth: true
+                            textRole: "text"
+                            model: [
+                                { text: i18n("Phase + moonrise & moonset"), value: "full" },
+                                { text: i18n("Phase + upcoming rise/set"),  value: "upcoming" },
+                                { text: i18n("Moonrise & moonset only"),    value: "times" }
+                            ]
+                            currentIndex: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].value === root.cfg_widgetMoonMode) return i;
+                                return 0;
+                            }
+                            onActivated: root.cfg_widgetMoonMode = model[currentIndex].value
+                        }
+                    }
+                }
+            }
+
             ScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -3300,7 +3417,7 @@ KCM.AbstractKCM {
                                                 if (id === "suntimes")
                                                     return b + "sunrise.svg";
                                                 if (id === "moonphase")
-                                                    return b + "wi-moon-alt-full.svg";
+                                                    return b + "moon-alt-full.svg";
                                                 if (id === "visibility")
                                                     return b + "fog.svg";
                                                 return "";
@@ -3325,6 +3442,19 @@ KCM.AbstractKCM {
                                             font: Kirigami.Theme.smallFont
                                             elide: Text.ElideRight
                                             opacity: 0.55
+                                        }
+                                    }
+                                    // ── Configure button (suntimes / moonphase only) ─────
+                                    ToolButton {
+                                        visible: model.itemId === "suntimes" || model.itemId === "moonphase"
+                                        implicitWidth: Kirigami.Units.iconSizes.medium
+                                        implicitHeight: Kirigami.Units.iconSizes.medium
+                                        icon.name: "configure"
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: i18n("Configure collapsed view")
+                                        onClicked: {
+                                            itemCfgDialog._itemId = model.itemId;
+                                            itemCfgDialog.open();
                                         }
                                     }
                                     // ── Enable / disable toggle ───────────────────────────
@@ -3587,7 +3717,7 @@ KCM.AbstractKCM {
                                                 if (id === "suntimes")
                                                     return b + "sunrise.svg";
                                                 if (id === "moonphase")
-                                                    return b + "wi-moon-alt-full.svg";
+                                                    return b + "moon-alt-full.svg";
                                                 if (id === "condition")
                                                     return b + "day-cloudy.svg";
                                                 if (id === "location")

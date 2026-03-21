@@ -157,11 +157,14 @@ Thank you to everyone who contributed translations to this project ❤️
 - **Russian** - [Dmaliog](https://github.com/dmaliog)
 - **French** - [LAZER-TY](https://github.com/LAZER-TY)
 
-## 🎨 Icons & Fonts
+## External resources
 
-This project uses weather icons and font resources from:
-https://github.com/erikflowers/weather-icons 
-Licensed under SIL OFL 1.1 (http://scripts.sil.org/OFL)
+- This project uses weather icons and font resources from: https://github.com/erikflowers/weather-icons  
+  Licensed under SIL OFL 1.1 (http://scripts.sil.org/OFL)
+
+- This project uses code from the SunCalc library: https://github.com/mourner/suncalc  
+  Copyright (c) Vladimir Agafonkin  
+  Licensed under the BSD license
 
 ## ❤️ Support the project
 

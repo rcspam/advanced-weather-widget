@@ -105,6 +105,8 @@
     <!-- Issue #7: configurable widget details view items (semicolon-separated) -->
     <entry name="widgetDetailsOrder" type="String"><default>feelslike;humidity;pressure;wind;dewpoint;visibility;moonphase;suntimes</default></entry>
     <entry name="widgetDetailsLayout" type="String"><default>cards2</default></entry>
+    <entry name="widgetSunTimesMode" type="String"><default>both</default></entry>
+    <entry name="widgetMoonMode" type="String"><default>full</default></entry>
     <entry name="widgetIconSize"       type="Int"   ><default>32</default></entry>
     <!-- Widget details icon theme -->
     <entry name="widgetIconTheme" type="String"><default>symbolic</default></entry>

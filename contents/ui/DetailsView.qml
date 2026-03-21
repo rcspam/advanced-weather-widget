@@ -11,6 +11,7 @@ import "js/weather.js" as W
 import "js/moonphase.js" as Moon
 import "js/moonpath.js" as MoonPath
 import "js/sunpath.js" as SunPath
+import "js/suncalc.js" as SC
 
 Item {
     id: root
@@ -30,6 +31,10 @@ Item {
 
     // ── Icon size from configuration ──────────────────────────────────────
     readonly property int iconSize: Plasmoid.configuration.widgetIconSize || 16
+    // Smaller glyph size for decorative indicators inside arc card info rows
+    // (sunrise ↑↓ and moonrise ↑↓ above the time label). Proportional to
+    // iconSize but capped so they fit inside the 44 px bottom row.
+    readonly property int glyphIconSize: Math.max(12, Math.round(iconSize * 0.55))
 
     // ── Theme helper — true when KDE is using a dark colour scheme ────────
     readonly property bool isDark: Kirigami.Theme.textColor.r > 0.5
@@ -51,6 +56,29 @@ Item {
     readonly property string iconTheme: Plasmoid.configuration.widgetIconTheme || "kde"
     readonly property int iconSz: iconSize
     readonly property bool isList: (Plasmoid.configuration.widgetDetailsLayout || "cards2") === "list"
+    readonly property string sunTimesMode: Plasmoid.configuration.widgetSunTimesMode || "both"
+    readonly property string moonMode: Plasmoid.configuration.widgetMoonMode || "full"
+
+    // Collapse state for the two arc cards.
+    // Plain bool properties so QML change detection works reliably.
+    // (var/object mutation does not trigger re-evaluation of bindings.)
+    property bool _sunExpanded: true
+    property bool _moonExpanded: true
+
+    // Height of regular (non-arc) cards — used as collapsed height for arc cards
+    // so they visually match feelslike/humidity/etc. when collapsed.
+    readonly property int regularCardHeight: Plasmoid.configuration.widgetCardsHeightAuto ? 30   // same as autoHeight for regular cards (line 259)
+    : (Plasmoid.configuration.widgetCardsHeight || 30)
+
+    // SVG icon base — wi-font falls back to symbolic so sun/moon icons always resolve
+    readonly property string svgBase: {
+        var th = iconTheme;
+        if (th === "wi-font")
+            th = "symbolic";
+        if (th === "kde")
+            return "";
+        return Qt.resolvedUrl("../icons/" + th + "/" + iconSize + "/wi-");
+    }
 
     // Resolved SVG URL for non-kde/wi-font themes
     function svgIconUrl(filename) {
@@ -82,7 +110,7 @@ Item {
                 suntimes: "wi-sunrise.svg",
                 dewpoint: "wi-raindrop.svg",
                 visibility: "wi-fog.svg",
-                moonphase: "wi-wi-moon-alt-full.svg",
+                moonphase: "wi-night-clear.svg",
                 condition: "wi-day-sunny.svg"
             })[id] || "wi-na.svg";
     }
@@ -208,7 +236,7 @@ Item {
         Column {
             id: detailsColumn
             width: parent.width
-            spacing: 8
+            spacing: root.isList ? 0 : 8
             bottomPadding: 4
 
             Repeater {
@@ -218,7 +246,7 @@ Item {
                     id: rowItem
                     required property var modelData   // array of 1 or 2 IDs
                     width: parent.width
-                    spacing: 8
+                    spacing: root.isList ? 0 : 8
 
                     Repeater {
                         model: rowItem.modelData
@@ -229,19 +257,54 @@ Item {
 
                             // Card height
                             readonly property bool isExpandedCard: card.modelData === "suntimes" || card.modelData === "moonphase"
-                                            // suntimes and moonphase both get the tall arc height
+                            // suntimes and moonphase both get the tall arc height
                             readonly property int autoHeight: {
-                                if (card.modelData === "suntimes")   return 178;
-                                if (card.modelData === "moonphase")  return 178;
-                                if (isExpandedCard) return 80;
-                                return 52;
+                                if (card.modelData === "suntimes")
+                                    return 165;
+                                if (card.modelData === "moonphase")
+                                    return 165;
+                                if (isExpandedCard)
+                                    return 80;
+                                return 30;  // ← adjust this value to change regular card height
                             }
                             Layout.fillWidth: true
-                            Layout.preferredHeight: Plasmoid.configuration.widgetCardsHeightAuto ? autoHeight : Plasmoid.configuration.widgetCardsHeight
-                            radius: root.isList ? 6 : 10
-                            color: root.cardBg
-                            border.color: root.cardBorder
-                            border.width: 1
+                            Layout.alignment: Qt.AlignTop
+                            // List mode: compact fixed height; Cards mode: auto or manual
+                            // Arc cards animate between expanded (arc view) and
+                            // collapsed (compact header-only row, ~44 px).
+                            readonly property bool _isArcExpanded: {
+                                if (!card.isExpandedCard)
+                                    return true;
+                                if (card.modelData === "suntimes")
+                                    return root._sunExpanded;
+                                if (card.modelData === "moonphase")
+                                    return root._moonExpanded;
+                                return true;
+                            }
+                            Layout.preferredHeight: root.isList ? (card.isExpandedCard ? 44 : 38) : (card.isExpandedCard ? (card._isArcExpanded ? autoHeight : root.regularCardHeight) : (Plasmoid.configuration.widgetCardsHeightAuto ? autoHeight : Plasmoid.configuration.widgetCardsHeight))
+                            Behavior on Layout.preferredHeight {
+                                NumberAnimation {
+                                    duration: 200
+                                    easing.type: Easing.InOutQuad
+                                }
+                            }
+                            radius: root.isList ? 0 : 10
+                            // List mode: no card background — just a flat row
+                            color: root.isList ? "transparent" : root.cardBg
+                            border.color: root.isList ? "transparent" : root.cardBorder
+                            border.width: root.isList ? 0 : 1
+
+                            // ── Separator line shown in list mode ─────────────────
+                            Rectangle {
+                                visible: root.isList
+                                anchors.bottom: parent.bottom
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.leftMargin: 6
+                                anchors.rightMargin: 6
+                                height: 1
+                                color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.10)
+                            }
 
                             // Standard item: single row
                             RowLayout {
@@ -253,14 +316,19 @@ Item {
                                 spacing: 8
                                 visible: !card.isExpandedCard && card.modelData !== "wind"
 
-                                // Icon
-                                Text {
+                                // Icon — uses existing theme-aware helpers
+                                Item {
                                     visible: root.iconTheme === "wi-font" && wiFont.status === FontLoader.Ready
-                                    text: root.wiGlyph(card.modelData)
-                                    font.family: wiFont.font.family
-                                    font.pixelSize: root.iconSize
-                                    color: root.accentFor(card.modelData)
+                                    implicitWidth: root.iconSize
+                                    implicitHeight: root.iconSize
                                     Layout.alignment: Qt.AlignVCenter
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: root.wiGlyph(card.modelData)
+                                        font.family: wiFont.font.family
+                                        font.pixelSize: root.iconSize
+                                        color: root.accentFor(card.modelData)
+                                    }
                                 }
                                 Kirigami.Icon {
                                     visible: root.iconTheme === "kde"
@@ -313,14 +381,19 @@ Item {
                                 spacing: 8
                                 visible: card.modelData === "wind"
 
-                                // Icon (same as above)
-                                Text {
+                                // Icon — uses existing theme-aware helpers
+                                Item {
                                     visible: root.iconTheme === "wi-font" && wiFont.status === FontLoader.Ready
-                                    text: root.wiGlyph("wind")
-                                    font.family: wiFont.font.family
-                                    font.pixelSize: root.iconSize
-                                    color: root.accentFor("wind")
+                                    implicitWidth: root.iconSize
+                                    implicitHeight: root.iconSize
                                     Layout.alignment: Qt.AlignVCenter
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: root.wiGlyph("wind")
+                                        font.family: wiFont.font.family
+                                        font.pixelSize: root.iconSize
+                                        color: root.accentFor("wind")
+                                    }
                                 }
                                 Kirigami.Icon {
                                     visible: root.iconTheme === "kde"
@@ -361,13 +434,18 @@ Item {
                                         })
                                         Layout.alignment: Qt.AlignVCenter
                                     }
-                                    Text {
+                                    Item {
                                         visible: weatherRoot && !isNaN(weatherRoot.windDirection)
-                                        text: W.windDirectionGlyph(weatherRoot.windDirection)
-                                        font.family: wiFont.status === FontLoader.Ready ? wiFont.font.family : ""
-                                        font.pixelSize: root.iconSize
-                                        color: Kirigami.Theme.textColor
+                                        implicitWidth: root.iconSize
+                                        implicitHeight: root.iconSize
                                         Layout.alignment: Qt.AlignVCenter
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: W.windDirectionGlyph(weatherRoot.windDirection)
+                                            font.family: wiFont.status === FontLoader.Ready ? wiFont.font.family : ""
+                                            font.pixelSize: root.iconSize
+                                            color: Kirigami.Theme.textColor
+                                        }
                                     }
                                 }
                             } // RowLayout (standard)
@@ -396,7 +474,125 @@ Item {
                             Item {
                                 id: suntimesCard
                                 anchors.fill: parent
-                                visible: card.modelData === "suntimes"
+                                clip: true
+                                // Arc card hidden in list mode (compact row used instead)
+                                visible: card.modelData === "suntimes" && !root.isList
+
+                                // ── Collapse / expand header ──────────────────────────
+                                // Styled like a standard item row so it blends when collapsed.
+                                RowLayout {
+                                    id: sunHeader
+                                    visible: !card._isArcExpanded
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.leftMargin: 10
+                                    anchors.rightMargin: 10
+                                    // height=0 when expanded so canvas anchors to parent.top
+                                    height: card._isArcExpanded ? 0 : root.regularCardHeight
+                                    spacing: 8
+
+                                    // Leading icon — sunrise or sunset depending on day/night
+                                    // Kirigami.Icon {
+                                    //     source: {
+                                    //         var stem = suntimesCard._isNight ? "sunset" : "sunrise";
+                                    //         return root.svgBase.length > 0
+                                    //             ? (root.svgBase + stem + ".svg")
+                                    //             : Qt.resolvedUrl("../icons/symbolic/32/wi-" + stem + ".svg");
+                                    //     }
+                                    //     isMask: true
+                                    //     color: root.accentFor("suntimes")
+                                    //     implicitWidth: root.iconSize
+                                    //     implicitHeight: root.iconSize
+                                    //     Layout.alignment: Qt.AlignVCenter
+                                    // }
+
+                                    Kirigami.Icon {
+                                        visible: root.iconTheme !== "kde" && root.iconTheme !== "wi-font"
+                                        source: root.svgIconUrl(root.wiFile("suntimes"))
+                                        isMask: root.iconTheme === "symbolic"
+                                        color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
+                                        implicitWidth: root.iconSize
+                                        implicitHeight: root.iconSize
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    // Dim label — matches standard row style
+                                    Label {
+                                        text: root.labelFor("suntimes") + ":"
+                                        color: Kirigami.Theme.textColor
+                                        opacity: 0.55
+                                        font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
+                                        elide: Text.ElideRight
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
+                                    // Bold value — sunrise / sunset times
+                                    Label {
+                                        text: {
+                                            if (!root.weatherRoot) return "--";
+                                            var m = root.sunTimesMode, r = root.weatherRoot;
+                                            if (m === "sunrise") return r.formatTimeForDisplay(r.sunriseTimeText);
+                                            if (m === "sunset")  return r.formatTimeForDisplay(r.sunsetTimeText);
+                                            if (m === "upcoming") {
+                                                var nowM = (new Date()).getHours()*60+(new Date()).getMinutes();
+                                                var riseM = SunPath.parseMins(r.sunriseTimeText);
+                                                var setM  = SunPath.parseMins(r.sunsetTimeText);
+                                                if (riseM >= 0 && nowM < riseM) return r.formatTimeForDisplay(r.sunriseTimeText);
+                                                if (setM  >= 0 && nowM < setM)  return r.formatTimeForDisplay(r.sunsetTimeText);
+                                                return r.formatTimeForDisplay(r.sunriseTimeText);
+                                            }
+                                            return r.formatTimeForDisplay(r.sunriseTimeText) + " / " + r.formatTimeForDisplay(r.sunsetTimeText);
+                                        }
+                                        color: root.valueColor
+                                        font: root.weatherRoot ? root.weatherRoot.wf(13, true) : Qt.font({
+                                            bold: true
+                                        })
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    // Chevron
+                                    Kirigami.Icon {
+                                        source: card._isArcExpanded ? "arrow-up" : "arrow-down"
+                                        implicitWidth: 14
+                                        implicitHeight: 14
+                                        opacity: 0.45
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                }
+                                // MouseArea must be a sibling of the RowLayout, not a child.
+                                // Inside a RowLayout, anchors.fill is ignored so the area gets 0 size.
+                                MouseArea {
+                                    anchors.top: sunHeader.top
+                                    anchors.left: sunHeader.left
+                                    anchors.right: sunHeader.right
+                                    height: sunHeader.height
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        root._sunExpanded = !card._isArcExpanded;
+                                    }
+                                }
+
+                                // ── Collapse button (expanded state only) ─────────
+                                Item {
+                                    visible: card._isArcExpanded
+                                    anchors.top: parent.top
+                                    anchors.right: parent.right
+                                    anchors.topMargin: 6
+                                    anchors.rightMargin: 8
+                                    width: 24
+                                    height: 24
+                                    Kirigami.Icon {
+                                        anchors.fill: parent
+                                        source: "arrow-up"
+                                        opacity: 0.50
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root._sunExpanded = false
+                                    }
+                                }
 
                                 // ── Day / night flag ──────────────────────────────────
                                 // Use weatherRoot.isNightTime() which reads the API's own
@@ -406,24 +602,29 @@ Item {
                                 // new Date().getHours() — which is always machine-local time,
                                 // not location-local time — and therefore always failed for
                                 // users checking a location in a different timezone.
-                                readonly property bool _isNight: root.weatherRoot
-                                    ? root.weatherRoot.isNightTime()
-                                    : false
+                                readonly property bool _isNight: root.weatherRoot ? root.weatherRoot.isNightTime() : false
 
                                 // ── Arc position (_prog) ───────────────────────────────
                                 // Uses UTC + location UTC-offset (from API) for reliable
                                 // local-time computation in Qt's V4 engine.
                                 // toLocaleTimeString/Intl with timeZone is NOT supported.
-                                readonly property int _utcOffset: root.weatherRoot
-                                    ? root.weatherRoot.locationUtcOffsetMins : 0
+                                readonly property int _utcOffset: root.weatherRoot ? root.weatherRoot.locationUtcOffsetMins : 0
                                 property real _prog: 0.5
 
+                                // _now is updated every minute and on every weather refresh.
+                                // The two centre Labels reference it so QML treats it as a
+                                // dependency and re-evaluates their text: bindings automatically.
+                                // Without this, SunPath helpers call new Date() internally which
+                                // is NOT a QML property — bindings would freeze on first eval.
+                                property int _now: 0
+                                function _refreshNow() {
+                                    _now = (new Date()).getTime(); // ms timestamp — just needs to change
+                                }
+
                                 function _updateProg() {
+                                    _refreshNow();
                                     if (root.weatherRoot) {
-                                        _prog = SunPath.sunProgress(
-                                            root.weatherRoot.sunriseTimeText,
-                                            root.weatherRoot.sunsetTimeText,
-                                            suntimesCard._utcOffset);
+                                        _prog = SunPath.sunProgress(root.weatherRoot.sunriseTimeText, root.weatherRoot.sunsetTimeText, suntimesCard._utcOffset);
                                     } else {
                                         _prog = 0.5;
                                     }
@@ -442,10 +643,21 @@ Item {
 
                                 Connections {
                                     target: root.weatherRoot
-                                    function onSunriseTimeTextChanged() { suntimesCard._updateProg(); }
-                                    function onSunsetTimeTextChanged()  { suntimesCard._updateProg(); }
-                                    // Repaint when is_day flag changes (e.g. weather refresh at sunset)
-                                    function onIsDayChanged() { sunCanvas.requestPaint(); }
+                                    function onSunriseTimeTextChanged() {
+                                        suntimesCard._updateProg();
+                                    }
+                                    function onSunsetTimeTextChanged() {
+                                        suntimesCard._updateProg();
+                                    }
+                                    // Repaint when is_day flag changes
+                                    function onIsDayChanged() {
+                                        sunCanvas.requestPaint();
+                                    }
+                                    // Re-evaluate time labels on every weather refresh.
+                                    // temperatureC changes on every provider response.
+                                    function onTemperatureCChanged() {
+                                        suntimesCard._updateProg();
+                                    }
                                 }
 
                                 // ── Glow-pulse: 0→1→0 over 3 s, looping ──────────────
@@ -453,51 +665,53 @@ Item {
                                 SequentialAnimation on glowPulse {
                                     running: suntimesCard.visible
                                     loops: Animation.Infinite
-                                    NumberAnimation { from: 0; to: 1; duration: 1500; easing.type: Easing.InOutSine }
-                                    NumberAnimation { from: 1; to: 0; duration: 1500; easing.type: Easing.InOutSine }
+                                    NumberAnimation {
+                                        from: 0
+                                        to: 1
+                                        duration: 1500
+                                        easing.type: Easing.InOutSine
+                                    }
+                                    NumberAnimation {
+                                        from: 1
+                                        to: 0
+                                        duration: 1500
+                                        easing.type: Easing.InOutSine
+                                    }
                                 }
                                 onGlowPulseChanged: sunCanvas.requestPaint()
 
                                 // ── Arc canvas ────────────────────────────────────────
                                 Canvas {
                                     id: sunCanvas
-                                    anchors.top: parent.top
+                                    anchors.top: sunHeader.bottom
                                     anchors.left: parent.left
                                     anchors.right: parent.right
-                                    height: parent.height - 50
+                                    height: parent.height - sunHeader.height - 50
                                     antialiasing: true
 
                                     onPaint: {
                                         var ctx2d = getContext("2d");
                                         // _prog drives arc dot position (visual).
                                         // _isNight drives sun vs moon — from API is_day flag.
-                                        SunPath.drawSunArc(
-                                            ctx2d, width, height,
-                                            suntimesCard._prog,
-                                            root.isDark,
-                                            suntimesCard.glowPulse,
-                                            root.weatherRoot ? root.weatherRoot.sunriseTimeText : "--",
-                                            root.weatherRoot ? root.weatherRoot.sunsetTimeText  : "--",
-                                            suntimesCard._utcOffset,
-                                            suntimesCard._isNight
-                                        );
+                                        SunPath.drawSunArc(ctx2d, width, height, suntimesCard._prog, root.isDark, suntimesCard.glowPulse, root.weatherRoot ? root.weatherRoot.sunriseTimeText : "--", root.weatherRoot ? root.weatherRoot.sunsetTimeText : "--", suntimesCard._utcOffset, suntimesCard._isNight);
                                     }
                                 } // Canvas
 
                                 // ── Night colour: soft pink/rose ──────────────────────
-                                readonly property color _nightLeft:   root.isDark ? "#f0a0c0" : "#c0406a"
-                                readonly property color _nightRight:  root.isDark ? "#c090f0" : "#8030b0"
+                                readonly property color _nightLeft: root.isDark ? "#f0a0c0" : "#c0406a"
+                                readonly property color _nightRight: root.isDark ? "#c090f0" : "#8030b0"
                                 readonly property color _nightCentre: root.isDark ? "#d8a0e0" : "#9040c0"
 
                                 // ── Bottom info row ───────────────────────────────────
                                 // DAY:   [↑ sunrise gold]  [day length / remaining]     [↓ sunset orange]
                                 // NIGHT: [↓ sunset pink]   [night length / until dawn]  [↑ sunrise violet]
                                 RowLayout {
+                                    visible: card._isArcExpanded
                                     anchors.bottom: parent.bottom
-                                    anchors.left:   parent.left
-                                    anchors.right:  parent.right
-                                    anchors.leftMargin:   10
-                                    anchors.rightMargin:  10
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.leftMargin: 10
+                                    anchors.rightMargin: 10
                                     anchors.bottomMargin: 6
                                     height: 44
                                     spacing: 4
@@ -506,29 +720,27 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        Text {
-                                            visible: wiFont.status === FontLoader.Ready
-                                            text:  suntimesCard._isNight ? "" : ""
-                                            font.family: wiFont.font.family
-                                            font.pixelSize: 11
-                                            color: suntimesCard._isNight
-                                                ? suntimesCard._nightLeft
-                                                : root.accentGold
+                                        Kirigami.Icon {
+                                            source: {
+                                                var stem = suntimesCard._isNight ? "sunset" : "sunrise";
+                                                return root.svgBase.length > 0 ? (root.svgBase + stem + ".svg") : Qt.resolvedUrl("../icons/symbolic/32/wi-" + stem + ".svg");
+                                            }
+                                            isMask: true
+                                            color: suntimesCard._isNight ? suntimesCard._nightLeft : root.accentGold
+                                            implicitWidth: root.glyphIconSize
+                                            implicitHeight: root.glyphIconSize
                                         }
                                         Label {
                                             text: {
-                                                if (!root.weatherRoot) return "--";
-                                                var t = suntimesCard._isNight
-                                                    ? root.weatherRoot.sunsetTimeText
-                                                    : root.weatherRoot.sunriseTimeText;
+                                                if (!root.weatherRoot)
+                                                    return "--";
+                                                var t = suntimesCard._isNight ? root.weatherRoot.sunsetTimeText : root.weatherRoot.sunriseTimeText;
                                                 return root.weatherRoot.formatTimeForDisplay(t);
                                             }
-                                            color: suntimesCard._isNight
-                                                ? suntimesCard._nightLeft
-                                                : root.accentGold
-                                            font: root.weatherRoot
-                                                ? root.weatherRoot.wf(12, true)
-                                                : Qt.font({ bold: true })
+                                            color: suntimesCard._isNight ? suntimesCard._nightLeft : root.accentGold
+                                            font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
+                                                bold: true
+                                            })
                                         }
                                     }
 
@@ -542,16 +754,14 @@ Item {
                                             width: parent.width
                                             horizontalAlignment: Text.AlignHCenter
                                             text: {
-                                                if (!root.weatherRoot) return "--";
+                                                void (suntimesCard._now); // reactive — re-evals every minute
+                                                if (!root.weatherRoot)
+                                                    return "--";
                                                 if (suntimesCard._isNight) {
-                                                    var nl = SunPath.nightLengthMins(
-                                                        root.weatherRoot.sunriseTimeText,
-                                                        root.weatherRoot.sunsetTimeText);
+                                                    var nl = SunPath.nightLengthMins(root.weatherRoot.sunriseTimeText, root.weatherRoot.sunsetTimeText);
                                                     return i18n("Night") + ": " + SunPath.formatDuration(nl);
                                                 }
-                                                var dl = SunPath.dayLengthMins(
-                                                    root.weatherRoot.sunriseTimeText,
-                                                    root.weatherRoot.sunsetTimeText);
+                                                var dl = SunPath.dayLengthMins(root.weatherRoot.sunriseTimeText, root.weatherRoot.sunsetTimeText);
                                                 return i18n("Day") + ": " + SunPath.formatDuration(dl);
                                             }
                                             color: Kirigami.Theme.textColor
@@ -564,16 +774,12 @@ Item {
                                             width: parent.width
                                             horizontalAlignment: Text.AlignHCenter
                                             text: {
-                                                if (!root.weatherRoot) return "--";
+                                                void (suntimesCard._now); // reactive — re-evals every minute
+                                                if (!root.weatherRoot)
+                                                    return "--";
                                                 if (suntimesCard._isNight) {
-                                                    var until = SunPath.minsUntilSunrise(
-                                                        root.weatherRoot.sunriseTimeText,
-                                                        root.weatherRoot.sunsetTimeText,
-                                                        suntimesCard._utcOffset);
-                                                    var mp = SunPath.moonProgress(
-                                                        root.weatherRoot.sunriseTimeText,
-                                                        root.weatherRoot.sunsetTimeText,
-                                                        suntimesCard._utcOffset);
+                                                    var until = SunPath.minsUntilSunrise(root.weatherRoot.sunriseTimeText, root.weatherRoot.sunsetTimeText, suntimesCard._utcOffset);
+                                                    var mp = SunPath.moonProgress(root.weatherRoot.sunriseTimeText, root.weatherRoot.sunsetTimeText, suntimesCard._utcOffset);
                                                     var phase = SunPath.nightPhaseLabel(mp, until);
                                                     if (phase === "approaching")
                                                         return i18n("Dawn approaching — ") + SunPath.formatDuration(until);
@@ -583,20 +789,13 @@ Item {
                                                         return i18n("Around midnight — ") + SunPath.formatDuration(until) + i18n(" until dawn");
                                                     return SunPath.formatDuration(until) + " " + i18n("until dawn");
                                                 }
-                                                var rem = SunPath.remainingMins(
-                                                    root.weatherRoot.sunriseTimeText,
-                                                    root.weatherRoot.sunsetTimeText,
-                                                    suntimesCard._utcOffset);
-                                                return rem > 0
-                                                    ? SunPath.formatDuration(rem) + " " + i18n("left")
-                                                    : i18n("Daylight over");
+                                                var rem = SunPath.remainingMins(root.weatherRoot.sunriseTimeText, root.weatherRoot.sunsetTimeText, suntimesCard._utcOffset);
+                                                return rem > 0 ? SunPath.formatDuration(rem) + " " + i18n("left") : i18n("Daylight over");
                                             }
-                                            color: suntimesCard._isNight
-                                                ? suntimesCard._nightCentre
-                                                : root.accentOrange
-                                            font: root.weatherRoot
-                                                ? root.weatherRoot.wf(11, true)
-                                                : Qt.font({ bold: true })
+                                            color: suntimesCard._isNight ? suntimesCard._nightCentre : root.accentOrange
+                                            font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({
+                                                bold: true
+                                            })
                                             elide: Text.ElideRight
                                         }
                                     }
@@ -605,36 +804,128 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        Text {
-                                            anchors.right: parent.right
-                                            visible: wiFont.status === FontLoader.Ready
-                                            text:  suntimesCard._isNight ? "" : ""
-                                            font.family: wiFont.font.family
-                                            font.pixelSize: 11
-                                            color: suntimesCard._isNight
-                                                ? suntimesCard._nightRight
-                                                : root.accentOrange
-                                            horizontalAlignment: Text.AlignRight
+                                        Kirigami.Icon {
+                                            source: {
+                                                var stem = suntimesCard._isNight ? "sunrise" : "sunset";
+                                                return root.svgBase.length > 0 ? (root.svgBase + stem + ".svg") : Qt.resolvedUrl("../icons/symbolic/32/wi-" + stem + ".svg");
+                                            }
+                                            isMask: true
+                                            color: suntimesCard._isNight ? suntimesCard._nightRight : root.accentOrange
+                                            implicitWidth: root.glyphIconSize
+                                            implicitHeight: root.glyphIconSize
+                                            Layout.alignment: Qt.AlignRight
                                         }
                                         Label {
                                             text: {
-                                                if (!root.weatherRoot) return "--";
-                                                var t = suntimesCard._isNight
-                                                    ? root.weatherRoot.sunriseTimeText
-                                                    : root.weatherRoot.sunsetTimeText;
+                                                if (!root.weatherRoot)
+                                                    return "--";
+                                                var t = suntimesCard._isNight ? root.weatherRoot.sunriseTimeText : root.weatherRoot.sunsetTimeText;
                                                 return root.weatherRoot.formatTimeForDisplay(t);
                                             }
-                                            color: suntimesCard._isNight
-                                                ? suntimesCard._nightRight
-                                                : root.accentOrange
-                                            font: root.weatherRoot
-                                                ? root.weatherRoot.wf(12, true)
-                                                : Qt.font({ bold: true })
+                                            color: suntimesCard._isNight ? suntimesCard._nightRight : root.accentOrange
+                                            font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
+                                                bold: true
+                                            })
                                         }
                                     }
                                 } // RowLayout (info row)
 
                             } // Item (suntimes)
+
+                            // ── LIST MODE: compact sunrise/sunset row ─────────────
+                            // Direct child of card Rectangle — never hidden by arc Item
+                            RowLayout {
+                                anchors {
+                                    fill: parent
+                                    leftMargin: 10
+                                    rightMargin: 10
+                                }
+                                visible: card.modelData === "suntimes" && root.isList
+                                spacing: 8
+
+                                // Icon
+                                Item {
+                                    visible: root.iconTheme === "wi-font" && wiFont.status === FontLoader.Ready
+                                    implicitWidth: root.iconSize
+                                    implicitHeight: root.iconSize
+                                    Layout.alignment: Qt.AlignVCenter
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: root.wiGlyph("suntimes")
+                                        font.family: wiFont.font.family
+                                        font.pixelSize: root.iconSize
+                                        color: root.accentFor("suntimes")
+                                    }
+                                }
+                                Kirigami.Icon {
+                                    visible: root.iconTheme === "kde"
+                                    source: root.kdeIcon("suntimes")
+                                    implicitWidth: root.iconSize
+                                    implicitHeight: root.iconSize
+                                    color: root.accentFor("suntimes")
+                                    Layout.alignment: Qt.AlignVCenter
+                                }
+                                Kirigami.Icon {
+                                    visible: root.iconTheme !== "kde" && root.iconTheme !== "wi-font"
+                                    source: root.svgIconUrl(root.wiFile("suntimes"))
+                                    isMask: root.iconTheme === "symbolic"
+                                    color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
+                                    implicitWidth: root.iconSize
+                                    implicitHeight: root.iconSize
+                                    Layout.alignment: Qt.AlignVCenter
+                                }
+                                Label {
+                                    text: root.labelFor("suntimes") + ":"
+                                    color: Kirigami.Theme.textColor
+                                    opacity: 0.55
+                                    font: weatherRoot ? weatherRoot.wf(11, false) : Qt.font({})
+                                    Layout.alignment: Qt.AlignVCenter
+                                }
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+                                // Sunrise / Sunset — SVG icons
+                                RowLayout {
+                                    spacing: 6
+                                    Layout.alignment: Qt.AlignVCenter
+                                    Kirigami.Icon {
+                                        source: root.svgBase.length > 0 ? (root.svgBase + "sunrise.svg") : "weather-sunrise"
+                                        isMask: root.iconTheme !== "kde"
+                                        color: root.accentGold
+                                        implicitWidth: root.iconSize
+                                        implicitHeight: root.iconSize
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    Label {
+                                        text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(root.weatherRoot.sunriseTimeText) : "--"
+                                        color: root.accentGold
+                                        font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
+                                            bold: true
+                                        })
+                                    }
+                                    Label {
+                                        text: "/"
+                                        color: Kirigami.Theme.textColor
+                                        opacity: 0.30
+                                        font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
+                                    }
+                                    Kirigami.Icon {
+                                        source: root.svgBase.length > 0 ? (root.svgBase + "sunset.svg") : "weather-sunset"
+                                        isMask: root.iconTheme !== "kde"
+                                        color: root.accentOrange
+                                        implicitWidth: root.iconSize
+                                        implicitHeight: root.iconSize
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    Label {
+                                        text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(root.weatherRoot.sunsetTimeText) : "--"
+                                        color: root.accentOrange
+                                        font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
+                                            bold: true
+                                        })
+                                    }
+                                }
+                            }
 
                             // ═══════════════════════════════════════════════════════════════
                             // Moon Phase — animated arc card
@@ -648,39 +939,124 @@ Item {
                             Item {
                                 id: moonCard
                                 anchors.fill: parent
-                                visible: card.modelData === "moonphase"
+                                clip: true
+                                // Arc card hidden in list mode (compact row used instead)
+                                visible: card.modelData === "moonphase" && !root.isList
+
+                                // ── Collapse / expand header ──────────────────────────
+                                RowLayout {
+                                    id: moonHeader
+                                    visible: !card._isArcExpanded
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.leftMargin: 10
+                                    anchors.rightMargin: 10
+                                    height: card._isArcExpanded ? 0 : root.regularCardHeight
+                                    spacing: 8
+
+                                    // Leading icon — phase-specific SVG
+                                                   Kirigami.Icon {
+                                    visible: root.iconTheme !== "kde" && root.iconTheme !== "wi-font"
+                                    source: root.iconTheme === "kde"
+                                        ? root.kdeIcon("moonphase")
+                                        : (root.svgBase.length > 0
+                                            ? (root.svgBase + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg")
+                                            : Qt.resolvedUrl("../icons/symbolic/32/wi-" + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg"))
+                                    isMask: root.iconTheme === "symbolic"
+                                    color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
+                                    implicitWidth: root.iconSize
+                                    implicitHeight: root.iconSize
+                                    Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    // Dim label
+                                    Label {
+                                        text: root.labelFor("moonphase") + ":"
+                                        color: Kirigami.Theme.textColor
+                                        opacity: 0.55
+                                        font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
+                                        elide: Text.ElideRight
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
+                                    Label {
+                                        text: root.weatherRoot ? root.weatherRoot.moonPhaseLabel() : "--"
+                                        color: root.accentViolet
+                                        font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({
+                                            bold: false
+                                        })
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    // Chevron
+                                    Kirigami.Icon {
+                                        source: card._isArcExpanded ? "arrow-up" : "arrow-down"
+                                        implicitWidth: 14
+                                        implicitHeight: 14
+                                        opacity: 0.45
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                }
+                                MouseArea {
+                                    anchors.top: moonHeader.top
+                                    anchors.left: moonHeader.left
+                                    anchors.right: moonHeader.right
+                                    height: moonHeader.height
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        root._moonExpanded = !card._isArcExpanded;
+                                    }
+                                }
+
+                                // ── Collapse button (expanded state only) ─────────
+                                Item {
+                                    visible: card._isArcExpanded
+                                    anchors.top: parent.top
+                                    anchors.right: parent.right
+                                    anchors.topMargin: 6
+                                    anchors.rightMargin: 8
+                                    width: 24
+                                    height: 24
+                                    Kirigami.Icon {
+                                        anchors.fill: parent
+                                        source: "arrow-up"
+                                        opacity: 0.50
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root._moonExpanded = false
+                                    }
+                                }
 
                                 // ── Location UTC offset ───────────────────────────────
-                                readonly property int _utcOffset: root.weatherRoot
-                                    ? root.weatherRoot.locationUtcOffsetMins : 0
+                                readonly property int _utcOffset: root.weatherRoot ? root.weatherRoot.locationUtcOffsetMins : 0
 
                                 // ── Computed moonrise / moonset ───────────────────────
                                 // Calculated astronomically from lat/lon — no API needed.
                                 // Recomputed once on load and whenever weather data updates.
                                 property string _moonriseText: "--"
-                                property string _moonsetText:  "--"
+                                property string _moonsetText: "--"
 
                                 function _computeTimes() {
                                     var lat = Plasmoid.configuration.latitude;
                                     var lon = Plasmoid.configuration.longitude;
                                     if (isNaN(lat) || isNaN(lon) || (lat === 0 && lon === 0)) {
                                         _moonriseText = "--";
-                                        _moonsetText  = "--";
+                                        _moonsetText = "--";
                                         return;
                                     }
-                                    var t = MoonPath.computeMoonTimes(lat, lon, moonCard._utcOffset);
+                                    var t = SC.getMoonTimes(new Date(), lat, lon, moonCard._utcOffset);
                                     _moonriseText = t.rise;
-                                    _moonsetText  = t.set;
+                                    _moonsetText = t.set;
                                 }
 
                                 // ── Moon arc progress ─────────────────────────────────
                                 property real _prog: 0.5
 
                                 function _updateProg() {
-                                    _prog = MoonPath.moonArcProgress(
-                                        moonCard._moonriseText,
-                                        moonCard._moonsetText,
-                                        moonCard._utcOffset);
+                                    _prog = MoonPath.moonArcProgress(moonCard._moonriseText, moonCard._moonsetText, moonCard._utcOffset);
                                     moonCanvas.requestPaint();
                                 }
 
@@ -715,39 +1091,45 @@ Item {
                                 SequentialAnimation on glowPulse {
                                     running: moonCard.visible
                                     loops: Animation.Infinite
-                                    NumberAnimation { from: 0; to: 1; duration: 1750; easing.type: Easing.InOutSine }
-                                    NumberAnimation { from: 1; to: 0; duration: 1750; easing.type: Easing.InOutSine }
+                                    NumberAnimation {
+                                        from: 0
+                                        to: 1
+                                        duration: 1750
+                                        easing.type: Easing.InOutSine
+                                    }
+                                    NumberAnimation {
+                                        from: 1
+                                        to: 0
+                                        duration: 1750
+                                        easing.type: Easing.InOutSine
+                                    }
                                 }
                                 onGlowPulseChanged: moonCanvas.requestPaint()
 
                                 // ── Arc canvas ────────────────────────────────────────
                                 Canvas {
                                     id: moonCanvas
-                                    anchors.top: parent.top
+                                    anchors.top: moonHeader.bottom
                                     anchors.left: parent.left
                                     anchors.right: parent.right
-                                    height: parent.height - 50
+                                    height: parent.height - moonHeader.height - 50
                                     antialiasing: true
 
                                     onPaint: {
                                         var ctx2d = getContext("2d");
-                                        MoonPath.drawMoonArc(
-                                            ctx2d, width, height,
-                                            moonCard._prog, root.isDark,
-                                            moonCard.glowPulse,
-                                            MoonPath.moonAge()
-                                        );
+                                        MoonPath.drawMoonArc(ctx2d, width, height, moonCard._prog, root.isDark, moonCard.glowPulse, Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
                                     }
                                 } // Canvas
 
                                 // ── Bottom info row ───────────────────────────────────
                                 // [↑ moonrise]  [phase glyph + name]  [↓ moonset]
                                 RowLayout {
+                                    visible: card._isArcExpanded
                                     anchors.bottom: parent.bottom
-                                    anchors.left:   parent.left
-                                    anchors.right:  parent.right
-                                    anchors.leftMargin:   10
-                                    anchors.rightMargin:  10
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.leftMargin: 10
+                                    anchors.rightMargin: 10
                                     anchors.bottomMargin: 6
                                     height: 44
                                     spacing: 4
@@ -756,21 +1138,21 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        Text {
-                                            visible: wiFont.status === FontLoader.Ready
-                                            text: "\uF0D4"
-                                            font.family: wiFont.font.family
-                                            font.pixelSize: 11
+                                        Kirigami.Icon {
+                                            source: root.svgBase.length > 0
+                                                ? (root.svgBase + "moonrise.svg")
+                                                : Qt.resolvedUrl("../icons/symbolic/32/wi-moonrise.svg")
+                                            isMask: true
                                             color: root.accentViolet
+                                            implicitWidth: root.glyphIconSize
+                                            implicitHeight: root.glyphIconSize
                                         }
                                         Label {
-                                            text: root.weatherRoot
-                                                ? root.weatherRoot.formatTimeForDisplay(moonCard._moonriseText)
-                                                : "--"
+                                            text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(moonCard._moonriseText) : "--"
                                             color: root.accentViolet
-                                            font: root.weatherRoot
-                                                ? root.weatherRoot.wf(12, true)
-                                                : Qt.font({ bold: true })
+                                            font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({
+                                                bold: false
+                                            })
                                         }
                                     }
 
@@ -779,65 +1161,236 @@ Item {
                                         Layout.fillWidth: true
                                         spacing: 4
                                         Layout.alignment: Qt.AlignVCenter
-                                        Item { Layout.fillWidth: true }
-                                        Text {
-                                            visible: wiFont.status === FontLoader.Ready
-                                            text: Moon.moonPhaseFontIcon()
-                                            font.family: wiFont.font.family
-                                            font.pixelSize: root.iconSize
-                                            color: root.accentViolet
-                                            Layout.alignment: Qt.AlignVCenter
+                                        Item {
+                                            Layout.fillWidth: true
                                         }
+                                             Kirigami.Icon {
+                                    visible: root.iconTheme !== "kde" && root.iconTheme !== "wi-font"
+                                    source: root.iconTheme === "kde"
+                                        ? root.kdeIcon("moonphase")
+                                        : (root.svgBase.length > 0
+                                            ? (root.svgBase + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg")
+                                            : Qt.resolvedUrl("../icons/symbolic/32/wi-" + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg"))
+                                    isMask: root.iconTheme === "symbolic"
+                                    color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
+                                    implicitWidth: root.iconSize
+                                    implicitHeight: root.iconSize
+                                    Layout.alignment: Qt.AlignVCenter
+                                    }
                                         Label {
-                                            text: root.weatherRoot
-                                                ? root.weatherRoot.moonPhaseLabel()
-                                                : "--"
+                                            text: root.weatherRoot ? root.weatherRoot.moonPhaseLabel() : "--"
                                             color: root.accentViolet
-                                            font: root.weatherRoot
-                                                ? root.weatherRoot.wf(11, true)
-                                                : Qt.font({ bold: true })
+                                            font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({
+                                                bold: false
+                                            })
                                             elide: Text.ElideRight
                                             Layout.alignment: Qt.AlignVCenter
                                         }
-                                        Item { Layout.fillWidth: true }
+                                        Item {
+                                            Layout.fillWidth: true
+                                        }
                                     }
 
                                     // ── Moonset (right) ───────────────────────────────
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        Text {
-                                            anchors.right: parent.right
-                                            visible: wiFont.status === FontLoader.Ready
-                                            text: "\uF0D6"
-                                            font.family: wiFont.font.family
-                                            font.pixelSize: 11
+                                        Kirigami.Icon {
+                                            source: root.svgBase.length > 0
+                                                ? (root.svgBase + "moonset.svg")
+                                                : Qt.resolvedUrl("../icons/symbolic/32/wi-moonset.svg")
+                                            isMask: true
                                             color: root.accentViolet
                                             opacity: 0.70
-                                            horizontalAlignment: Text.AlignRight
+                                            implicitWidth: root.glyphIconSize
+                                            implicitHeight: root.glyphIconSize
+                                            Layout.alignment: Qt.AlignRight
                                         }
                                         Label {
-                                            text: root.weatherRoot
-                                                ? root.weatherRoot.formatTimeForDisplay(moonCard._moonsetText)
-                                                : "--"
+                                            text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(moonCard._moonsetText) : "--"
                                             color: root.accentViolet
                                             opacity: 0.75
-                                            font: root.weatherRoot
-                                                ? root.weatherRoot.wf(12, true)
-                                                : Qt.font({ bold: true })
+                                            font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
+                                                bold: true
+                                            })
                                         }
                                     }
                                 } // RowLayout (info row)
 
                             } // Item (moonphase)
 
+                            // ── LIST MODE: compact moon phase row ─────────────────
+                            // Direct child of card Rectangle — never hidden by arc Item
+                            Item {
+                                id: listMoonRow
+                                anchors.fill: parent
+                                visible: card.modelData === "moonphase" && root.isList
+
+                                // Compute moon times directly here — moonCard.visible is
+                                // false in list mode so its Timer never fires.
+                                readonly property int _utcOffset: root.weatherRoot ? root.weatherRoot.locationUtcOffsetMins : 0
+                                property string _riseText: "--"
+                                property string _setText: "--"
+
+                                function _compute() {
+                                    var lat = Plasmoid.configuration.latitude;
+                                    var lon = Plasmoid.configuration.longitude;
+                                    if (isNaN(lat) || isNaN(lon) || (lat === 0 && lon === 0)) {
+                                        _riseText = "--";
+                                        _setText = "--";
+                                        return;
+                                    }
+                                    var t = SC.getMoonTimes(new Date(), lat, lon, listMoonRow._utcOffset);
+                                    _riseText = t.rise;
+                                    _setText = t.set;
+                                }
+
+                                Component.onCompleted: _compute()
+                                Timer {
+                                    interval: 3600000   // refresh hourly
+                                    running: listMoonRow.visible
+                                    repeat: true
+                                    onTriggered: listMoonRow._compute()
+                                }
+                                Connections {
+                                    target: root.weatherRoot
+                                    function onLocationUtcOffsetMinsChanged() {
+                                        listMoonRow._compute();
+                                    }
+                                }
+
+                                RowLayout {
+                                    anchors {
+                                        fill: parent
+                                        leftMargin: 10
+                                        rightMargin: 10
+                                    }
+                                    spacing: 8
+
+                                    // ── Leading icon: moonPhaseSvgStem() SVG for all non-KDE themes
+                                    Kirigami.Icon {
+                                        visible: root.iconTheme === "kde"
+                                        source: root.kdeIcon("moonphase")
+                                        implicitWidth: root.iconSize
+                                        implicitHeight: root.iconSize
+                                        color: root.accentViolet
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    Kirigami.Icon {
+                                        visible: root.iconTheme !== "kde"
+                                        // moonPhaseSvgStem gives e.g. "moon-alt-full" → wi-moon-alt-full.svg
+                                        // svgBase already resolves to ../icons/<theme>/<size>/wi-
+                                        source: root.iconTheme === "kde"
+                                            ? root.kdeIcon("moonphase")
+                                            : (root.svgBase.length > 0
+                                                ? (root.svgBase + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg")
+                                                : Qt.resolvedUrl("../icons/symbolic/32/wi-" + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg"))
+                                        isMask: root.iconTheme === "symbolic"
+                                        color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
+                                        implicitWidth: root.iconSize
+                                        implicitHeight: root.iconSize
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+
+                                    // Label
+                                    Label {
+                                        text: root.labelFor("moonphase") + ":"
+                                        color: Kirigami.Theme.textColor
+                                        opacity: 0.55
+                                        font: weatherRoot ? weatherRoot.wf(11, false) : Qt.font({})
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
+
+                                    // ── Right side: phase name + moonrise / moonset ──────
+                                    RowLayout {
+                                        spacing: 8
+                                        Layout.alignment: Qt.AlignVCenter
+
+                                        // Phase icon + name
+                                        Kirigami.Icon {
+                                            visible: root.iconTheme === "kde"
+                                            source: root.kdeIcon("moonphase")
+                                            implicitWidth: root.iconSize
+                                            implicitHeight: root.iconSize
+                                            color: root.accentViolet
+                                            Layout.alignment: Qt.AlignVCenter
+                                        }
+                                        Kirigami.Icon {
+                                            visible: root.iconTheme !== "kde"
+                                            source: root.svgBase.length > 0 ? (root.svgBase + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg") : Qt.resolvedUrl("../icons/symbolic/32/wi-" + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg")
+                                            isMask: true
+                                            color: root.accentViolet
+                                            implicitWidth: root.iconSize
+                                            implicitHeight: root.iconSize
+                                            Layout.alignment: Qt.AlignVCenter
+                                        }
+                                        Label {
+                                            text: root.weatherRoot ? root.weatherRoot.moonPhaseLabel() : "--"
+                                            color: root.accentViolet
+                                            font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
+                                                bold: true
+                                            })
+                                        }
+
+                                        // Moonrise — SVG icon
+                                        RowLayout {
+                                            spacing: 3
+                                            Layout.alignment: Qt.AlignVCenter
+                                            Kirigami.Icon {
+                                                source: root.svgBase.length > 0 ? (root.svgBase + "moonrise.svg") : Qt.resolvedUrl("../icons/symbolic/32/wi-moonrise.svg")
+                                                isMask: root.iconTheme !== "kde"
+                                                color: root.accentViolet
+                                                implicitWidth: root.iconSize
+                                                implicitHeight: root.iconSize
+                                                Layout.alignment: Qt.AlignVCenter
+                                            }
+                                            Label {
+                                                text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(listMoonRow._riseText) : "--"
+                                                color: root.accentViolet
+                                                font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
+                                            }
+                                        }
+                                        Label {
+                                            text: "/"
+                                            color: Kirigami.Theme.textColor
+                                            opacity: 0.30
+                                            font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
+                                            Layout.alignment: Qt.AlignVCenter
+                                        }
+
+                                        // Moonset — SVG icon
+                                        RowLayout {
+                                            spacing: 3
+                                            Layout.alignment: Qt.AlignVCenter
+                                            Kirigami.Icon {
+                                                source: root.svgBase.length > 0 ? (root.svgBase + "moonset.svg") : Qt.resolvedUrl("../icons/symbolic/32/wi-moonset.svg")
+                                                isMask: root.iconTheme !== "kde"
+                                                color: root.accentViolet
+                                                opacity: 0.75
+                                                implicitWidth: root.iconSize
+                                                implicitHeight: root.iconSize
+                                                Layout.alignment: Qt.AlignVCenter
+                                            }
+                                            Label {
+                                                text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(listMoonRow._setText) : "--"
+                                                color: root.accentViolet
+                                                opacity: 0.75
+                                                font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         } // Rectangle (card)
                     } // Repeater (items)
 
                     // spacer for odd rows
                     Item {
                         Layout.fillWidth: true
-                        visible: rowItem.modelData.length === 1
+                        visible: rowItem.modelData.length === 1 && !root.isList
                     }
                 } // RowLayout (row)
             } // Repeater (rows)
