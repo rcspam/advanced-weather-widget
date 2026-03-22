@@ -28,10 +28,10 @@ Item {
     // Resolved at load time so the path is correct in all rendering contexts
     readonly property url iconsBaseDir: Qt.resolvedUrl("../icons/")
 
-    // Widget icon theme — needed to build correct SVG icon paths
+    // Forecast icon theme — reads its own config key; "kde" is valid.
     readonly property string widgetIconTheme: {
-        var t = Plasmoid.configuration.widgetIconTheme || "symbolic";
-        return (t === "kde" || t === "wi-font") ? "symbolic" : t;
+        var t = Plasmoid.configuration.forecastIconTheme || "symbolic";
+        return (t === "wi-font") ? "symbolic" : t;
     }
     readonly property int iconSz: Plasmoid.configuration.widgetIconSize || 16
     readonly property string iconTheme: widgetIconTheme

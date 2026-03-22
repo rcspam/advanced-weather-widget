@@ -72,6 +72,9 @@ Item {
     // ── Size ──────────────────────────────────────────────────────────────
     implicitWidth: iconSize
     implicitHeight: iconSize
+    width: iconSize
+    height: iconSize
+    clip: true
 
     visible: iconSource.length > 0
 
@@ -88,28 +91,24 @@ Item {
         horizontalAlignment: Text.AlignHCenter
     }
 
-    // ── KDE system icon — primary, with SVG fallback behind ───────────────
-    // Kirigami.Icon gracefully shows nothing when source is not found,
-    // so the SVG fallback behind it becomes visible.
-    Item {
-        id: kdeContainer
+    // ── KDE system icon (colorful — no mask, no color override) ──────────
+    Kirigami.Icon {
+        id: kdeIcon
         anchors.fill: parent
-        visible: weatherIcon.iconType === "kde" && weatherIcon.iconSource.length > 0
+        visible: weatherIcon.iconType === "kde" && weatherIcon.iconSource.length > 0 && !weatherIcon.isMask
+        source: weatherIcon.iconSource
+        fallback: "dialog-question"
+    }
 
-        // SVG fallback layer (behind the KDE icon)
-        Kirigami.Icon {
-            anchors.fill: parent
-            visible: weatherIcon.svgFallback.length > 0
-            source: weatherIcon.svgFallback
-            isMask: weatherIcon.isMask
-            color: weatherIcon.isMask ? weatherIcon.iconColor : "transparent"
-        }
-
-        // KDE system icon (on top — if theme has it, it covers the fallback)
-        Kirigami.Icon {
-            anchors.fill: parent
-            source: weatherIcon.iconSource
-        }
+    // ── KDE system icon (symbolic — monochrome mask) ──────────────────────
+    Kirigami.Icon {
+        id: kdeSymbolicIcon
+        anchors.fill: parent
+        visible: weatherIcon.iconType === "kde" && weatherIcon.iconSource.length > 0 && weatherIcon.isMask
+        source: weatherIcon.iconSource
+        isMask: true
+        color: weatherIcon.iconColor
+        fallback: "dialog-question-symbolic"
     }
 
     // ── SVG file icon ─────────────────────────────────────────────────────

@@ -9,6 +9,8 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 
 import "js/weather.js" as W
+import "js/iconResolver.js" as IconResolver
+import "components"
 
 Rectangle {
     id: fullView
@@ -25,6 +27,13 @@ Rectangle {
 
     // Maximum height: 90% of screen height, but no more than 40 grid units
     readonly property int maxHeight: Math.min(Screen.desktopAvailableHeight * 0.9, Kirigami.Units.gridUnit * 40)
+
+    // Condition icon theme for the hero icon — "kde" uses system icons, others use SVGs
+    readonly property string conditionIconTheme: {
+        var t = Plasmoid.configuration.conditionIconTheme || "kde";
+        return (t === "wi-font") ? "symbolic" : t;
+    }
+    readonly property url iconsBaseDir: Qt.resolvedUrl("../icons/")
 
     // Always transparent — Plasma draws the background via backgroundHints
     // (DefaultBackground | ConfigurableBackground set in main.qml).
@@ -200,12 +209,13 @@ Rectangle {
             }
 
             // CENTRE — condition icon enlarged to 120 px (#6)
-            Kirigami.Icon {
+            WeatherIcon {
                 anchors.centerIn: parent
-                source: weatherRoot ? W.weatherCodeToIcon(weatherRoot.weatherCode, weatherRoot.isNightTime()) : "weather-none-available"
-                width: 120
-                height: 120
-                smooth: true
+                iconInfo: weatherRoot ? IconResolver.resolveCondition(
+                    weatherRoot.weatherCode, weatherRoot.isNightTime(),
+                    32, fullView.iconsBaseDir,
+                    fullView.conditionIconTheme) : null
+                iconSize: 120
             }
 
             // RIGHT — today's High / Low (#7)

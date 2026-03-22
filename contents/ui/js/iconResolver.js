@@ -102,10 +102,12 @@ var _wiGlyphs = {
  *                               Otherwise: bundled SVG primary, KDE emergency fallback.
  */
 function resolve(itemId, iconSize, iconsBaseDir, svgTheme) {
-    var isKde = (svgTheme === "kde");
+    var isKde = (svgTheme === "kde" || svgTheme === "kde-symbolic");
+    var isMaskOverride = (svgTheme === "kde-symbolic");
     var theme = isKde ? "symbolic" : (svgTheme || "symbolic");
-    var isMask = (theme === "symbolic" || theme === "symbolic-light");
+    var isMask = isKde ? isMaskOverride : (theme === "symbolic" || theme === "symbolic-light");
     var kdeIcon = _kdeIcons[itemId] || "";
+    if (isMaskOverride && kdeIcon.length > 0) kdeIcon += "-symbolic";
     var svgStem = _svgStems[itemId] || "";
 
     var svgSource = "";
@@ -141,10 +143,12 @@ function resolve(itemId, iconSize, iconsBaseDir, svgTheme) {
  * @param {string} svgTheme    — SVG theme subfolder
  */
 function resolveCondition(weatherCode, isNight, iconSize, iconsBaseDir, svgTheme) {
-    var isKde = (svgTheme === "kde");
+    var isKde = (svgTheme === "kde" || svgTheme === "kde-symbolic");
+    var isMaskOverride = (svgTheme === "kde-symbolic");
     var theme = isKde ? "symbolic" : (svgTheme || "symbolic");
-    var isMask = (theme === "symbolic" || theme === "symbolic-light");
+    var isMask = isKde ? isMaskOverride : (theme === "symbolic" || theme === "symbolic-light");
     var kdeIcon = _conditionKdeIcon(weatherCode, isNight);
+    if (isMaskOverride && kdeIcon.length > 0) kdeIcon += "-symbolic";
     var svgStem = _conditionSvgStem(weatherCode, isNight);
 
     var svgSource = "";
@@ -176,18 +180,21 @@ function resolveCondition(weatherCode, isNight, iconSize, iconsBaseDir, svgTheme
  * @param {string} svgTheme
  */
 function resolveMoonPhase(moonPhaseSvgStem, iconSize, iconsBaseDir, svgTheme) {
-    var isKde = (svgTheme === "kde");
+    var isKde = (svgTheme === "kde" || svgTheme === "kde-symbolic");
+    var isMaskOverride = (svgTheme === "kde-symbolic");
     var theme = isKde ? "symbolic" : (svgTheme || "symbolic");
-    var isMask = (theme === "symbolic" || theme === "symbolic-light");
+    var isMask = isKde ? isMaskOverride : (theme === "symbolic" || theme === "symbolic-light");
     var svgSource = "";
     if (moonPhaseSvgStem && iconsBaseDir) {
         svgSource = iconsBaseDir + theme + "/" + iconSize + "/wi-" + moonPhaseSvgStem + ".svg";
     }
 
     if (isKde) {
+        var moonKde = "weather-clear-night";
+        if (isMaskOverride) moonKde += "-symbolic";
         return {
             type: "kde",
-            source: "weather-clear-night",
+            source: moonKde,
             svgFallback: svgSource,
             isMask: isMask
         };
@@ -204,7 +211,7 @@ function resolveMoonPhase(moonPhaseSvgStem, iconSize, iconsBaseDir, svgTheme) {
 
     return {
         type: "kde",
-        source: "weather-clear-night",
+        source: isMaskOverride ? "weather-clear-night-symbolic" : "weather-clear-night",
         svgFallback: "",
         isMask: isMask
     };

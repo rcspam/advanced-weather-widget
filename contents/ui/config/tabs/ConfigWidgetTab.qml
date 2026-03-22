@@ -1,15 +1,15 @@
 /**
- * ConfigWidgetTab.qml — Widget (details) tab content
- *
- * Extracted from configAppearance.qml for readability.
+ * ConfigWidgetTab.qml — Widget tab with sub-tabs: General, Details, Forecast
  */
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
-Kirigami.FormLayout {
+ColumnLayout {
     id: widgetTab
+    spacing: 0
 
     /** Reference to the root KCM (configAppearance) for cfg_* properties */
     required property var configRoot
@@ -17,208 +17,246 @@ Kirigami.FormLayout {
     /** Emitted when the user clicks Configure… to push the details sub-page */
     signal pushSubPage()
 
-    Kirigami.Separator {
-        Kirigami.FormData.label: i18n("Widget settings")
-        Kirigami.FormData.isSection: true
-    }
-    SpinBox {
-        Kirigami.FormData.label: i18n("Forecast days:")
-        from: 3
-        to: 7
-        value: widgetTab.configRoot.cfg_forecastDays
-        onValueModified: widgetTab.configRoot.cfg_forecastDays = value
-    }
-    CheckBox {
-        Kirigami.FormData.label: i18n("Footer:")
-        text: i18n("Show update time and provider")
-        checked: widgetTab.configRoot.cfg_showUpdateText
-        onToggled: widgetTab.configRoot.cfg_showUpdateText = checked
+    /** Icon theme choices shared by all combos */
+    readonly property var iconThemeModel: [
+        { text: i18n("KDE Icon Theme"),        value: "kde"          },
+        { text: i18n("KDE Symbolic"),          value: "kde-symbolic" },
+        { text: i18n("Symbolic (SVG)"),        value: "symbolic"     },
+        { text: i18n("Flat Color (SVG)"),      value: "flat-color"   },
+        { text: i18n("3D Oxygen (SVG)"),       value: "3d-oxygen"    }
+    ]
+
+    function findThemeIndex(theme) {
+        if (theme === "wi-font") theme = "symbolic";
+        for (var i = 0; i < iconThemeModel.length; ++i)
+            if (iconThemeModel[i].value === theme) return i;
+        return 0;
     }
 
-    // ── Widget items ──────────────────────────────────────
-    Kirigami.Separator {
-        Kirigami.FormData.label: i18n("Widget items")
-        Kirigami.FormData.isSection: true
-    }
-
-    // ── Widget icon theme selector ────────────────────────
-    RowLayout {
-        Kirigami.FormData.label: i18n("Icon theme:")
-        spacing: Kirigami.Units.largeSpacing
-        ComboBox {
-            id: widgetIconThemeCombo
-            Layout.preferredWidth: 200
-            textRole: "text"
-            model: [
-                {
-                    text: i18n("Symbolic (SVG)"),
-                    value: "symbolic"
-                },
-                {
-                    text: i18n("Flat Color (SVG)"),
-                    value: "flat-color"
-                },
-                {
-                    text: i18n("3D Oxygen (SVG)"),
-                    value: "3d-oxygen"
-                }
-            ]
-            Component.onCompleted: {
-                var theme = widgetTab.configRoot.cfg_widgetIconTheme;
-                if (theme === "kde" || theme === "wi-font") {
-                    theme = "symbolic";
-                    widgetTab.configRoot.cfg_widgetIconTheme = "symbolic";
-                }
-                for (var i = 0; i < model.length; ++i)
-                    if (model[i].value === theme) {
-                        currentIndex = i;
-                        break;
-                    }
-                if (currentIndex < 0)
-                    currentIndex = 0;
-            }
-            onActivated: widgetTab.configRoot.cfg_widgetIconTheme = model[currentIndex].value
+    PlasmaComponents.TabBar {
+        id: subTabBar
+        Layout.fillWidth: true
+        PlasmaComponents.TabButton {
+            icon.name: "preferences-system-windows"
+            text: i18n("General")
+        }
+        PlasmaComponents.TabButton {
+            icon.name: "view-list-details"
+            text: i18n("Details")
+        }
+        PlasmaComponents.TabButton {
+            icon.name: "weather-few-clouds"
+            text: i18n("Forecast")
         }
     }
 
-    // ── Widget icon size (shown for SVG themes) ───────────
-    RowLayout {
-        Kirigami.FormData.label: i18n("Icon size:")
-        spacing: Kirigami.Units.largeSpacing
-        ComboBox {
-            id: widgetIconSizeCombo
-            Layout.preferredWidth: 120
-            textRole: "text"
-            model: [
-                {
-                    text: "16 px",
-                    value: 16
-                },
-                {
-                    text: "22 px",
-                    value: 22
-                },
-                {
-                    text: "24 px",
-                    value: 24
-                },
-                {
-                    text: "32 px",
-                    value: 32
-                }
-            ]
-            Component.onCompleted: {
-                for (var i = 0; i < model.length; ++i)
-                    if (model[i].value === widgetTab.configRoot.cfg_widgetIconSize) {
-                        currentIndex = i;
-                        break;
-                    }
-                if (currentIndex < 0)
-                    currentIndex = 0;
-            }
-            onActivated: widgetTab.configRoot.cfg_widgetIconSize = model[currentIndex].value
-        }
-    }
+    Item { Layout.preferredHeight: Kirigami.Units.largeSpacing }
 
-    // ── Details layout: Cards (2-col) or List (1-col flat) ──
-    RowLayout {
-        Kirigami.FormData.label: i18n("Details layout:")
-        ComboBox {
-            id: detailsLayoutCombo
-            Layout.preferredWidth: 160
-            textRole: "text"
-            model: [
-                { text: i18n("Cards (2 columns)"), value: "cards2" },
-                { text: i18n("List"),              value: "list"   }
-            ]
-            currentIndex: widgetTab.configRoot.cfg_widgetDetailsLayout === "list" ? 1 : 0
-            onActivated: widgetTab.configRoot.cfg_widgetDetailsLayout = model[currentIndex].value
-        }
-    }
+    StackLayout {
+        currentIndex: subTabBar.currentIndex
+        Layout.fillWidth: true
+        Layout.fillHeight: true
 
-    // ── Cards height (hidden in list mode) ────────────────
-    RowLayout {
-        visible: widgetTab.configRoot.cfg_widgetDetailsLayout !== "list"
-        Kirigami.FormData.label: i18n("Cards height:")
-        spacing: Kirigami.Units.largeSpacing
-        ComboBox {
-            id: cardsHeightModeCombo
-            Layout.preferredWidth: 130
-            textRole: "text"
-            model: [
-                {
-                    text: i18n("Auto"),
-                    value: true
-                },
-                {
-                    text: i18n("Manual"),
-                    value: false
-                }
-            ]
-            currentIndex: widgetTab.configRoot.cfg_widgetCardsHeightAuto ? 0 : 1
-            onActivated: {
-                var newMode = model[currentIndex].value;
-                if (widgetTab.configRoot.cfg_widgetCardsHeightAuto !== newMode) {
-                    widgetTab.configRoot.cfg_widgetCardsHeightAuto = newMode;
+        // ── SUB-TAB 0: General ────────────────────────────────────────
+        Kirigami.FormLayout {
+            RowLayout {
+                Kirigami.FormData.label: i18n("Weather condition icon:")
+                spacing: Kirigami.Units.largeSpacing
+                ComboBox {
+                    id: conditionIconThemeCombo
+                    Layout.preferredWidth: 200
+                    textRole: "text"
+                    model: widgetTab.iconThemeModel
+                    Component.onCompleted: currentIndex = widgetTab.findThemeIndex(
+                        widgetTab.configRoot.cfg_conditionIconTheme)
+                    onActivated: widgetTab.configRoot.cfg_conditionIconTheme = model[currentIndex].value
                 }
             }
+            CheckBox {
+                Kirigami.FormData.label: i18n("Footer:")
+                text: i18n("Show update time and provider")
+                checked: widgetTab.configRoot.cfg_showUpdateText
+                onToggled: widgetTab.configRoot.cfg_showUpdateText = checked
+            }
         }
-        SpinBox {
-            enabled: !widgetTab.configRoot.cfg_widgetCardsHeightAuto
-            from: 30
-            to: 120
-            value: widgetTab.configRoot.cfg_widgetCardsHeight
-            onValueModified: widgetTab.configRoot.cfg_widgetCardsHeight = value
-        }
-        Label {
-            visible: !widgetTab.configRoot.cfg_widgetCardsHeightAuto
-            text: "px"
-            opacity: 0.65
-        }
-    }
 
-    // Details items configurator (enable/disable, no drag)
-    Item {
-        Kirigami.FormData.label: i18n("Details items:")
-        implicitWidth: detailsPreviewRow.implicitWidth
-        implicitHeight: detailsPreviewRow.implicitHeight
-        RowLayout {
-            id: detailsPreviewRow
-            spacing: 10
-            Flow {
-                spacing: 4
-                Layout.maximumWidth: 260
-                Repeater {
-                    model: widgetTab.configRoot.cfg_widgetDetailsOrder.split(";").filter(function (t) {
-                        return t.length > 0;
-                    })
-                    delegate: Rectangle {
-                        radius: 3
-                        color: Qt.rgba(1, 1, 1, 0.10)
-                        border.color: Qt.rgba(1, 1, 1, 0.22)
-                        border.width: 1
-                        implicitWidth: detailChipLbl.implicitWidth + 10
-                        implicitHeight: detailChipLbl.implicitHeight + 6
-                        Label {
-                            id: detailChipLbl
-                            anchors.centerIn: parent
-                            text: {
-                                var d = modelData.trim();
-                                for (var i = 0; i < widgetTab.configRoot.allDetailsDefs.length; ++i)
-                                    if (widgetTab.configRoot.allDetailsDefs[i].itemId === d)
-                                        return widgetTab.configRoot.allDetailsDefs[i].label;
-                                return d;
+        // ── SUB-TAB 1: Details ────────────────────────────────────────
+        Kirigami.FormLayout {
+            // Icon theme + Icon size on same row
+            RowLayout {
+                Kirigami.FormData.label: i18n("Icon theme:")
+                spacing: Kirigami.Units.largeSpacing
+                ComboBox {
+                    id: widgetIconThemeCombo
+                    Layout.preferredWidth: 200
+                    textRole: "text"
+                    model: widgetTab.iconThemeModel
+                    Component.onCompleted: currentIndex = widgetTab.findThemeIndex(
+                        widgetTab.configRoot.cfg_widgetIconTheme)
+                    onActivated: widgetTab.configRoot.cfg_widgetIconTheme = model[currentIndex].value
+                }
+                Label {
+                    text: i18n("Size:")
+                    opacity: 0.8
+                }
+                ComboBox {
+                    id: widgetIconSizeCombo
+                    Layout.preferredWidth: 90
+                    textRole: "text"
+                    model: [
+                        { text: "16 px", value: 16 },
+                        { text: "22 px", value: 22 },
+                        { text: "24 px", value: 24 },
+                        { text: "32 px", value: 32 }
+                    ]
+                    Component.onCompleted: {
+                        for (var i = 0; i < model.length; ++i)
+                            if (model[i].value === widgetTab.configRoot.cfg_widgetIconSize) {
+                                currentIndex = i; break;
                             }
+                        if (currentIndex < 0) currentIndex = 0;
+                    }
+                    onActivated: widgetTab.configRoot.cfg_widgetIconSize = model[currentIndex].value
+                }
+            }
+
+            // ── Warning — KDE themes lack some item icons ──
+            Kirigami.InlineMessage {
+                Layout.fillWidth: true
+                visible: widgetTab.configRoot.cfg_widgetIconTheme === "kde" || widgetTab.configRoot.cfg_widgetIconTheme === "kde-symbolic"
+                type: Kirigami.MessageType.Warning
+                text: i18n("KDE icon themes don't fully support many item icons. You can set your own icons by clicking \"Set your own icons\".")
+                showCloseButton: true
+                actions: [
+                    Kirigami.Action {
+                        text: i18n("Set your own icons\u2026")
+                        icon.name: "view-visible"
+                        onTriggered: {
+                            widgetTab.configRoot.initDetailsModel();
+                            widgetTab.pushSubPage();
+                        }
+                    }
+                ]
+            }
+
+            // Details layout
+            RowLayout {
+                Kirigami.FormData.label: i18n("Details layout:")
+                ComboBox {
+                    id: detailsLayoutCombo
+                    Layout.preferredWidth: 160
+                    textRole: "text"
+                    model: [
+                        { text: i18n("Cards (2 columns)"), value: "cards2" },
+                        { text: i18n("List"),              value: "list"   }
+                    ]
+                    currentIndex: widgetTab.configRoot.cfg_widgetDetailsLayout === "list" ? 1 : 0
+                    onActivated: widgetTab.configRoot.cfg_widgetDetailsLayout = model[currentIndex].value
+                }
+            }
+
+            // Cards height (hidden in list mode)
+            RowLayout {
+                visible: widgetTab.configRoot.cfg_widgetDetailsLayout !== "list"
+                Kirigami.FormData.label: i18n("Cards height:")
+                spacing: Kirigami.Units.largeSpacing
+                ComboBox {
+                    id: cardsHeightModeCombo
+                    Layout.preferredWidth: 130
+                    textRole: "text"
+                    model: [
+                        { text: i18n("Auto"),   value: true  },
+                        { text: i18n("Manual"), value: false }
+                    ]
+                    currentIndex: widgetTab.configRoot.cfg_widgetCardsHeightAuto ? 0 : 1
+                    onActivated: {
+                        var newMode = model[currentIndex].value;
+                        if (widgetTab.configRoot.cfg_widgetCardsHeightAuto !== newMode)
+                            widgetTab.configRoot.cfg_widgetCardsHeightAuto = newMode;
+                    }
+                }
+                SpinBox {
+                    enabled: !widgetTab.configRoot.cfg_widgetCardsHeightAuto
+                    from: 30
+                    to: 120
+                    value: widgetTab.configRoot.cfg_widgetCardsHeight
+                    onValueModified: widgetTab.configRoot.cfg_widgetCardsHeight = value
+                }
+                Label {
+                    visible: !widgetTab.configRoot.cfg_widgetCardsHeightAuto
+                    text: "px"
+                    opacity: 0.65
+                }
+            }
+
+            // Details items configurator
+            Item {
+                Kirigami.FormData.label: i18n("Details items:")
+                implicitWidth: detailsPreviewRow.implicitWidth
+                implicitHeight: detailsPreviewRow.implicitHeight
+                RowLayout {
+                    id: detailsPreviewRow
+                    spacing: 10
+                    Flow {
+                        spacing: 4
+                        Layout.maximumWidth: 260
+                        Repeater {
+                            model: widgetTab.configRoot.cfg_widgetDetailsOrder.split(";").filter(function (t) {
+                                return t.length > 0;
+                            })
+                            delegate: Rectangle {
+                                radius: 3
+                                color: Qt.rgba(1, 1, 1, 0.10)
+                                border.color: Qt.rgba(1, 1, 1, 0.22)
+                                border.width: 1
+                                implicitWidth: detailChipLbl.implicitWidth + 10
+                                implicitHeight: detailChipLbl.implicitHeight + 6
+                                Label {
+                                    id: detailChipLbl
+                                    anchors.centerIn: parent
+                                    text: {
+                                        var d = modelData.trim();
+                                        for (var i = 0; i < widgetTab.configRoot.allDetailsDefs.length; ++i)
+                                            if (widgetTab.configRoot.allDetailsDefs[i].itemId === d)
+                                                return widgetTab.configRoot.allDetailsDefs[i].label;
+                                        return d;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Button {
+                        text: i18n("Configure\u2026")
+                        icon.name: "configure"
+                        onClicked: {
+                            widgetTab.configRoot.initDetailsModel();
+                            widgetTab.pushSubPage();
                         }
                     }
                 }
             }
-            Button {
-                text: i18n("Configure\u2026")
-                icon.name: "configure"
-                onClicked: {
-                    widgetTab.configRoot.initDetailsModel();
-                    widgetTab.pushSubPage();
+        }
+
+        // ── SUB-TAB 2: Forecast ───────────────────────────────────────
+        Kirigami.FormLayout {
+            SpinBox {
+                Kirigami.FormData.label: i18n("Forecast days:")
+                from: 3
+                to: 7
+                value: widgetTab.configRoot.cfg_forecastDays
+                onValueModified: widgetTab.configRoot.cfg_forecastDays = value
+            }
+            RowLayout {
+                Kirigami.FormData.label: i18n("Icon theme:")
+                spacing: Kirigami.Units.largeSpacing
+                ComboBox {
+                    id: forecastIconThemeCombo
+                    Layout.preferredWidth: 200
+                    textRole: "text"
+                    model: widgetTab.iconThemeModel
+                    Component.onCompleted: currentIndex = widgetTab.findThemeIndex(
+                        widgetTab.configRoot.cfg_forecastIconTheme)
+                    onActivated: widgetTab.configRoot.cfg_forecastIconTheme = model[currentIndex].value
                 }
             }
         }

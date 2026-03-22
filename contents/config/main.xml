@@ -100,6 +100,8 @@
 
     <!-- ── Widget — details view ──────────────────────────────────────── -->
     <entry name="widgetDetailsOrder"    type="String"><default>feelslike;humidity;pressure;wind;dewpoint;visibility;moonphase;suntimes</default></entry>
+    <entry name="widgetDetailsItemIcons" type="String"><default>feelslike=1;humidity=1;pressure=1;wind=1;suntimes=1;dewpoint=1;visibility=1;moonphase=1</default></entry>
+    <entry name="widgetDetailsCustomIcons" type="String"><default></default></entry>
     <entry name="widgetDetailsLayout"   type="String"><default>cards2</default></entry>
     <entry name="widgetSunTimesMode"    type="String"><default>both</default></entry>
     <entry name="widgetMoonMode"        type="String"><default>full</default></entry>
@@ -115,8 +117,10 @@
     <entry name="widgetShowVisibility"  type="Bool"><default>true</default></entry>
 
     <!-- ── Widget — icons and font ────────────────────────────────────── -->
-    <!-- widgetIconTheme: "symbolic" | "wi-font" | "flat-color" | "3d-oxygen" | "kde" -->
+    <!-- widgetIconTheme: "symbolic" | "wi-font" | "flat-color" | "3d-oxygen" | "kde" | "kde-symbolic" -->
     <entry name="widgetIconTheme" type="String"><default>symbolic</default></entry>
+    <!-- conditionIconTheme: controls the main hero condition icon in the widget popup -->
+    <entry name="conditionIconTheme" type="String"><default>kde</default></entry>
     <entry name="widgetIconSize"  type="Int"><default>32</default></entry>
     <entry name="useSystemFont"   type="Bool"><default>true</default></entry>
     <entry name="fontFamily"      type="String"><default>Noto Sans</default></entry>
@@ -126,6 +130,7 @@
     <!-- ── Widget — forecast ──────────────────────────────────────────── -->
     <entry name="forecastLayout"      type="String"><default>rows</default></entry>
     <entry name="forecastDays"        type="Int"><default>5</default><min>3</min><max>7</max></entry>
+    <entry name="forecastIconTheme"   type="String"><default>symbolic</default></entry>
     <entry name="animateTransitions"  type="Bool"><default>true</default></entry>
 
     <!-- ── Tooltip ────────────────────────────────────────────────────── -->

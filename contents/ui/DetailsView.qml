@@ -55,16 +55,73 @@ Item {
     readonly property color accentViolet: isDark ? "#c4b4ff" : "#5030a0"
 
     // ── icon theme ────────────────────────────────────────────────────────
-    // Normalise legacy values: "kde" and "wi-font" have no bundled icon
-    // folder, so fall back to "symbolic".
+    // Normalise legacy "wi-font" to "symbolic"; "kde" and "kde-symbolic" are valid.
     readonly property string iconTheme: {
         var t = Plasmoid.configuration.widgetIconTheme || "symbolic";
-        return (t === "kde" || t === "wi-font") ? "symbolic" : t;
+        return (t === "wi-font") ? "symbolic" : t;
     }
     readonly property int iconSz: iconSize
     readonly property bool isList: (Plasmoid.configuration.widgetDetailsLayout || "cards2") === "list"
     readonly property string sunTimesMode: Plasmoid.configuration.widgetSunTimesMode || "both"
     readonly property string moonMode: Plasmoid.configuration.widgetMoonMode || "full"
+
+    /** Returns "sunrise" or "sunset" depending on which is next (for upcoming mode) */
+    function upcomingSunEvent() {
+        if (!weatherRoot) return "sunrise";
+        var nowM = (new Date()).getHours()*60+(new Date()).getMinutes();
+        var riseM = SunPath.parseMins(weatherRoot.sunriseTimeText);
+        var setM  = SunPath.parseMins(weatherRoot.sunsetTimeText);
+        if (riseM >= 0 && nowM < riseM) return "sunrise";
+        if (setM  >= 0 && nowM < setM)  return "sunset";
+        return "sunrise";
+    }
+
+    /** Returns "moonrise" or "moonset" depending on which is next (for upcoming mode) */
+    function upcomingMoonEvent(riseText, setText) {
+        var nowM = (new Date()).getHours()*60+(new Date()).getMinutes();
+        var riseM = SunPath.parseMins(riseText);
+        var setM  = SunPath.parseMins(setText);
+        if (riseM >= 0 && nowM < riseM) return "moonrise";
+        if (setM  >= 0 && nowM < setM)  return "moonset";
+        return "moonrise";
+    }
+
+    /** Whether to show sunrise items in sun collapsed/list row */
+    function showSunrise() {
+        var m = sunTimesMode;
+        if (m === "both") return true;
+        if (m === "sunrise") return true;
+        if (m === "sunset") return false;
+        return upcomingSunEvent() === "sunrise"; // upcoming
+    }
+
+    /** Whether to show sunset items in sun collapsed/list row */
+    function showSunset() {
+        var m = sunTimesMode;
+        if (m === "both") return true;
+        if (m === "sunrise") return false;
+        if (m === "sunset") return true;
+        return upcomingSunEvent() === "sunset"; // upcoming
+    }
+
+    /** Whether to show moonrise items in moon collapsed/list row */
+    function showMoonrise(riseText, setText) {
+        var m = moonMode;
+        if (m === "full" || m === "times") return true;
+        return upcomingMoonEvent(riseText, setText) === "moonrise"; // upcoming
+    }
+
+    /** Whether to show moonset items in moon collapsed/list row */
+    function showMoonset(riseText, setText) {
+        var m = moonMode;
+        if (m === "full" || m === "times") return true;
+        return upcomingMoonEvent(riseText, setText) === "moonset"; // upcoming
+    }
+
+    /** Whether to show the moon phase name in collapsed/list row */
+    function showMoonPhase() {
+        return moonMode !== "times";
+    }
 
     // Collapse state for the two arc cards.
     property bool _sunExpanded: true
@@ -77,8 +134,25 @@ Item {
     readonly property string iconsBaseDir: Qt.resolvedUrl("../icons/")
 
     // ── Icon resolution via IconResolver ──────────────────────────────────
+    /** Returns a saved custom icon name for the given item, or "" */
+    function getDetailsCustomIcon(itemId) {
+        var raw = Plasmoid.configuration.widgetDetailsCustomIcons || "";
+        if (raw.length === 0) return "";
+        var m = {};
+        raw.split(";").forEach(function(pair) {
+            var kv = pair.split("=");
+            if (kv.length === 2 && kv[0].trim().length > 0)
+                m[kv[0].trim()] = kv[1].trim();
+        });
+        return (itemId in m) ? m[itemId] : "";
+    }
     /** Resolves an icon for the given detail card ID */
     function resolveIcon(itemId) {
+        if (root.iconTheme === "kde" || root.iconTheme === "kde-symbolic") {
+            var custom = getDetailsCustomIcon(itemId);
+            if (custom.length > 0)
+                return { type: "kde", source: custom, svgFallback: "", isMask: (root.iconTheme === "kde-symbolic") };
+        }
         return IconResolver.resolve(itemId, root.iconSize, root.iconsBaseDir, root.iconTheme);
     }
     /** Resolves the current moon phase icon */
@@ -100,10 +174,10 @@ Item {
             })[id] || root.accentBlue;
     }
 
-    // When the icon theme is symbolic, icons should render monochrome (textColor).
-    // Accent colours are only applied for non-mask themes (flat-color, 3d-oxygen).
+    // When the icon theme is symbolic or kde-symbolic, icons should render monochrome (textColor).
+    // Accent colours are only applied for non-mask themes (flat-color, 3d-oxygen, kde).
     function iconColorFor(c) {
-        return (root.iconTheme === "symbolic") ? Kirigami.Theme.textColor : c;
+        return (root.iconTheme === "symbolic" || root.iconTheme === "kde-symbolic") ? Kirigami.Theme.textColor : c;
     }
     function labelFor(id) {
         return ({
@@ -151,13 +225,22 @@ Item {
     // List of detail IDs in configured order
     property var detailIds: (Plasmoid.configuration.widgetDetailsOrder || "feelslike;humidity;pressure;wind;suntimes;dewpoint;visibility;moonphase").split(";").map(s => s.trim()).filter(s => s.length > 0)
 
-    // Build rows: each row is an array of 1 or 2 IDs
-    function buildRows() {
-        var order = (Plasmoid.configuration.widgetDetailsOrder || "feelslike;humidity;pressure;wind;suntimes;dewpoint;visibility;moonphase").split(";").map(function (s) {
-            return s.trim();
-        }).filter(function (s) {
-            return s.length > 0;
+    // Per-item icon visibility map (parsed from "id=1;id=0;…" config string)
+    readonly property var iconShowMap: {
+        var map = {};
+        var raw = Plasmoid.configuration.widgetDetailsItemIcons || "";
+        raw.split(";").forEach(function(pair) {
+            var kv = pair.split("=");
+            if (kv.length === 2) map[kv[0].trim()] = (kv[1].trim() === "1");
         });
+        return map;
+    }
+    function showIconFor(itemId) {
+        return (itemId in iconShowMap) ? iconShowMap[itemId] : true;
+    }
+
+    // Build rows: each row is an array of 1 or 2 IDs.
+    function buildRows() {
         var rows = [];
         var i = 0;
         if (root.isList) {
@@ -282,7 +365,7 @@ Item {
                                 visible: !card.isExpandedCard && card.modelData !== "wind"
 
                                 WeatherIcon {
-                                    iconInfo: root.resolveIcon(card.modelData)
+                                    iconInfo: root.showIconFor(card.modelData) ? root.resolveIcon(card.modelData) : null
                                     iconSize: root.iconSize
                                     iconColor: root.iconColorFor(root.accentFor(card.modelData))
                                     Layout.alignment: Qt.AlignVCenter
@@ -322,7 +405,7 @@ Item {
                                 visible: card.modelData === "wind"
 
                                 WeatherIcon {
-                                    iconInfo: root.resolveIcon("wind")
+                                    iconInfo: root.showIconFor("wind") ? root.resolveIcon("wind") : null
                                     iconSize: root.iconSize
                                     iconColor: root.iconColorFor(root.accentFor("wind"))
                                     Layout.alignment: Qt.AlignVCenter
@@ -423,14 +506,21 @@ Item {
                                     // }
 
                                     WeatherIcon {
-                                        iconInfo: root.resolveIcon("suntimes")
+                                        iconInfo: root.showIconFor("suntimes") ? root.resolveIcon("suntimes") : null
                                         iconSize: root.iconSize
                                         iconColor: root.iconColorFor(root.accentFor("suntimes"))
                                         Layout.alignment: Qt.AlignVCenter
                                     }
                                     // Dim label — matches standard row style
                                     Label {
-                                        text: root.labelFor("suntimes") + ":"
+                                        text: {
+                                            var m = root.sunTimesMode;
+                                            if (m === "sunrise") return i18n("Sunrise") + ":";
+                                            if (m === "sunset")  return i18n("Sunset") + ":";
+                                            if (m === "upcoming")
+                                                return (root.upcomingSunEvent() === "sunrise" ? i18n("Sunrise") : i18n("Sunset")) + ":";
+                                            return root.labelFor("suntimes") + ":";
+                                        }
                                         color: Kirigami.Theme.textColor
                                         opacity: 0.55
                                         font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
@@ -600,6 +690,7 @@ Item {
                                     anchors.right: parent.right
                                     height: parent.height - sunHeader.height - 50
                                     antialiasing: true
+                                    onWidthChanged: requestPaint()
 
                                     onPaint: {
                                         var ctx2d = getContext("2d");
@@ -632,10 +723,10 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        WeatherIcon {
-                                            iconInfo: IconResolver.resolve(suntimesCard._isNight ? "sunset" : "sunrise", root.glyphIconSize, root.iconsBaseDir, root.iconTheme)
-                                            iconSize: root.glyphIconSize
-                                            iconColor: root.iconColorFor(suntimesCard._isNight ? suntimesCard._nightLeft : root.accentGold)
+                                        Rectangle {
+                                            width: 6; height: 6; radius: 3
+                                            color: suntimesCard._isNight ? suntimesCard._nightLeft : root.accentGold
+                                            anchors.horizontalCenter: parent.horizontalCenter
                                         }
                                         Label {
                                             text: {
@@ -711,10 +802,10 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        WeatherIcon {
-                                            iconInfo: IconResolver.resolve(suntimesCard._isNight ? "sunrise" : "sunset", root.glyphIconSize, root.iconsBaseDir, root.iconTheme)
-                                            iconSize: root.glyphIconSize
-                                            iconColor: root.iconColorFor(suntimesCard._isNight ? suntimesCard._nightRight : root.accentOrange)
+                                        Rectangle {
+                                            width: 6; height: 6; radius: 3
+                                            color: suntimesCard._isNight ? suntimesCard._nightRight : root.accentOrange
+                                            anchors.horizontalCenter: parent.horizontalCenter
                                         }
                                         Label {
                                             text: {
@@ -745,13 +836,20 @@ Item {
                                 spacing: 8
 
                                 WeatherIcon {
-                                    iconInfo: root.resolveIcon("suntimes")
+                                    iconInfo: root.showIconFor("suntimes") ? root.resolveIcon("suntimes") : null
                                     iconSize: root.iconSize
                                     iconColor: root.iconColorFor(root.accentFor("suntimes"))
                                     Layout.alignment: Qt.AlignVCenter
                                 }
                                 Label {
-                                    text: root.labelFor("suntimes") + ":"
+                                    text: {
+                                        var m = root.sunTimesMode;
+                                        if (m === "sunrise") return i18n("Sunrise") + ":";
+                                        if (m === "sunset")  return i18n("Sunset") + ":";
+                                        if (m === "upcoming")
+                                            return (root.upcomingSunEvent() === "sunrise" ? i18n("Sunrise") : i18n("Sunset")) + ":";
+                                        return root.labelFor("suntimes") + ":";
+                                    }
                                     color: Kirigami.Theme.textColor
                                     opacity: 0.55
                                     font: weatherRoot ? weatherRoot.wf(11, false) : Qt.font({})
@@ -760,36 +858,45 @@ Item {
                                 Item {
                                     Layout.fillWidth: true
                                 }
-                                // Sunrise / Sunset — SVG icons
+                                // Sunrise / Sunset — mode-aware right side
                                 RowLayout {
                                     spacing: 6
                                     Layout.alignment: Qt.AlignVCenter
+
+                                    // Sunrise icon + time
                                     WeatherIcon {
-                                        iconInfo: IconResolver.resolve("sunrise", root.iconSize, root.iconsBaseDir, root.iconTheme)
+                                        visible: root.showSunrise()
+                                        iconInfo: root.resolveIcon("suntimes-sunrise")
                                         iconSize: root.iconSize
                                         iconColor: root.iconColorFor(root.accentGold)
                                         Layout.alignment: Qt.AlignVCenter
                                     }
                                     Label {
+                                        visible: root.showSunrise()
                                         text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(root.weatherRoot.sunriseTimeText) : "--"
                                         color: root.accentGold
                                         font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
                                             bold: true
                                         })
                                     }
+                                    // Separator
                                     Label {
+                                        visible: root.sunTimesMode === "both"
                                         text: "/"
                                         color: Kirigami.Theme.textColor
                                         opacity: 0.30
                                         font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
                                     }
+                                    // Sunset icon + time
                                     WeatherIcon {
-                                        iconInfo: IconResolver.resolve("sunset", root.iconSize, root.iconsBaseDir, root.iconTheme)
+                                        visible: root.showSunset()
+                                        iconInfo: root.resolveIcon("suntimes-sunset")
                                         iconSize: root.iconSize
                                         iconColor: root.iconColorFor(root.accentOrange)
                                         Layout.alignment: Qt.AlignVCenter
                                     }
                                     Label {
+                                        visible: root.showSunset()
                                         text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(root.weatherRoot.sunsetTimeText) : "--"
                                         color: root.accentOrange
                                         font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
@@ -828,14 +935,22 @@ Item {
                                     spacing: 8
 
                                     WeatherIcon {
-                                        iconInfo: root.resolveMoonPhaseIcon()
+                                        iconInfo: root.showIconFor("moonphase") ? root.resolveMoonPhaseIcon() : null
                                         iconSize: root.iconSize
                                         iconColor: root.iconColorFor(root.accentViolet)
                                         Layout.alignment: Qt.AlignVCenter
                                     }
                                     // Dim label
                                     Label {
-                                        text: root.labelFor("moonphase") + ":"
+                                        text: {
+                                            var m = root.moonMode;
+                                            if (m === "times") return i18n("Moonrise/Moonset") + ":";
+                                            if (m === "upcoming") {
+                                                var ev = root.upcomingMoonEvent(moonCard._moonriseText, moonCard._moonsetText);
+                                                return (ev === "moonrise" ? i18n("Moonrise") : i18n("Moonset")) + ":";
+                                            }
+                                            return root.labelFor("moonphase") + ":";
+                                        }
                                         color: Kirigami.Theme.textColor
                                         opacity: 0.55
                                         font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
@@ -846,7 +961,18 @@ Item {
                                         Layout.fillWidth: true
                                     }
                                     Label {
-                                        text: root.weatherRoot ? root.weatherRoot.moonPhaseLabel() : "--"
+                                        text: {
+                                            if (!root.weatherRoot) return "--";
+                                            var m = root.moonMode;
+                                            if (m === "times") {
+                                                return root.weatherRoot.formatTimeForDisplay(moonCard._moonriseText) + " / " + root.weatherRoot.formatTimeForDisplay(moonCard._moonsetText);
+                                            }
+                                            if (m === "upcoming") {
+                                                var ev = root.upcomingMoonEvent(moonCard._moonriseText, moonCard._moonsetText);
+                                                return root.weatherRoot.formatTimeForDisplay(ev === "moonrise" ? moonCard._moonriseText : moonCard._moonsetText);
+                                            }
+                                            return root.weatherRoot.moonPhaseLabel();
+                                        }
                                         color: root.accentViolet
                                         font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({
                                             bold: false
@@ -978,6 +1104,7 @@ Item {
                                     anchors.right: parent.right
                                     height: parent.height - moonHeader.height - 50
                                     antialiasing: true
+                                    onWidthChanged: requestPaint()
 
                                     onPaint: {
                                         var ctx2d = getContext("2d");
@@ -1002,10 +1129,10 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        WeatherIcon {
-                                            iconInfo: IconResolver.resolve("moonrise", root.glyphIconSize, root.iconsBaseDir, root.iconTheme)
-                                            iconSize: root.glyphIconSize
-                                            iconColor: root.iconColorFor(root.accentViolet)
+                                        Rectangle {
+                                            width: 6; height: 6; radius: 3
+                                            color: root.accentViolet
+                                            anchors.horizontalCenter: parent.horizontalCenter
                                         }
                                         Label {
                                             text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(moonCard._moonriseText) : "--"
@@ -1048,11 +1175,11 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        WeatherIcon {
-                                            iconInfo: IconResolver.resolve("moonset", root.glyphIconSize, root.iconsBaseDir, root.iconTheme)
-                                            iconSize: root.glyphIconSize
-                                            iconColor: root.iconColorFor(root.accentViolet)
+                                        Rectangle {
+                                            width: 6; height: 6; radius: 3
+                                            color: root.accentViolet
                                             opacity: 0.70
+                                            anchors.horizontalCenter: parent.horizontalCenter
                                         }
                                         Label {
                                             text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(moonCard._moonsetText) : "--"
@@ -1116,15 +1243,23 @@ Item {
                                     spacing: 8
 
                                     WeatherIcon {
-                                        iconInfo: root.resolveMoonPhaseIcon()
+                                        iconInfo: root.showIconFor("moonphase") ? root.resolveMoonPhaseIcon() : null
                                         iconSize: root.iconSize
                                         iconColor: root.iconColorFor(root.accentViolet)
                                         Layout.alignment: Qt.AlignVCenter
                                     }
 
-                                    // Label
+                                    // Label — mode-aware
                                     Label {
-                                        text: root.labelFor("moonphase") + ":"
+                                        text: {
+                                            var m = root.moonMode;
+                                            if (m === "times") return i18n("Moonrise/Moonset") + ":";
+                                            if (m === "upcoming") {
+                                                var ev = root.upcomingMoonEvent(listMoonRow._riseText, listMoonRow._setText);
+                                                return (ev === "moonrise" ? i18n("Moonrise") : i18n("Moonset")) + ":";
+                                            }
+                                            return root.labelFor("moonphase") + ":";
+                                        }
                                         color: Kirigami.Theme.textColor
                                         opacity: 0.55
                                         font: weatherRoot ? weatherRoot.wf(11, false) : Qt.font({})
@@ -1134,19 +1269,21 @@ Item {
                                         Layout.fillWidth: true
                                     }
 
-                                    // ── Right side: phase name + moonrise / moonset ──────
+                                    // ── Right side: mode-aware content ──────
                                     RowLayout {
                                         spacing: 8
                                         Layout.alignment: Qt.AlignVCenter
 
-                                        // Phase icon + name
+                                        // Phase icon + name (hidden in "times" mode)
                                         WeatherIcon {
+                                            visible: root.showMoonPhase()
                                             iconInfo: root.resolveMoonPhaseIcon()
                                             iconSize: root.iconSize
                                             iconColor: root.iconColorFor(root.accentViolet)
                                             Layout.alignment: Qt.AlignVCenter
                                         }
                                         Label {
+                                            visible: root.showMoonPhase()
                                             text: root.weatherRoot ? root.weatherRoot.moonPhaseLabel() : "--"
                                             color: root.accentViolet
                                             font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
@@ -1154,12 +1291,13 @@ Item {
                                             })
                                         }
 
-                                        // Moonrise — SVG icon
+                                        // Moonrise icon + time
                                         RowLayout {
+                                            visible: root.showMoonrise(listMoonRow._riseText, listMoonRow._setText)
                                             spacing: 3
                                             Layout.alignment: Qt.AlignVCenter
                                             WeatherIcon {
-                                                iconInfo: IconResolver.resolve("moonrise", root.iconSize, root.iconsBaseDir, root.iconTheme)
+                                                iconInfo: root.resolveIcon("moonrise")
                                                 iconSize: root.iconSize
                                                 iconColor: root.iconColorFor(root.accentViolet)
                                                 Layout.alignment: Qt.AlignVCenter
@@ -1170,7 +1308,9 @@ Item {
                                                 font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
                                             }
                                         }
+                                        // Separator
                                         Label {
+                                            visible: root.showMoonrise(listMoonRow._riseText, listMoonRow._setText) && root.showMoonset(listMoonRow._riseText, listMoonRow._setText)
                                             text: "/"
                                             color: Kirigami.Theme.textColor
                                             opacity: 0.30
@@ -1178,12 +1318,13 @@ Item {
                                             Layout.alignment: Qt.AlignVCenter
                                         }
 
-                                        // Moonset — SVG icon
+                                        // Moonset icon + time
                                         RowLayout {
+                                            visible: root.showMoonset(listMoonRow._riseText, listMoonRow._setText)
                                             spacing: 3
                                             Layout.alignment: Qt.AlignVCenter
                                             WeatherIcon {
-                                                iconInfo: IconResolver.resolve("moonset", root.iconSize, root.iconsBaseDir, root.iconTheme)
+                                                iconInfo: root.resolveIcon("moonset")
                                                 iconSize: root.iconSize
                                                 iconColor: root.iconColorFor(root.accentViolet)
                                                 opacity: 0.75

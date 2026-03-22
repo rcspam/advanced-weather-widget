@@ -15,6 +15,8 @@ ColumnLayout {
     id: detailsSubPageRoot
     spacing: 0
     property string _savedOrder: configRoot.cfg_widgetDetailsOrder
+    property string _savedIcons: configRoot.cfg_widgetDetailsItemIcons
+    property string _savedCustomIcons: configRoot.cfg_widgetDetailsCustomIcons
     Dialog {
         id: detailsLeaveDialog
         title: i18n("Apply Settings?")
@@ -40,6 +42,8 @@ ColumnLayout {
                 DialogButtonBox.buttonRole: DialogButtonBox.DestructiveRole
                 onClicked: {
                     configRoot.cfg_widgetDetailsOrder = detailsSubPageRoot._savedOrder;
+                    configRoot.cfg_widgetDetailsItemIcons = detailsSubPageRoot._savedIcons;
+                    configRoot.cfg_widgetDetailsCustomIcons = detailsSubPageRoot._savedCustomIcons;
                     detailsLeaveDialog.close();
                     stack.pop();
                 }
@@ -63,7 +67,7 @@ ColumnLayout {
             text: i18n("Back")
             flat: true
             onClicked: {
-                if (configRoot.cfg_widgetDetailsOrder !== detailsSubPageRoot._savedOrder)
+                if (configRoot.cfg_widgetDetailsOrder !== detailsSubPageRoot._savedOrder || configRoot.cfg_widgetDetailsItemIcons !== detailsSubPageRoot._savedIcons || configRoot.cfg_widgetDetailsCustomIcons !== detailsSubPageRoot._savedCustomIcons)
                     detailsLeaveDialog.open();
                 else
                     stack.pop();
@@ -249,6 +253,16 @@ ColumnLayout {
                                     source: model.itemFallback
                                     visible: (configRoot.cfg_widgetIconTheme === "wi-font" && (model.itemWiChar.length === 0 || !configRoot.wiFontReady)) || configRoot.cfg_widgetIconTheme === "kde"
                                 }
+                                // KDE custom icon (overridden by the user)
+                                Kirigami.Icon {
+                                    anchors.fill: parent
+                                    visible: (configRoot.cfg_widgetIconTheme === "kde" || configRoot.cfg_widgetIconTheme === "kde-symbolic") && configRoot.getDetailsCustomIcon(model.itemId).length > 0
+                                    source: {
+                                        var _w = configRoot.cfg_widgetDetailsCustomIcons;
+                                        var saved = configRoot.getDetailsCustomIcon(model.itemId);
+                                        return saved.length > 0 ? saved : "";
+                                    }
+                                }
                                 // SVG theme icon (symbolic / flat-color / 3d-oxygen)
                                 Kirigami.Icon {
                                     anchors.fill: parent
@@ -299,7 +313,7 @@ ColumnLayout {
                             }
                             // ── Configure button (suntimes / moonphase only) ─────
                             ToolButton {
-                                visible: model.itemId === "suntimes" || model.itemId === "moonphase"
+                                visible: (model.itemId === "suntimes" || model.itemId === "moonphase") && configRoot.cfg_widgetIconTheme !== "kde" && configRoot.cfg_widgetIconTheme !== "kde-symbolic"
                                 implicitWidth: Kirigami.Units.iconSizes.medium
                                 implicitHeight: Kirigami.Units.iconSizes.medium
                                 icon.name: "configure"
@@ -308,6 +322,40 @@ ColumnLayout {
                                 onClicked: {
                                     itemCfgDialog._itemId = model.itemId;
                                     itemCfgDialog.open();
+                                }
+                            }
+                            // ── Configure icon button (KDE themes) — opens icon-config dialog ──
+                            ToolButton {
+                                visible: configRoot.cfg_widgetIconTheme === "kde" || configRoot.cfg_widgetIconTheme === "kde-symbolic"
+                                enabled: model.itemEnabled
+                                opacity: model.itemEnabled ? 1.0 : 0.3
+                                implicitWidth: Kirigami.Units.iconSizes.medium
+                                implicitHeight: Kirigami.Units.iconSizes.medium
+                                icon.name: "color-picker"
+                                ToolTip.visible: hovered
+                                ToolTip.text: i18n("Configure icon\u2026")
+                                onClicked: {
+                                    iconConfigDialog.context = "details";
+                                    iconConfigDialog.itemId = model.itemId;
+                                    iconConfigDialog.itemLabel = model.itemLabel;
+                                    iconConfigDialog.itemFallback = model.itemFallback;
+                                    iconConfigDialog.isSuntimes = (model.itemId === "suntimes");
+                                    iconConfigDialog.isMoonphase = (model.itemId === "moonphase");
+                                    iconConfigDialog.open();
+                                }
+                            }
+                            // ── Eye toggle — show/hide prefix icon ────────────────
+                            ToolButton {
+                                implicitWidth: Kirigami.Units.iconSizes.medium
+                                implicitHeight: Kirigami.Units.iconSizes.medium
+                                enabled: model.itemEnabled
+                                opacity: model.itemEnabled ? 1.0 : 0.25
+                                icon.name: model.itemShowIcon ? "view-visible" : "view-hidden"
+                                ToolTip.visible: hovered
+                                ToolTip.text: model.itemShowIcon ? i18n("Hide prefix icon") : i18n("Show prefix icon")
+                                onClicked: {
+                                    detailsWorkingModel.setProperty(model.index, "itemShowIcon", !model.itemShowIcon);
+                                    configRoot.applyDetailsItems();
                                 }
                             }
                             // ── Enable / disable toggle ───────────────────────────
@@ -375,6 +423,33 @@ ColumnLayout {
                 }
                 Label {
                     text: i18n("Drag to reorder shown items")
+                    font: Kirigami.Theme.smallFont
+                    opacity: 0.75
+                }
+            }
+            RowLayout {
+                spacing: 4
+                Kirigami.Icon {
+                    source: "view-visible"
+                    implicitWidth: Kirigami.Units.iconSizes.small
+                    implicitHeight: Kirigami.Units.iconSizes.small
+                }
+                Label {
+                    text: i18n("Show / hide the prefix icon")
+                    font: Kirigami.Theme.smallFont
+                    opacity: 0.75
+                }
+            }
+            RowLayout {
+                visible: configRoot.cfg_widgetIconTheme === "kde" || configRoot.cfg_widgetIconTheme === "kde-symbolic"
+                spacing: 4
+                Kirigami.Icon {
+                    source: "color-picker"
+                    implicitWidth: Kirigami.Units.iconSizes.small
+                    implicitHeight: Kirigami.Units.iconSizes.small
+                }
+                Label {
+                    text: i18n("Choose a custom icon for this item")
                     font: Kirigami.Theme.smallFont
                     opacity: 0.75
                 }

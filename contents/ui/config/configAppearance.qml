@@ -76,6 +76,42 @@ KCM.AbstractKCM {
                 root.setTooltipCustomIcon("suntimes-sunset", iconName);
         }
     }
+    // ── Details icon dialogs (for KDE theme custom icon picking) ─────────────
+    KIconThemes.IconDialog {
+        id: iconDialogDetailsMain
+        onIconNameChanged: {
+            if (iconName && root._editingIconKey.length > 0)
+                root.setDetailsCustomIcon(root._editingIconKey, iconName);
+        }
+    }
+    KIconThemes.IconDialog {
+        id: iconDialogDetailsRise
+        onIconNameChanged: {
+            if (iconName)
+                root.setDetailsCustomIcon("suntimes-sunrise", iconName);
+        }
+    }
+    KIconThemes.IconDialog {
+        id: iconDialogDetailsSet
+        onIconNameChanged: {
+            if (iconName)
+                root.setDetailsCustomIcon("suntimes-sunset", iconName);
+        }
+    }
+    KIconThemes.IconDialog {
+        id: iconDialogDetailsMoonrise
+        onIconNameChanged: {
+            if (iconName)
+                root.setDetailsCustomIcon("moonrise", iconName);
+        }
+    }
+    KIconThemes.IconDialog {
+        id: iconDialogDetailsMoonset
+        onIconNameChanged: {
+            if (iconName)
+                root.setDetailsCustomIcon("moonset", iconName);
+        }
+    }
 
     // ── Per-condition icon picker — single shared KIconThemes dialog ──────────
     // Feeds into conditionIconDialog._tempMap; only committed on OK.
@@ -365,28 +401,35 @@ KCM.AbstractKCM {
         }
     }
 
-    // The configure dialog itself — shared between Panel and Tooltip tabs.
-    // Set context = "panel" or "tooltip" before opening.
+    // The configure dialog itself — shared between Panel, Tooltip and Details tabs.
+    // Set context = "panel", "tooltip" or "details" before opening.
     Dialog {
         id: iconConfigDialog
         property string itemId: ""
         property string itemLabel: ""
         property string itemFallback: ""
         property bool isSuntimes: false
-        property string context: "panel"   // "panel" | "tooltip"
+        property bool isMoonphase: false
+        property string context: "panel"   // "panel" | "tooltip" | "details"
 
         function getIcon(id) {
-            return context === "tooltip" ? root.getTooltipCustomIcon(id) : root.getCustomIcon(id);
+            if (context === "tooltip") return root.getTooltipCustomIcon(id);
+            if (context === "details") return root.getDetailsCustomIcon(id);
+            return root.getCustomIcon(id);
         }
         function setIcon(id, name) {
             if (context === "tooltip")
                 root.setTooltipCustomIcon(id, name);
+            else if (context === "details")
+                root.setDetailsCustomIcon(id, name);
             else
                 root.setCustomIcon(id, name);
         }
         // Which icon strings to watch for reactive re-evaluation
         function watchRaw() {
-            return context === "tooltip" ? root.cfg_tooltipCustomIcons : root.cfg_panelCustomIcons;
+            if (context === "tooltip") return root.cfg_tooltipCustomIcons;
+            if (context === "details") return root.cfg_widgetDetailsCustomIcons;
+            return root.cfg_panelCustomIcons;
         }
 
         title: i18n("Configure icon — %1", itemLabel)
@@ -399,9 +442,9 @@ KCM.AbstractKCM {
         contentItem: ColumnLayout {
             spacing: Kirigami.Units.largeSpacing
 
-            // ── Single-item picker (all non-suntimes items) ───────────────
+            // ── Single-item picker (all non-suntimes/moonphase items) ───────────────
             ColumnLayout {
-                visible: !iconConfigDialog.isSuntimes
+                visible: !iconConfigDialog.isSuntimes && !iconConfigDialog.isMoonphase
                 spacing: Kirigami.Units.smallSpacing
                 Layout.fillWidth: true
 
@@ -435,6 +478,8 @@ KCM.AbstractKCM {
                             root._editingIconKey = iconConfigDialog.itemId;
                             if (iconConfigDialog.context === "tooltip")
                                 iconDialogTooltipMain.open();
+                            else if (iconConfigDialog.context === "details")
+                                iconDialogDetailsMain.open();
                             else
                                 iconDialogMain.open();
                         }
@@ -530,6 +575,8 @@ KCM.AbstractKCM {
                         onClicked: {
                             if (iconConfigDialog.context === "tooltip")
                                 iconDialogTooltipRise.open();
+                            else if (iconConfigDialog.context === "details")
+                                iconDialogDetailsRise.open();
                             else
                                 iconDialogRise.open();
                         }
@@ -571,6 +618,8 @@ KCM.AbstractKCM {
                         onClicked: {
                             if (iconConfigDialog.context === "tooltip")
                                 iconDialogTooltipSet.open();
+                            else if (iconConfigDialog.context === "details")
+                                iconDialogDetailsSet.open();
                             else
                                 iconDialogSet.open();
                         }
@@ -583,6 +632,91 @@ KCM.AbstractKCM {
                             return iconConfigDialog.getIcon("suntimes-sunset").length > 0;
                         }
                         onClicked: iconConfigDialog.setIcon("suntimes-sunset", "")
+                    }
+                }
+            }
+
+            // ── Moonphase picker (moonrise + moonset) ─────────────────────
+            ColumnLayout {
+                visible: iconConfigDialog.isMoonphase
+                spacing: Kirigami.Units.smallSpacing
+                Layout.fillWidth: true
+
+                // Moonrise icon
+                Label {
+                    text: i18n("Moonrise icon:")
+                    font.bold: true
+                    opacity: 0.85
+                }
+                RowLayout {
+                    spacing: Kirigami.Units.smallSpacing
+                    Layout.fillWidth: true
+
+                    Kirigami.Icon {
+                        source: {
+                            var _w = iconConfigDialog.watchRaw();
+                            var saved = iconConfigDialog.getIcon("moonrise");
+                            return saved.length > 0 ? saved : "weather-clear-night";
+                        }
+                        implicitWidth: Kirigami.Units.iconSizes.medium
+                        implicitHeight: Kirigami.Units.iconSizes.medium
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    Button {
+                        text: i18n("Browse…")
+                        icon.name: "document-open"
+                        onClicked: {
+                            if (iconConfigDialog.context === "details")
+                                iconDialogDetailsMoonrise.open();
+                        }
+                    }
+                    Button {
+                        text: i18n("Reset")
+                        icon.name: "edit-undo"
+                        enabled: {
+                            var _w = iconConfigDialog.watchRaw();
+                            return iconConfigDialog.getIcon("moonrise").length > 0;
+                        }
+                        onClicked: iconConfigDialog.setIcon("moonrise", "")
+                    }
+                }
+
+                // Moonset icon
+                Label {
+                    text: i18n("Moonset icon:")
+                    font.bold: true
+                    opacity: 0.85
+                }
+                RowLayout {
+                    spacing: Kirigami.Units.smallSpacing
+                    Layout.fillWidth: true
+
+                    Kirigami.Icon {
+                        source: {
+                            var _w = iconConfigDialog.watchRaw();
+                            var saved = iconConfigDialog.getIcon("moonset");
+                            return saved.length > 0 ? saved : "weather-clear-night";
+                        }
+                        implicitWidth: Kirigami.Units.iconSizes.medium
+                        implicitHeight: Kirigami.Units.iconSizes.medium
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    Button {
+                        text: i18n("Browse…")
+                        icon.name: "document-open"
+                        onClicked: {
+                            if (iconConfigDialog.context === "details")
+                                iconDialogDetailsMoonset.open();
+                        }
+                    }
+                    Button {
+                        text: i18n("Reset")
+                        icon.name: "edit-undo"
+                        enabled: {
+                            var _w = iconConfigDialog.watchRaw();
+                            return iconConfigDialog.getIcon("moonset").length > 0;
+                        }
+                        onClicked: iconConfigDialog.setIcon("moonset", "")
                     }
                 }
             }
@@ -626,16 +760,20 @@ KCM.AbstractKCM {
     property string cfg_tooltipStyle: "verbose"
     property string cfg_forecastLayout: "rows"
     property int cfg_forecastDays: 5
+    property string cfg_forecastIconTheme: "symbolic"
     property bool cfg_roundValues: true
     property bool cfg_showScrollbox: true
     property bool cfg_showUpdateText: true
     // Issue #7: widgetDetailsOrder replaces individual booleans
     property string cfg_widgetDetailsOrder: "feelslike;humidity;pressure;wind;dewpoint;visibility;moonphase;suntimes"
+    property string cfg_widgetDetailsItemIcons: "feelslike=1;humidity=1;pressure=1;wind=1;suntimes=1;dewpoint=1;visibility=1;moonphase=1"
+    property string cfg_widgetDetailsCustomIcons: ""
     property string cfg_widgetDetailsLayout: "cards2"  // "cards2" | "list"
     property string cfg_widgetSunTimesMode: "both"   // "both" | "sunrise" | "sunset" | "upcoming"
     property string cfg_widgetMoonMode: "full"        // "full" | "upcoming" | "times"
     property int cfg_widgetIconSize: 16
-    property string cfg_widgetIconTheme: "symbolic"   // "kde" | "wi-font" | "flat-color" | "symbolic" | "3d-oxygen"
+    property string cfg_widgetIconTheme: "symbolic"   // "kde" | "kde-symbolic" | "wi-font" | "flat-color" | "symbolic" | "3d-oxygen"
+    property string cfg_conditionIconTheme: "kde"      // controls main hero condition icon in widget popup
     property int cfg_widgetWidth: 0       // 0 = default 540 px
     property int cfg_widgetHeight: 0       // 0 = default 500 px
     property bool cfg_widgetShowFeelsLike: true
@@ -763,6 +901,19 @@ KCM.AbstractKCM {
     }
     function getTooltipCustomIcon(itemId) {
         var m = parseCustomIcons(root.cfg_tooltipCustomIcons);
+        return (itemId in m) ? m[itemId] : "";
+    }
+    // ── Details custom icon map helpers ──────────────────────────────────
+    function setDetailsCustomIcon(itemId, iconName) {
+        var m = parseCustomIcons(root.cfg_widgetDetailsCustomIcons);
+        if (iconName.length > 0)
+            m[itemId] = iconName;
+        else
+            delete m[itemId];
+        root.cfg_widgetDetailsCustomIcons = serializeCustomIcons(m);
+    }
+    function getDetailsCustomIcon(itemId) {
+        var m = parseCustomIcons(root.cfg_widgetDetailsCustomIcons);
         return (itemId in m) ? m[itemId] : "";
     }
 
@@ -1058,20 +1209,41 @@ KCM.AbstractKCM {
     // ─────────────────────────────────────────────────────────────────────
     // Details items helpers
     // ─────────────────────────────────────────────────────────────────────
+    function parseDetailsItemIcons() {
+        var raw = cfg_widgetDetailsItemIcons || "";
+        var map = {};
+        raw.split(";").forEach(function (pair) {
+            var kv = pair.split("=");
+            if (kv.length === 2)
+                map[kv[0].trim()] = (kv[1].trim() === "1");
+        });
+        return map;
+    }
+    function serializeDetailsItemIcons(map) {
+        return allDetailsDefs.map(function (d) {
+            var v = (d.itemId in map) ? map[d.itemId] : true;
+            return d.itemId + "=" + (v !== false ? "1" : "0");
+        }).join(";");
+    }
     function initDetailsModel() {
         // Ensure arc cards always present (migrate old configs)
         var raw = cfg_widgetDetailsOrder.split(";").map(function(t){return t.trim();}).filter(function(t){return t.length>0;});
         if (raw.indexOf("suntimes")  < 0) raw.push("suntimes");
         if (raw.indexOf("moonphase") < 0) raw.push("moonphase");
-        _initItemModel(detailsWorkingModel, allDetailsDefs, raw.join(";"), null);
+        var iconMap = parseDetailsItemIcons();
+        _initItemModel(detailsWorkingModel, allDetailsDefs, raw.join(";"),
+            function(def, tok) { return { itemShowIcon: (tok in iconMap) ? iconMap[tok] : true }; });
     }
     function applyDetailsItems() {
-        var ids = [];
+        var ids = [], iconMap = {};
         for (var i = 0; i < detailsWorkingModel.count; ++i) {
-            if (detailsWorkingModel.get(i).itemEnabled)
-                ids.push(detailsWorkingModel.get(i).itemId);
+            var item = detailsWorkingModel.get(i);
+            iconMap[item.itemId] = item.itemShowIcon;
+            if (item.itemEnabled)
+                ids.push(item.itemId);
         }
         cfg_widgetDetailsOrder = ids.join(";");
+        cfg_widgetDetailsItemIcons = serializeDetailsItemIcons(iconMap);
         // Sync legacy booleans
         cfg_widgetShowFeelsLike = ids.indexOf("feelslike") >= 0;
         cfg_widgetShowHumidity = ids.indexOf("humidity") >= 0;
