@@ -12,6 +12,8 @@ import "js/moonphase.js" as Moon
 import "js/moonpath.js" as MoonPath
 import "js/sunpath.js" as SunPath
 import "js/suncalc.js" as SC
+import "js/iconResolver.js" as IconResolver
+import "components"
 
 Item {
     id: root
@@ -53,79 +55,36 @@ Item {
     readonly property color accentViolet: isDark ? "#c4b4ff" : "#5030a0"
 
     // ── icon theme ────────────────────────────────────────────────────────
-    readonly property string iconTheme: Plasmoid.configuration.widgetIconTheme || "kde"
+    // Normalise legacy values: "kde" and "wi-font" have no bundled icon
+    // folder, so fall back to "symbolic".
+    readonly property string iconTheme: {
+        var t = Plasmoid.configuration.widgetIconTheme || "symbolic";
+        return (t === "kde" || t === "wi-font") ? "symbolic" : t;
+    }
     readonly property int iconSz: iconSize
     readonly property bool isList: (Plasmoid.configuration.widgetDetailsLayout || "cards2") === "list"
     readonly property string sunTimesMode: Plasmoid.configuration.widgetSunTimesMode || "both"
     readonly property string moonMode: Plasmoid.configuration.widgetMoonMode || "full"
 
     // Collapse state for the two arc cards.
-    // Plain bool properties so QML change detection works reliably.
-    // (var/object mutation does not trigger re-evaluation of bindings.)
     property bool _sunExpanded: true
     property bool _moonExpanded: true
 
-    // Height of regular (non-arc) cards — used as collapsed height for arc cards
-    // so they visually match feelslike/humidity/etc. when collapsed.
-    readonly property int regularCardHeight: Plasmoid.configuration.widgetCardsHeightAuto ? 30   // same as autoHeight for regular cards (line 259)
+    readonly property int regularCardHeight: Plasmoid.configuration.widgetCardsHeightAuto ? 30
     : (Plasmoid.configuration.widgetCardsHeight || 30)
 
-    // SVG icon base — wi-font falls back to symbolic so sun/moon icons always resolve
-    readonly property string svgBase: {
-        var th = iconTheme;
-        if (th === "wi-font")
-            th = "symbolic";
-        if (th === "kde")
-            return "";
-        return Qt.resolvedUrl("../icons/" + th + "/" + iconSize + "/wi-");
-    }
+    // ── Resolved icons base URL ───────────────────────────────────────────
+    readonly property string iconsBaseDir: Qt.resolvedUrl("../icons/")
 
-    // Resolved SVG URL for non-kde/wi-font themes
-    function svgIconUrl(filename) {
-        if (iconTheme === "kde" || iconTheme === "wi-font")
-            return "";
-        return Qt.resolvedUrl("../icons/" + iconTheme + "/" + iconSize + "/" + filename);
+    // ── Icon resolution via IconResolver ──────────────────────────────────
+    /** Resolves an icon for the given detail card ID */
+    function resolveIcon(itemId) {
+        return IconResolver.resolve(itemId, root.iconSize, root.iconsBaseDir, root.iconTheme);
     }
-
-    // ── Lookup tables ─────────────────────────────────────────────────────
-    function wiGlyph(id) {
-        return ({
-                feelslike: "\uF055",
-                humidity: "\uF07A",
-                pressure: "\uF079",
-                wind: "\uF050",
-                suntimes: "\uF051",
-                dewpoint: "\uF078",
-                visibility: "\uF0B6",
-                moonphase: "\uF0D0",
-                condition: "\uF013"
-            })[id] || "\uF00D";
-    }
-    function wiFile(id) {
-        return ({
-                feelslike: "wi-thermometer.svg",
-                humidity: "wi-humidity.svg",
-                pressure: "wi-barometer.svg",
-                wind: "wi-strong-wind.svg",
-                suntimes: "wi-sunrise.svg",
-                dewpoint: "wi-raindrop.svg",
-                visibility: "wi-fog.svg",
-                moonphase: "wi-night-clear.svg",
-                condition: "wi-day-sunny.svg"
-            })[id] || "wi-na.svg";
-    }
-    function kdeIcon(id) {
-        return ({
-                feelslike: "thermometer",
-                humidity: "weather-humidity",
-                pressure: "weather-pressure",
-                wind: "weather-windy",
-                suntimes: "weather-sunrise",
-                dewpoint: "weather-dew-point",
-                visibility: "weather-fog",
-                moonphase: "weather-clear-night",
-                condition: "weather-few-clouds"
-            })[id] || "weather-none-available";
+    /** Resolves the current moon phase icon */
+    function resolveMoonPhaseIcon() {
+        var stem = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
+        return IconResolver.resolveMoonPhase(stem, root.iconSize, root.iconsBaseDir, root.iconTheme);
     }
     function accentFor(id) {
         return ({
@@ -139,6 +98,12 @@ Item {
                 moonphase: root.accentViolet,
                 condition: Kirigami.Theme.textColor
             })[id] || root.accentBlue;
+    }
+
+    // When the icon theme is symbolic, icons should render monochrome (textColor).
+    // Accent colours are only applied for non-mask themes (flat-color, 3d-oxygen).
+    function iconColorFor(c) {
+        return (root.iconTheme === "symbolic") ? Kirigami.Theme.textColor : c;
     }
     function labelFor(id) {
         return ({
@@ -316,35 +281,10 @@ Item {
                                 spacing: 8
                                 visible: !card.isExpandedCard && card.modelData !== "wind"
 
-                                // Icon — uses existing theme-aware helpers
-                                Item {
-                                    visible: root.iconTheme === "wi-font" && wiFont.status === FontLoader.Ready
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
-                                    Layout.alignment: Qt.AlignVCenter
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: root.wiGlyph(card.modelData)
-                                        font.family: wiFont.font.family
-                                        font.pixelSize: root.iconSize
-                                        color: root.accentFor(card.modelData)
-                                    }
-                                }
-                                Kirigami.Icon {
-                                    visible: root.iconTheme === "kde"
-                                    source: root.kdeIcon(card.modelData)
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
-                                    color: root.accentFor(card.modelData)
-                                    Layout.alignment: Qt.AlignVCenter
-                                }
-                                Kirigami.Icon {
-                                    visible: root.iconTheme !== "kde" && root.iconTheme !== "wi-font"
-                                    source: root.svgIconUrl(root.wiFile(card.modelData))
-                                    isMask: root.iconTheme === "symbolic"
-                                    color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
+                                WeatherIcon {
+                                    iconInfo: root.resolveIcon(card.modelData)
+                                    iconSize: root.iconSize
+                                    iconColor: root.iconColorFor(root.accentFor(card.modelData))
                                     Layout.alignment: Qt.AlignVCenter
                                 }
                                 // label (dim)
@@ -381,35 +321,10 @@ Item {
                                 spacing: 8
                                 visible: card.modelData === "wind"
 
-                                // Icon — uses existing theme-aware helpers
-                                Item {
-                                    visible: root.iconTheme === "wi-font" && wiFont.status === FontLoader.Ready
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
-                                    Layout.alignment: Qt.AlignVCenter
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: root.wiGlyph("wind")
-                                        font.family: wiFont.font.family
-                                        font.pixelSize: root.iconSize
-                                        color: root.accentFor("wind")
-                                    }
-                                }
-                                Kirigami.Icon {
-                                    visible: root.iconTheme === "kde"
-                                    source: root.kdeIcon("wind")
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
-                                    color: root.accentFor("wind")
-                                    Layout.alignment: Qt.AlignVCenter
-                                }
-                                Kirigami.Icon {
-                                    visible: root.iconTheme !== "kde" && root.iconTheme !== "wi-font"
-                                    source: root.svgIconUrl(root.wiFile("wind"))
-                                    isMask: root.iconTheme === "symbolic"
-                                    color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
+                                WeatherIcon {
+                                    iconInfo: root.resolveIcon("wind")
+                                    iconSize: root.iconSize
+                                    iconColor: root.iconColorFor(root.accentFor("wind"))
                                     Layout.alignment: Qt.AlignVCenter
                                 }
                                 Label {
@@ -507,13 +422,10 @@ Item {
                                     //     Layout.alignment: Qt.AlignVCenter
                                     // }
 
-                                    Kirigami.Icon {
-                                        visible: root.iconTheme !== "kde" && root.iconTheme !== "wi-font"
-                                        source: root.svgIconUrl(root.wiFile("suntimes"))
-                                        isMask: root.iconTheme === "symbolic"
-                                        color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
-                                        implicitWidth: root.iconSize
-                                        implicitHeight: root.iconSize
+                                    WeatherIcon {
+                                        iconInfo: root.resolveIcon("suntimes")
+                                        iconSize: root.iconSize
+                                        iconColor: root.iconColorFor(root.accentFor("suntimes"))
                                         Layout.alignment: Qt.AlignVCenter
                                     }
                                     // Dim label — matches standard row style
@@ -720,15 +632,10 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        Kirigami.Icon {
-                                            source: {
-                                                var stem = suntimesCard._isNight ? "sunset" : "sunrise";
-                                                return root.svgBase.length > 0 ? (root.svgBase + stem + ".svg") : Qt.resolvedUrl("../icons/symbolic/32/wi-" + stem + ".svg");
-                                            }
-                                            isMask: true
-                                            color: suntimesCard._isNight ? suntimesCard._nightLeft : root.accentGold
-                                            implicitWidth: root.glyphIconSize
-                                            implicitHeight: root.glyphIconSize
+                                        WeatherIcon {
+                                            iconInfo: IconResolver.resolve(suntimesCard._isNight ? "sunset" : "sunrise", root.glyphIconSize, root.iconsBaseDir, root.iconTheme)
+                                            iconSize: root.glyphIconSize
+                                            iconColor: root.iconColorFor(suntimesCard._isNight ? suntimesCard._nightLeft : root.accentGold)
                                         }
                                         Label {
                                             text: {
@@ -804,16 +711,10 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        Kirigami.Icon {
-                                            source: {
-                                                var stem = suntimesCard._isNight ? "sunrise" : "sunset";
-                                                return root.svgBase.length > 0 ? (root.svgBase + stem + ".svg") : Qt.resolvedUrl("../icons/symbolic/32/wi-" + stem + ".svg");
-                                            }
-                                            isMask: true
-                                            color: suntimesCard._isNight ? suntimesCard._nightRight : root.accentOrange
-                                            implicitWidth: root.glyphIconSize
-                                            implicitHeight: root.glyphIconSize
-                                            Layout.alignment: Qt.AlignRight
+                                        WeatherIcon {
+                                            iconInfo: IconResolver.resolve(suntimesCard._isNight ? "sunrise" : "sunset", root.glyphIconSize, root.iconsBaseDir, root.iconTheme)
+                                            iconSize: root.glyphIconSize
+                                            iconColor: root.iconColorFor(suntimesCard._isNight ? suntimesCard._nightRight : root.accentOrange)
                                         }
                                         Label {
                                             text: {
@@ -843,35 +744,10 @@ Item {
                                 visible: card.modelData === "suntimes" && root.isList
                                 spacing: 8
 
-                                // Icon
-                                Item {
-                                    visible: root.iconTheme === "wi-font" && wiFont.status === FontLoader.Ready
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
-                                    Layout.alignment: Qt.AlignVCenter
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: root.wiGlyph("suntimes")
-                                        font.family: wiFont.font.family
-                                        font.pixelSize: root.iconSize
-                                        color: root.accentFor("suntimes")
-                                    }
-                                }
-                                Kirigami.Icon {
-                                    visible: root.iconTheme === "kde"
-                                    source: root.kdeIcon("suntimes")
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
-                                    color: root.accentFor("suntimes")
-                                    Layout.alignment: Qt.AlignVCenter
-                                }
-                                Kirigami.Icon {
-                                    visible: root.iconTheme !== "kde" && root.iconTheme !== "wi-font"
-                                    source: root.svgIconUrl(root.wiFile("suntimes"))
-                                    isMask: root.iconTheme === "symbolic"
-                                    color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
+                                WeatherIcon {
+                                    iconInfo: root.resolveIcon("suntimes")
+                                    iconSize: root.iconSize
+                                    iconColor: root.iconColorFor(root.accentFor("suntimes"))
                                     Layout.alignment: Qt.AlignVCenter
                                 }
                                 Label {
@@ -888,12 +764,10 @@ Item {
                                 RowLayout {
                                     spacing: 6
                                     Layout.alignment: Qt.AlignVCenter
-                                    Kirigami.Icon {
-                                        source: root.svgBase.length > 0 ? (root.svgBase + "sunrise.svg") : "weather-sunrise"
-                                        isMask: root.iconTheme !== "kde"
-                                        color: root.accentGold
-                                        implicitWidth: root.iconSize
-                                        implicitHeight: root.iconSize
+                                    WeatherIcon {
+                                        iconInfo: IconResolver.resolve("sunrise", root.iconSize, root.iconsBaseDir, root.iconTheme)
+                                        iconSize: root.iconSize
+                                        iconColor: root.iconColorFor(root.accentGold)
                                         Layout.alignment: Qt.AlignVCenter
                                     }
                                     Label {
@@ -909,12 +783,10 @@ Item {
                                         opacity: 0.30
                                         font: root.weatherRoot ? root.weatherRoot.wf(11, false) : Qt.font({})
                                     }
-                                    Kirigami.Icon {
-                                        source: root.svgBase.length > 0 ? (root.svgBase + "sunset.svg") : "weather-sunset"
-                                        isMask: root.iconTheme !== "kde"
-                                        color: root.accentOrange
-                                        implicitWidth: root.iconSize
-                                        implicitHeight: root.iconSize
+                                    WeatherIcon {
+                                        iconInfo: IconResolver.resolve("sunset", root.iconSize, root.iconsBaseDir, root.iconTheme)
+                                        iconSize: root.iconSize
+                                        iconColor: root.iconColorFor(root.accentOrange)
                                         Layout.alignment: Qt.AlignVCenter
                                     }
                                     Label {
@@ -955,19 +827,11 @@ Item {
                                     height: card._isArcExpanded ? 0 : root.regularCardHeight
                                     spacing: 8
 
-                                    // Leading icon — phase-specific SVG
-                                                   Kirigami.Icon {
-                                    visible: root.iconTheme !== "kde" && root.iconTheme !== "wi-font"
-                                    source: root.iconTheme === "kde"
-                                        ? root.kdeIcon("moonphase")
-                                        : (root.svgBase.length > 0
-                                            ? (root.svgBase + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg")
-                                            : Qt.resolvedUrl("../icons/symbolic/32/wi-" + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg"))
-                                    isMask: root.iconTheme === "symbolic"
-                                    color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
-                                    Layout.alignment: Qt.AlignVCenter
+                                    WeatherIcon {
+                                        iconInfo: root.resolveMoonPhaseIcon()
+                                        iconSize: root.iconSize
+                                        iconColor: root.iconColorFor(root.accentViolet)
+                                        Layout.alignment: Qt.AlignVCenter
                                     }
                                     // Dim label
                                     Label {
@@ -1138,14 +1002,10 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        Kirigami.Icon {
-                                            source: root.svgBase.length > 0
-                                                ? (root.svgBase + "moonrise.svg")
-                                                : Qt.resolvedUrl("../icons/symbolic/32/wi-moonrise.svg")
-                                            isMask: true
-                                            color: root.accentViolet
-                                            implicitWidth: root.glyphIconSize
-                                            implicitHeight: root.glyphIconSize
+                                        WeatherIcon {
+                                            iconInfo: IconResolver.resolve("moonrise", root.glyphIconSize, root.iconsBaseDir, root.iconTheme)
+                                            iconSize: root.glyphIconSize
+                                            iconColor: root.iconColorFor(root.accentViolet)
                                         }
                                         Label {
                                             text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(moonCard._moonriseText) : "--"
@@ -1164,19 +1024,12 @@ Item {
                                         Item {
                                             Layout.fillWidth: true
                                         }
-                                             Kirigami.Icon {
-                                    visible: root.iconTheme !== "kde" && root.iconTheme !== "wi-font"
-                                    source: root.iconTheme === "kde"
-                                        ? root.kdeIcon("moonphase")
-                                        : (root.svgBase.length > 0
-                                            ? (root.svgBase + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg")
-                                            : Qt.resolvedUrl("../icons/symbolic/32/wi-" + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg"))
-                                    isMask: root.iconTheme === "symbolic"
-                                    color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
-                                    implicitWidth: root.iconSize
-                                    implicitHeight: root.iconSize
-                                    Layout.alignment: Qt.AlignVCenter
-                                    }
+                                        WeatherIcon {
+                                            iconInfo: root.resolveMoonPhaseIcon()
+                                            iconSize: root.iconSize
+                                            iconColor: root.iconColorFor(root.accentViolet)
+                                            Layout.alignment: Qt.AlignVCenter
+                                        }
                                         Label {
                                             text: root.weatherRoot ? root.weatherRoot.moonPhaseLabel() : "--"
                                             color: root.accentViolet
@@ -1195,16 +1048,11 @@ Item {
                                     Column {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
-                                        Kirigami.Icon {
-                                            source: root.svgBase.length > 0
-                                                ? (root.svgBase + "moonset.svg")
-                                                : Qt.resolvedUrl("../icons/symbolic/32/wi-moonset.svg")
-                                            isMask: true
-                                            color: root.accentViolet
+                                        WeatherIcon {
+                                            iconInfo: IconResolver.resolve("moonset", root.glyphIconSize, root.iconsBaseDir, root.iconTheme)
+                                            iconSize: root.glyphIconSize
+                                            iconColor: root.iconColorFor(root.accentViolet)
                                             opacity: 0.70
-                                            implicitWidth: root.glyphIconSize
-                                            implicitHeight: root.glyphIconSize
-                                            Layout.alignment: Qt.AlignRight
                                         }
                                         Label {
                                             text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(moonCard._moonsetText) : "--"
@@ -1267,28 +1115,10 @@ Item {
                                     }
                                     spacing: 8
 
-                                    // ── Leading icon: moonPhaseSvgStem() SVG for all non-KDE themes
-                                    Kirigami.Icon {
-                                        visible: root.iconTheme === "kde"
-                                        source: root.kdeIcon("moonphase")
-                                        implicitWidth: root.iconSize
-                                        implicitHeight: root.iconSize
-                                        color: root.accentViolet
-                                        Layout.alignment: Qt.AlignVCenter
-                                    }
-                                    Kirigami.Icon {
-                                        visible: root.iconTheme !== "kde"
-                                        // moonPhaseSvgStem gives e.g. "moon-alt-full" → wi-moon-alt-full.svg
-                                        // svgBase already resolves to ../icons/<theme>/<size>/wi-
-                                        source: root.iconTheme === "kde"
-                                            ? root.kdeIcon("moonphase")
-                                            : (root.svgBase.length > 0
-                                                ? (root.svgBase + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg")
-                                                : Qt.resolvedUrl("../icons/symbolic/32/wi-" + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg"))
-                                        isMask: root.iconTheme === "symbolic"
-                                        color: root.iconTheme === "symbolic" ? Kirigami.Theme.textColor : "transparent"
-                                        implicitWidth: root.iconSize
-                                        implicitHeight: root.iconSize
+                                    WeatherIcon {
+                                        iconInfo: root.resolveMoonPhaseIcon()
+                                        iconSize: root.iconSize
+                                        iconColor: root.iconColorFor(root.accentViolet)
                                         Layout.alignment: Qt.AlignVCenter
                                     }
 
@@ -1310,21 +1140,10 @@ Item {
                                         Layout.alignment: Qt.AlignVCenter
 
                                         // Phase icon + name
-                                        Kirigami.Icon {
-                                            visible: root.iconTheme === "kde"
-                                            source: root.kdeIcon("moonphase")
-                                            implicitWidth: root.iconSize
-                                            implicitHeight: root.iconSize
-                                            color: root.accentViolet
-                                            Layout.alignment: Qt.AlignVCenter
-                                        }
-                                        Kirigami.Icon {
-                                            visible: root.iconTheme !== "kde"
-                                            source: root.svgBase.length > 0 ? (root.svgBase + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg") : Qt.resolvedUrl("../icons/symbolic/32/wi-" + Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)) + ".svg")
-                                            isMask: true
-                                            color: root.accentViolet
-                                            implicitWidth: root.iconSize
-                                            implicitHeight: root.iconSize
+                                        WeatherIcon {
+                                            iconInfo: root.resolveMoonPhaseIcon()
+                                            iconSize: root.iconSize
+                                            iconColor: root.iconColorFor(root.accentViolet)
                                             Layout.alignment: Qt.AlignVCenter
                                         }
                                         Label {
@@ -1339,12 +1158,10 @@ Item {
                                         RowLayout {
                                             spacing: 3
                                             Layout.alignment: Qt.AlignVCenter
-                                            Kirigami.Icon {
-                                                source: root.svgBase.length > 0 ? (root.svgBase + "moonrise.svg") : Qt.resolvedUrl("../icons/symbolic/32/wi-moonrise.svg")
-                                                isMask: root.iconTheme !== "kde"
-                                                color: root.accentViolet
-                                                implicitWidth: root.iconSize
-                                                implicitHeight: root.iconSize
+                                            WeatherIcon {
+                                                iconInfo: IconResolver.resolve("moonrise", root.iconSize, root.iconsBaseDir, root.iconTheme)
+                                                iconSize: root.iconSize
+                                                iconColor: root.iconColorFor(root.accentViolet)
                                                 Layout.alignment: Qt.AlignVCenter
                                             }
                                             Label {
@@ -1365,13 +1182,11 @@ Item {
                                         RowLayout {
                                             spacing: 3
                                             Layout.alignment: Qt.AlignVCenter
-                                            Kirigami.Icon {
-                                                source: root.svgBase.length > 0 ? (root.svgBase + "moonset.svg") : Qt.resolvedUrl("../icons/symbolic/32/wi-moonset.svg")
-                                                isMask: root.iconTheme !== "kde"
-                                                color: root.accentViolet
+                                            WeatherIcon {
+                                                iconInfo: IconResolver.resolve("moonset", root.iconSize, root.iconsBaseDir, root.iconTheme)
+                                                iconSize: root.iconSize
+                                                iconColor: root.iconColorFor(root.accentViolet)
                                                 opacity: 0.75
-                                                implicitWidth: root.iconSize
-                                                implicitHeight: root.iconSize
                                                 Layout.alignment: Qt.AlignVCenter
                                             }
                                             Label {

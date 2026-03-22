@@ -23,6 +23,10 @@ function _rad(d) { return d * Math.PI / 180; }
 function _frac(x) { return x - Math.floor(x); }
 function _rev(x)  { return x - Math.floor(x / 360) * 360; } // mod 360
 
+// NOTE: parseMins(), nowMinsAt() and formatDuration() below are intentional
+// local copies of the same functions in sunpath.js.  .pragma library files
+// cannot import each other in Qt/QML, so deduplication at the JS level is
+// not possible — they must be self-contained.
 function parseMins(t) {
     if (!t || t === "--") return -1;
     var p = t.split(":");
@@ -118,11 +122,7 @@ function _moonPos(jd) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Moonrise / Moonset calculation
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Moon arc progress (unchanged)
+// Moon arc progress
 // ─────────────────────────────────────────────────────────────────────────────
 
 function moonArcProgress(riseText, setText, utcOffsetMins) {
@@ -154,8 +154,6 @@ function formatDuration(totalMins) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Moon illumination / age (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
-
-// moonAge() and illuminationPercent() removed — use SC.getMoonIllumination() from suncalc.js
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Canvas drawing (all unchanged from previous version)

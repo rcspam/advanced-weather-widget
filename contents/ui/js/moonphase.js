@@ -22,38 +22,12 @@ function moonAgeFromPhase(phase) {
 }
 
 /**
- * Returns a wi-font Unicode glyph (PUA F0D0+) for the given moon age.
- * If age is omitted the current age is computed automatically.
+ * Returns a wi-font Unicode glyph for the given moon age.
+ * This is the single canonical glyph function.
+ * (moonPhaseGlyph was identical and has been removed.)
  */
-function moonPhaseGlyph(age) {
-    var a = (age !== undefined) ? age : 0; // age must be supplied by caller via SC.getMoonIllumination()
-    var offsets = [0x00, 0x02, 0x05, 0x08, 0x0C, 0x10, 0x14, 0x17];
-    var idx = Math.round((a / 29.53) * 7) % 8;
-    return String.fromCodePoint(0xF0D0 + offsets[idx]);
-}
-
-/**
- * Returns the wi-* SVG icon name stem (e.g. "wi-moon-alt-full") for the given moon age.
- * Full URL: Qt.resolvedUrl("../icons/wi-" + Moon.moonPhaseSvgStem(age) + ".svg")
- */
-function moonPhaseSvgStem(age) {
-    var a = (age !== undefined) ? age : 0; // age must be supplied by caller via SC.getMoonIllumination()
-    if (a < 1.85)  return "moon-alt-new";
-    if (a < 5.0)   return "moon-alt-waxing-crescent-2";
-    if (a < 7.38)  return "moon-alt-waxing-crescent-5";
-    if (a < 9.23)  return "moon-alt-first-quarter";
-    if (a < 12.0)  return "moon-alt-waxing-gibbous-3";
-    if (a < 14.77) return "moon-alt-waxing-gibbous-6";
-    if (a < 16.62) return "moon-alt-full";
-    if (a < 19.0)  return "moon-alt-waning-gibbous-3";
-    if (a < 22.15) return "moon-alt-waning-gibbous-6";
-    if (a < 24.0)  return "moon-alt-third-quarter";
-    if (a < 26.5)  return "moon-alt-waning-crescent-3";
-    return "moon-alt-waning-crescent-6";
-}
-
 function moonPhaseFontIcon(age) {
-    var a = (age !== undefined) ? age : 0; // age must be supplied by caller via SC.getMoonIllumination()
+    var a = (age !== undefined) ? age : 0;
     if (a < 1.85)  return "\uF0EB";  // moon-alt-new
     if (a < 5.0)   return "\uF0D2";  // moon-alt-waxing-crescent-2
     if (a < 7.38)  return "\uF0D5";  // moon-alt-waxing-crescent-5
@@ -66,6 +40,26 @@ function moonPhaseFontIcon(age) {
     if (a < 24.0)  return "\uF0E4";  // moon-alt-third-quarter
     if (a < 26.5)  return "\uF0E6";  // moon-alt-waning-crescent-3
     return "\uF0E9";                 // moon-alt-waning-crescent-6
+}
+
+/**
+ * Returns the wi-* SVG icon filename stem for the given moon age.
+ * e.g. "moon-alt-full" → use as: base + "wi-" + stem + ".svg"
+ */
+function moonPhaseSvgStem(age) {
+    var a = (age !== undefined) ? age : 0;
+    if (a < 1.85)  return "moon-alt-new";
+    if (a < 5.0)   return "moon-alt-waxing-crescent-2";
+    if (a < 7.38)  return "moon-alt-waxing-crescent-5";
+    if (a < 9.23)  return "moon-alt-first-quarter";
+    if (a < 12.0)  return "moon-alt-waxing-gibbous-3";
+    if (a < 14.77) return "moon-alt-waxing-gibbous-6";
+    if (a < 16.62) return "moon-alt-full";
+    if (a < 19.0)  return "moon-alt-waning-gibbous-3";
+    if (a < 22.15) return "moon-alt-waning-gibbous-6";
+    if (a < 24.0)  return "moon-alt-third-quarter";
+    if (a < 26.5)  return "moon-alt-waning-crescent-3";
+    return "moon-alt-waning-crescent-6";
 }
 
 /**

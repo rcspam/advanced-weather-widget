@@ -6,7 +6,6 @@
  * Supports the same icon themes as the Panel: wi-font, symbolic, flat-color,
  * 3d-oxygen, kde, and custom (user-picked KDE icons per item).
  */
-pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
@@ -17,8 +16,10 @@ import org.kde.plasma.plasmoid
 import "js/moonphase.js" as Moon
 import "js/suncalc.js" as SC
 import "js/weather.js" as W
+import "js/iconResolver.js" as IconResolver
+import "components"
 
-ColumnLayout {
+Item {
     id: ttRoot
 
     // ── Interface ─────────────────────────────────────────────────────────
@@ -29,7 +30,6 @@ ColumnLayout {
     // (CompactView also sets active:false on the ToolTipArea, so the popup
     //  never opens at all.  This guard is a belt-and-suspenders fallback.)
     visible: Plasmoid.configuration.tooltipEnabled !== false
-    spacing: 5
 
     // When truncating, cap tooltip width so the Label elide actually fires.
     // When wrapping, still cap at a reasonable max so very long names wrap
@@ -41,7 +41,25 @@ ColumnLayout {
     readonly property int ttHeightManual: Plasmoid.configuration.tooltipHeightManual || 300
     // Auto width: fit content, min 280, max 480
     readonly property int ttMaxWidth: ttWidthAuto ? 480 : Math.max(200, ttWidthManual)
-    implicitWidth: (Plasmoid.configuration.tooltipEnabled !== false) ? (ttWidthAuto ? Math.min(ttMaxWidth, Math.max(280, ttContentCol.implicitWidth + 24)) : ttWidthManual) : 0
+
+    // Using an Item root (not ColumnLayout) ensures implicitWidth/Height
+    // are NOT overridden by the layout engine, so manual tooltip sizing works.
+    implicitWidth: (Plasmoid.configuration.tooltipEnabled !== false)
+        ? (ttWidthAuto
+            ? Math.min(ttMaxWidth, Math.max(280, ttContentCol.implicitWidth + 24))
+            : ttWidthManual)
+        : 0
+    implicitHeight: (Plasmoid.configuration.tooltipEnabled !== false)
+        ? (ttHeightAuto
+            ? Math.max(40, ttDataCol.implicitHeight + _headerHeight + 16)
+            : ttHeightManual)
+        : 0
+
+    // Sum of header labels + separator — used in manual-height calculation
+    readonly property int _headerHeight: _ttHeaderLabel.implicitHeight
+        + ((_ttTimestamp.visible ? _ttTimestamp.implicitHeight : 0))
+        + ((_ttNoLocHint.visible ? _ttNoLocHint.implicitHeight : 0))
+        + 6 /* separator + margins */
 
     // ── Wi-font loaded inside tooltip popup ───────────────────────────────
     FontLoader {
@@ -55,7 +73,7 @@ ColumnLayout {
     readonly property bool ttUseIcons: Plasmoid.configuration.tooltipUseIcons !== false
     readonly property string ttSunTimesMode: Plasmoid.configuration.tooltipSunTimesMode || "both"
 
-    readonly property url iconsBaseDir: Qt.resolvedUrl("../icons/")
+    readonly property string iconsBaseDir: Qt.resolvedUrl("../icons/")
 
     // Resolved icon font to use in tooltip rows
     readonly property font ttFont: {
@@ -83,12 +101,11 @@ ColumnLayout {
         return (itemId in m) ? m[itemId] : "";
     }
 
-    // Returns { type, source, kdeFallback } for a given token + ttIconTheme
+    // Returns { type, source, svgFallback, isMask } for a given token + ttIconTheme
     function ttItemIconInfo(tok) {
         var theme = ttIconTheme;
 
         if (theme === "wi-font") {
-            // Return the same wi-font codepoints used historically
             var glyphs = {
                 temperature: "\uF055",
                 feelslike: "\uF053",
@@ -102,11 +119,7 @@ ColumnLayout {
                 "suntimes-sunrise": "\uF051",
                 "suntimes-sunset": "\uF052"
             };
-            return {
-                type: "wi",
-                source: glyphs[tok] || "",
-                kdeFallback: ""
-            };
+            return { type: "wi", source: glyphs[tok] || "", svgFallback: "", isMask: false };
         }
 
         if (theme === "custom") {
@@ -124,95 +137,35 @@ ColumnLayout {
                 "suntimes-sunset": "weather-sunset"
             };
             var saved = getTooltipCustomIcon(tok);
-            return {
-                type: "kde",
-                source: saved.length > 0 ? saved : (defaults[tok] || ""),
-                kdeFallback: ""
-            };
+            return { type: "kde", source: saved.length > 0 ? saved : (defaults[tok] || ""), svgFallback: "", isMask: false };
         }
 
-        if (theme === "kde") {
-            var kdeMap = {
-                temperature: "thermometer",
-                feelslike: "thermometer",
-                wind: "weather-wind-beaufort-0",
-                humidity: "weather-humidity",
-                pressure: "weather-pressure",
-                dewpoint: "raindrop",
-                visibility: "weather-fog",
-                moonphase: "weather-clear-night",
-                "suntimes-sunrise": "weather-sunrise",
-                "suntimes-sunset": "weather-sunset"
-            };
-            if (tok === "condition")
-                return {
-                    type: "kde",
-                    source: weatherRoot ? W.weatherCodeToIcon(weatherRoot.weatherCode, weatherRoot.isNightTime()) : "weather-none-available",
-                    kdeFallback: ""
-                };
-            return {
-                type: "kde",
-                source: kdeMap[tok] || "",
-                kdeFallback: ""
-            };
-        }
+        // KDE / SVG themes — unified via IconResolver
+        // Pass theme directly; "kde" is handled by IconResolver internally.
+        var svgTheme = theme;
 
-        // ── SVG themes ────────────────────────────────────────────────────
-        // Use iconsBaseDir (resolved at load time) — do NOT call Qt.resolvedUrl() here;
-        // inside a JS function in a detached tooltip context the base path is wrong.
-        var base = ttRoot.iconsBaseDir + theme + "/" + ttIconSize + "/wi-";
-
-        var svgMap = {
-            temperature: "thermometer",
-            feelslike: "thermometer",
-            humidity: "humidity",
-            pressure: "barometer",
-            wind: "strong-wind",
-            dewpoint: "raindrop",
-            visibility: "thermometer",
-            moonphase: Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)),
-            "suntimes-sunrise": "sunrise",
-            "suntimes-sunset": "sunset"
-        };
         if (tok === "condition") {
             if (!weatherRoot)
-                return {
-                    type: "svg",
-                    source: "",
-                    kdeFallback: ""
-                };
-            var code = weatherRoot.weatherCode, night = weatherRoot.isNightTime(), stem;
-            if (code === 0)
-                stem = night ? "night-clear" : "day-sunny";
-            else if (code <= 2)
-                stem = night ? "night-alt-partly-cloudy" : "day-cloudy";
-            else if (code === 3)
-                stem = "cloudy";
-            else if (code <= 48)
-                stem = night ? "night-fog" : "day-fog";
-            else if (code <= 65)
-                stem = night ? "night-alt-rain" : "day-rain";
-            else if (code <= 75)
-                stem = night ? "night-alt-snow" : "day-snow";
-            else
-                stem = night ? "night-alt-thunderstorm" : "day-thunderstorm";
-            return {
-                type: "svg",
-                source: base + stem + ".svg",
-                kdeFallback: ""
-            };
+                return { type: "kde", source: "weather-none-available", svgFallback: "", isMask: false };
+            return IconResolver.resolveCondition(weatherRoot.weatherCode, weatherRoot.isNightTime(), ttIconSize, ttRoot.iconsBaseDir, svgTheme);
         }
-        var s = svgMap[tok];
-        // wi-sunrise.svg and wi-sunset.svg exist in all SVG theme packs — no kdeFallback needed
-        return {
-            type: "svg",
-            source: s ? base + s + ".svg" : "",
-            kdeFallback: ""
-        };
+        if (tok === "moonphase") {
+            var moonStem = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
+            return IconResolver.resolveMoonPhase(moonStem, ttIconSize, ttRoot.iconsBaseDir, svgTheme);
+        }
+
+        return IconResolver.resolve(tok, ttIconSize, ttRoot.iconsBaseDir, svgTheme);
     }
+
+    // ── Inner layout — anchored to root Item for proper sizing ───────────
+    ColumnLayout {
+        id: ttLayout
+        anchors.fill: parent
+        spacing: 5
 
     // ── Header: location name ─────────────────────────────────────────────
     Label {
+        id: _ttHeaderLabel
         Layout.fillWidth: true
         Layout.maximumWidth: ttRoot.ttMaxWidth - 24
         text: ttRoot.weatherRoot && ttRoot.weatherRoot.hasSelectedTown ? Plasmoid.configuration.locationName : i18n("Weather Widget")
@@ -226,6 +179,7 @@ ColumnLayout {
 
     // ── Update timestamp ─────────────────────────────────────────────────
     Label {
+        id: _ttTimestamp
         Layout.fillWidth: true
         visible: ttRoot.weatherRoot && ttRoot.weatherRoot.hasSelectedTown && ttRoot.weatherRoot.updateText.length > 0
         text: ttRoot.weatherRoot ? ttRoot.weatherRoot.updateText : ""
@@ -235,6 +189,7 @@ ColumnLayout {
 
     // ── No-location hint ─────────────────────────────────────────────────
     Label {
+        id: _ttNoLocHint
         Layout.fillWidth: true
         visible: !ttRoot.weatherRoot || !ttRoot.weatherRoot.hasSelectedTown
         text: i18n("Click to configure a location")
@@ -254,11 +209,16 @@ ColumnLayout {
     // ── Scrollable data area — height capped when Manual ──────────────
     ScrollView {
         Layout.fillWidth: true
-        // Auto: natural height. Manual: fixed height with scrollbar when needed.
-        implicitHeight: ttRoot.ttHeightAuto ? ttDataCol.implicitHeight : Math.min(ttRoot.ttHeightManual, ttDataCol.implicitHeight)
+        Layout.fillHeight: !ttRoot.ttHeightAuto
+        // Auto: natural height. Manual: fill remaining space within the capped tooltip.
+        implicitHeight: ttRoot.ttHeightAuto
+            ? ttDataCol.implicitHeight
+            : Math.min(Math.max(40, ttRoot.ttHeightManual - ttRoot._headerHeight - 16), ttDataCol.implicitHeight)
         clip: true
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-        ScrollBar.vertical.policy: ttRoot.ttHeightAuto ? ScrollBar.AlwaysOff : (ttDataCol.implicitHeight > ttRoot.ttHeightManual ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff)
+        ScrollBar.vertical.policy: ttRoot.ttHeightAuto
+            ? ScrollBar.AlwaysOff
+            : (ttDataCol.implicitHeight > (ttRoot.ttHeightManual - ttRoot._headerHeight - 16) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff)
 
         ColumnLayout {
             id: ttDataCol
@@ -290,50 +250,19 @@ ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 5
 
-                        // ── wi-font glyph ─────────────────────────────────────────
-                        Text {
-                            visible: ttIconDelegate.modelData.showIcon && ttIconDelegate.modelData.glyphType === "wi" && (ttIconDelegate.modelData.glyph || "").length > 0
-                            text: ttIconDelegate.modelData.glyph || ""
-                            font.family: wiFontTT.status === FontLoader.Ready ? wiFontTT.font.family : ""
-                            font.pixelSize: ttRoot.ttFont.pixelSize + 2
-                            color: Kirigami.Theme.textColor
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        // ── KDE icon ──────────────────────────────────────────────
-                        Kirigami.Icon {
-                            visible: ttIconDelegate.modelData.showIcon && ttIconDelegate.modelData.glyphType === "kde" && (ttIconDelegate.modelData.glyph || "").length > 0
-                            source: ttIconDelegate.modelData.glyph || ""
-                            implicitWidth: ttRoot.ttIconSize
-                            implicitHeight: ttRoot.ttIconSize
+                        WeatherIcon {
+                            visible: modelData.showIcon
+                            iconInfo: modelData.iconInfo
+                            iconSize: ttRoot.ttIconSize
+                            wiFontFamily: wiFontTT.status === FontLoader.Ready ? wiFontTT.font.family : ""
+                            wiFontReady: wiFontTT.status === FontLoader.Ready
                             Layout.alignment: Qt.AlignVCenter
-                        }
-
-                        // ── SVG icon ──────────────────────────────────────────────
-                        Item {
-                            id: svgIconItem
-                            visible: svgIconItem_modelData.showIcon && svgIconItem_modelData.glyphType === "svg" && (svgIconItem_modelData.glyph || "").length > 0
-                            implicitWidth: ttRoot.ttIconSize
-                            implicitHeight: ttRoot.ttIconSize
-                            Layout.alignment: Qt.AlignVCenter
-                            property var svgIconItem_modelData: ttIconDelegate.modelData
-                            Kirigami.Icon {
-                                anchors.fill: parent
-                                source: svgIconItem.svgIconItem_modelData.glyphKdeFallback || ""
-                                visible: (svgIconItem.svgIconItem_modelData.glyphKdeFallback || "").length > 0
-                            }
-                            Kirigami.Icon {
-                                anchors.fill: parent
-                                source: svgIconItem.svgIconItem_modelData.glyph || ""
-                                isMask: ttRoot.ttIconTheme === "symbolic"
-                                color: Kirigami.Theme.textColor
-                            }
                         }
 
                         // ── Value text ────────────────────────────────────────────
                         Label {
                             Layout.fillWidth: true
-                            text: ttIconDelegate.modelData.text || ""
+                            text: modelData.text || ""
                             color: Kirigami.Theme.textColor
                             font: ttRoot.ttFont
                             verticalAlignment: Text.AlignVCenter
@@ -370,6 +299,8 @@ ColumnLayout {
         } // ttDataCol
     } // ScrollView
 
+    } // ColumnLayout (ttLayout)
+
     // ── Private: build tooltip rows ───────────────────────────────────────
     function _buildTooltipItems() {
         if (!weatherRoot || !weatherRoot.hasSelectedTown)
@@ -397,32 +328,20 @@ ColumnLayout {
 
     /**
      * Returns 1–2 row objects for a given token.
-     * Icons mode: { glyph, glyphType, glyphKdeFallback, showIcon, text }
-     * Text mode:  { glyph: "", glyphType: "", glyphKdeFallback: "", showIcon: false, text: "Label: value" }
+     * Icons mode: { iconInfo, showIcon, text }
+     * Text mode:  { iconInfo: null, showIcon: false, text: "Label: value" }
      */
     function _tooltipItemsFor(tok, iconMap) {
         var r = weatherRoot;
         var showIcon = ttUseIcons && ((tok in iconMap) ? iconMap[tok] : true);
         var textMode = !ttUseIcons;
+        var emptyInfo = { type: "", source: "", svgFallback: "", isMask: false };
 
         function iconRow(iconTok, txt) {
-            var info = ttItemIconInfo(iconTok);
-            return {
-                glyph: info.source,
-                glyphType: info.type,
-                glyphKdeFallback: info.kdeFallback,
-                showIcon: showIcon,
-                text: txt
-            };
+            return { iconInfo: ttItemIconInfo(iconTok), showIcon: showIcon, text: txt };
         }
         function textRow(txt) {
-            return {
-                glyph: "",
-                glyphType: "",
-                glyphKdeFallback: "",
-                showIcon: false,
-                text: txt
-            };
+            return { iconInfo: emptyInfo, showIcon: false, text: txt };
         }
         function row(iconTok, iconText, labelText) {
             return textMode ? textRow(labelText) : iconRow(iconTok, iconText);
@@ -442,26 +361,14 @@ ColumnLayout {
             if (textMode)
                 return [textRow(i18n("Wind:") + " " + windTxt)];
             // Icons mode: use wind-direction glyph for wi-font
-            var glyph, type, kdf;
+            var windInfo;
             if (ttIconTheme === "wi-font") {
-                glyph = isNaN(r.windDirection) ? "\uF050" : W.windDirectionGlyph(r.windDirection);
-                type = "wi";
-                kdf = "";
+                var g = isNaN(r.windDirection) ? "\uF050" : W.windDirectionGlyph(r.windDirection);
+                windInfo = { type: "wi", source: g, svgFallback: "", isMask: false };
             } else {
-                var info = ttItemIconInfo("wind");
-                glyph = info.source;
-                type = info.type;
-                kdf = info.kdeFallback;
+                windInfo = ttItemIconInfo("wind");
             }
-            return [
-                {
-                    glyph: glyph,
-                    glyphType: type,
-                    glyphKdeFallback: kdf,
-                    showIcon: showIcon,
-                    text: windTxt
-                }
-            ];
+            return [{ iconInfo: windInfo, showIcon: showIcon, text: windTxt }];
         }
 
         if (tok === "humidity")
@@ -478,9 +385,10 @@ ColumnLayout {
             return [row("visibility", visTxt, i18n("Visibility:") + " " + visTxt)];
         }
 
-        if (tok === "moonphase")
+        if (tok === "moonphase") {
             var _age = Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase);
             return [row("moonphase", i18n(Moon.moonPhaseNameKey(_age)), i18n("Moon:") + " " + i18n(Moon.moonPhaseNameKey(_age)))];
+        }
 
         if (tok === "suntimes") {
             var mode = ttSunTimesMode;
@@ -498,26 +406,12 @@ ColumnLayout {
             }
 
             if (mode === "sunrise") {
-                return textMode ? [textRow(i18n("Sunrise:") + " " + riseTime)] : [
-                    {
-                        glyph: infoRise.source,
-                        glyphType: infoRise.type,
-                        glyphKdeFallback: infoRise.kdeFallback,
-                        showIcon: showIcon,
-                        text: riseTime
-                    }
-                ];
+                return textMode ? [textRow(i18n("Sunrise:") + " " + riseTime)]
+                    : [{ iconInfo: infoRise, showIcon: showIcon, text: riseTime }];
             }
             if (mode === "sunset") {
-                return textMode ? [textRow(i18n("Sunset:") + " " + setTime)] : [
-                    {
-                        glyph: infoSet.source,
-                        glyphType: infoSet.type,
-                        glyphKdeFallback: infoSet.kdeFallback,
-                        showIcon: showIcon,
-                        text: setTime
-                    }
-                ];
+                return textMode ? [textRow(i18n("Sunset:") + " " + setTime)]
+                    : [{ iconInfo: infoSet, showIcon: showIcon, text: setTime }];
             }
             if (mode === "upcoming") {
                 var nowM = (new Date()).getHours() * 60 + (new Date()).getMinutes();
@@ -525,45 +419,19 @@ ColumnLayout {
                 var setM = parseMins(r.sunsetTimeText);
                 var useSet = riseM >= 0 && nowM >= riseM && (setM < 0 || nowM < setM);
                 if (useSet)
-                    return textMode ? [textRow(i18n("Sunset:") + " " + setTime)] : [
-                        {
-                            glyph: infoSet.source,
-                            glyphType: infoSet.type,
-                            glyphKdeFallback: infoSet.kdeFallback,
-                            showIcon: showIcon,
-                            text: setTime
-                        }
-                    ];
+                    return textMode ? [textRow(i18n("Sunset:") + " " + setTime)]
+                        : [{ iconInfo: infoSet, showIcon: showIcon, text: setTime }];
                 else
-                    return textMode ? [textRow(i18n("Sunrise:") + " " + riseTime)] : [
-                        {
-                            glyph: infoRise.source,
-                            glyphType: infoRise.type,
-                            glyphKdeFallback: infoRise.kdeFallback,
-                            showIcon: showIcon,
-                            text: riseTime
-                        }
-                    ];
+                    return textMode ? [textRow(i18n("Sunrise:") + " " + riseTime)]
+                        : [{ iconInfo: infoRise, showIcon: showIcon, text: riseTime }];
             }
             // "both" (default)
             if (textMode) {
                 return [textRow(i18n("Sunrise:") + " " + riseTime), textRow(i18n("Sunset:") + " " + setTime)];
             }
             return [
-                {
-                    glyph: infoRise.source,
-                    glyphType: infoRise.type,
-                    glyphKdeFallback: infoRise.kdeFallback,
-                    showIcon: showIcon,
-                    text: riseTime
-                },
-                {
-                    glyph: infoSet.source,
-                    glyphType: infoSet.type,
-                    glyphKdeFallback: infoSet.kdeFallback,
-                    showIcon: showIcon,
-                    text: setTime
-                }
+                { iconInfo: infoRise, showIcon: showIcon, text: riseTime },
+                { iconInfo: infoSet, showIcon: showIcon, text: setTime }
             ];
         }
         return [];

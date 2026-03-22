@@ -234,15 +234,5 @@ function formatPressure(hpa, unit) {
     return Math.round(hpa) + " hPa";
 }
 
-/**
- * Returns the wind SVG filename stem for the 16-point compass rose
- * in /contents/icons/wind/.  E.g.: windDirSvgFilename(45) => "ne"
- * Use as: Qt.resolvedUrl("../../icons/wind/wind-" + W.windDirSvgFilename(deg) + ".svg")
- */
-function windDirSvgFilename(degrees) {
-    if (degrees === undefined || degrees === null || isNaN(degrees))
-        return "n"; // fallback
-    var dirs = ["n","nne","ne","ene","e","ese","se","sse","s","ssw","sw","wsw","w","wnw","nw","nnw"];
-    var idx = Math.floor(((degrees + 11.25) % 360) / 22.5) % 16;
-    return dirs[idx];
-}
+// windDirSvgFilename() removed — was a duplicate of windDirectionSvgStem().
+// Callers should use windDirectionSvgStem() instead.

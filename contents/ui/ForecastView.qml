@@ -8,6 +8,8 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 
 import "js/weather.js" as W
+import "js/iconResolver.js" as IconResolver
+import "components"
 
 Item {
     id: forecastRoot
@@ -27,7 +29,10 @@ Item {
     readonly property url iconsBaseDir: Qt.resolvedUrl("../icons/")
 
     // Widget icon theme — needed to build correct SVG icon paths
-    readonly property string widgetIconTheme: Plasmoid.configuration.widgetIconTheme || "symbolic"
+    readonly property string widgetIconTheme: {
+        var t = Plasmoid.configuration.widgetIconTheme || "symbolic";
+        return (t === "kde" || t === "wi-font") ? "symbolic" : t;
+    }
     readonly property int iconSz: Plasmoid.configuration.widgetIconSize || 16
     readonly property string iconTheme: widgetIconTheme
 
@@ -130,10 +135,12 @@ Item {
                                 }
                             }
 
-                            Kirigami.Icon {
-                                source: W.weatherCodeToIcon(weatherRoot.dailyData[index].code)
-                                width: 28
-                                height: 28
+                            WeatherIcon {
+                                iconInfo: IconResolver.resolveCondition(
+                                    weatherRoot.dailyData[index].code, false,
+                                    forecastRoot.iconSz, forecastRoot.iconsBaseDir,
+                                    forecastRoot.widgetIconTheme)
+                                iconSize: 28
                                 Layout.alignment: Qt.AlignVCenter
                                 Layout.leftMargin: 6
                                 Layout.rightMargin: 4
@@ -277,17 +284,15 @@ Item {
                                             visible: modelData.isSunrise === true || modelData.isSunset === true
                                             anchors.centerIn: parent
                                             spacing: 6
-                                            Kirigami.Icon {
+                                            WeatherIcon {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                source: {
-                                                    var th = forecastRoot.widgetIconTheme === "wi-font" ? "symbolic" : forecastRoot.widgetIconTheme;
-                                                    if (th === "kde") return modelData.isSunrise ? "weather-sunrise" : "weather-sunset";
-                                                    return forecastRoot.iconsBaseDir + th + "/" + forecastRoot.iconSz + "/wi-" + (modelData.isSunrise ? "sunrise" : "sunset") + ".svg";
-                                                }
-                                                isMask: forecastRoot.widgetIconTheme !== "kde"
-                                                color: modelData.isSunrise ? "#ffcf63" : "#ff8c52"
-                                                Layout.preferredWidth: 32
-                                                Layout.preferredHeight: 32
+                                                iconInfo: IconResolver.resolve(
+                                                    modelData.isSunrise ? "sunrise" : "sunset",
+                                                    32,
+                                                    forecastRoot.iconsBaseDir,
+                                                    forecastRoot.widgetIconTheme === "wi-font" ? "symbolic" : forecastRoot.widgetIconTheme)
+                                                iconSize: 32
+                                                iconColor: modelData.isSunrise ? "#ffcf63" : "#ff8c52"
                                             }
                                             Label {
                                                 Layout.alignment: Qt.AlignHCenter
@@ -329,9 +334,9 @@ Item {
                                                 font: weatherRoot ? weatherRoot.wf(9, false) : Qt.font({})
                                             }
 
-                                            Kirigami.Icon {
+                                            WeatherIcon {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                source: {
+                                                iconInfo: {
                                                     // Derive night flag from the hour vs sunrise/sunset
                                                     var isNight = false;
                                                     if (modelData.hour && modelData.hour !== "--") {
@@ -349,10 +354,12 @@ Item {
                                                                 isNight = hMins < rise || hMins >= set_;
                                                         }
                                                     }
-                                                    return W.weatherCodeToIcon(modelData.code || 0, isNight);
+                                                    return IconResolver.resolveCondition(
+                                                        modelData.code || 0, isNight,
+                                                        forecastRoot.iconSz, forecastRoot.iconsBaseDir,
+                                                        forecastRoot.widgetIconTheme);
                                                 }
-                                                Layout.preferredWidth: 48
-                                                Layout.preferredHeight: 48
+                                                iconSize: 48
                                             }
 
                                             Label {
@@ -388,17 +395,11 @@ Item {
                                             RowLayout {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 spacing: 3
-                                                Kirigami.Icon {
-                                                    source: {
-                                                        var th = forecastRoot.widgetIconTheme;
-                                                        if (th === "kde" || th === "wi-font")
-                                                            th = "symbolic";
-                                                        return forecastRoot.iconsBaseDir + th + "/32/wi-umbrella.svg";
-                                                    }
-                                                    isMask: true
-                                                    color: "#5ea8ff"
-                                                    Layout.preferredWidth: 32
-                                                    Layout.preferredHeight: 32
+                                                WeatherIcon {
+                                                    iconInfo: IconResolver.resolve("umbrella", 32, forecastRoot.iconsBaseDir,
+                                                        forecastRoot.widgetIconTheme === "wi-font" ? "symbolic" : forecastRoot.widgetIconTheme)
+                                                    iconSize: 32
+                                                    iconColor: "#5ea8ff"
                                                     Layout.alignment: Qt.AlignVCenter
                                                 }
                                                 Label {

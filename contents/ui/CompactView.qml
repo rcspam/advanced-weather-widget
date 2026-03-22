@@ -34,6 +34,8 @@ import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
 
 import "js/weather.js" as W
+import "js/iconResolver.js" as IconResolver
+import "components"
 
 PlasmaCore.ToolTipArea {
     id: compactRoot
@@ -354,41 +356,13 @@ PlasmaCore.ToolTipArea {
                     required property var modelData
                     spacing: 5
 
-                    Text {
-                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "wi"
-                        text: slRowItem.modelData.glyph
-                        font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                        font.pixelSize: compactRoot.glyphSize
-                        color: Kirigami.Theme.textColor
+                    WeatherIcon {
+                        visible: slRowItem.modelData.iconVis
+                        iconInfo: slRowItem.modelData.iconInfo
+                        iconSize: (slRowItem.modelData.iconInfo.type || "") === "wi" ? compactRoot.glyphSize : compactRoot.svgIconPx
+                        wiFontFamily: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                        wiFontReady: wiFontPanel.status === FontLoader.Ready
                         Layout.alignment: Qt.AlignVCenter
-                    }
-                    Kirigami.Icon {
-                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "kde" && slRowItem.modelData.glyph.length > 0
-                        source: slRowItem.modelData.glyph
-                        implicitWidth: compactRoot.svgIconPx
-                        implicitHeight: compactRoot.svgIconPx
-                    }
-                    Kirigami.Icon {
-                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "kirigami" && slRowItem.modelData.glyph.length > 0
-                        source: slRowItem.modelData.glyph
-                        implicitWidth: compactRoot.glyphSize
-                        implicitHeight: compactRoot.glyphSize
-                    }
-                    Item {
-                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "svg" && slRowItem.modelData.glyph.length > 0
-                        implicitWidth: compactRoot.svgIconPx
-                        implicitHeight: compactRoot.svgIconPx
-                        Kirigami.Icon {
-                            anchors.fill: parent
-                            source: slRowItem.modelData.glyphKdeFallback || ""
-                            visible: (slRowItem.modelData.glyphKdeFallback || "").length > 0
-                        }
-                        Kirigami.Icon {
-                            anchors.fill: parent
-                            source: slRowItem.modelData.glyph
-                            isMask: compactRoot.iconTheme === "symbolic"
-                            color: Kirigami.Theme.textColor
-                        }
                     }
                     Label {
                         text: slRowItem.modelData.text
@@ -447,44 +421,13 @@ PlasmaCore.ToolTipArea {
                         spacing: 4
                         clip: false
 
-                        Text {
-                            visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "wi"
-                            text: slVertItem.modelData.glyph
-                            font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                            font.pixelSize: compactRoot.glyphSize
-                            color: Kirigami.Theme.textColor
+                        WeatherIcon {
+                            visible: slVertItem.modelData.iconVis
+                            iconInfo: slVertItem.modelData.iconInfo
+                            iconSize: (slVertItem.modelData.iconInfo.type || "") === "wi" ? compactRoot.glyphSize : compactRoot.svgIconPx
+                            wiFontFamily: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                            wiFontReady: wiFontPanel.status === FontLoader.Ready
                             Layout.alignment: Qt.AlignVCenter
-                        }
-                        Kirigami.Icon {
-                            visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "kde" && slVertItem.modelData.glyph.length > 0
-                            source: slVertItem.modelData.glyph
-                            implicitWidth: compactRoot.svgIconPx
-                            implicitHeight: compactRoot.svgIconPx
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Kirigami.Icon {
-                            visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "kirigami" && slVertItem.modelData.glyph.length > 0
-                            source: slVertItem.modelData.glyph
-                            implicitWidth: compactRoot.mlVertRowH
-                            implicitHeight: compactRoot.mlVertRowH
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Item {
-                            visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "svg" && slVertItem.modelData.glyph.length > 0
-                            implicitWidth: compactRoot.svgIconPx
-                            implicitHeight: compactRoot.svgIconPx
-                            Layout.alignment: Qt.AlignVCenter
-                            Kirigami.Icon {
-                                anchors.fill: parent
-                                source: slVertItem.modelData.glyphKdeFallback || ""
-                                visible: (slVertItem.modelData.glyphKdeFallback || "").length > 0
-                            }
-                            Kirigami.Icon {
-                                anchors.fill: parent
-                                source: slVertItem.modelData.glyph
-                                isMask: compactRoot.iconTheme === "symbolic"
-                                color: Kirigami.Theme.textColor
-                            }
                         }
                         Label {
                             text: slVertItem.modelData.text
@@ -604,44 +547,13 @@ PlasmaCore.ToolTipArea {
                             height: scrollCol.rowH
                             spacing: 6
                             clip: true
-                            Text {
-                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "wi"
-                                text: mlRowItem.modelData.glyph
-                                font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                                font.pixelSize: Math.round(scrollCol.rowFontPx * 1.3)
-                                color: Kirigami.Theme.textColor
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            Kirigami.Icon {
-                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "kde" && mlRowItem.modelData.glyph.length > 0
-                                source: mlRowItem.modelData.glyph
-                                implicitWidth: compactRoot.svgIconPx
-                                implicitHeight: compactRoot.svgIconPx
+                            WeatherIcon {
+                                visible: mlRowItem.modelData.iconVis
+                                iconInfo: mlRowItem.modelData.iconInfo
+                                iconSize: (mlRowItem.modelData.iconInfo.type || "") === "wi" ? Math.round(scrollCol.rowFontPx * 1.3) : compactRoot.svgIconPx
+                                wiFontFamily: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                                wiFontReady: wiFontPanel.status === FontLoader.Ready
                                 Layout.alignment: Qt.AlignVCenter
-                            }
-                            Kirigami.Icon {
-                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "kirigami" && mlRowItem.modelData.glyph.length > 0
-                                source: mlRowItem.modelData.glyph
-                                implicitWidth: scrollCol.rowFontPx
-                                implicitHeight: scrollCol.rowFontPx
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-                            Item {
-                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "svg" && mlRowItem.modelData.glyph.length > 0
-                                implicitWidth: compactRoot.svgIconPx
-                                implicitHeight: compactRoot.svgIconPx
-                                Layout.alignment: Qt.AlignVCenter
-                                Kirigami.Icon {
-                                    anchors.fill: parent
-                                    source: mlRowItem.modelData.glyphKdeFallback || ""
-                                    visible: (mlRowItem.modelData.glyphKdeFallback || "").length > 0
-                                }
-                                Kirigami.Icon {
-                                    anchors.fill: parent
-                                    source: mlRowItem.modelData.glyph
-                                    isMask: compactRoot.iconTheme === "symbolic"
-                                    color: Kirigami.Theme.textColor
-                                }
                             }
                             Label {
                                 text: mlRowItem.modelData.text
@@ -729,44 +641,13 @@ PlasmaCore.ToolTipArea {
                             height: scrollColV.rowH
                             spacing: 4
                             clip: true
-                            Text {
-                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "wi"
-                                text: mlRowItemV.modelData.glyph
-                                font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                                font.pixelSize: Math.round(scrollColV.rowFontPx * 1.3)
-                                color: Kirigami.Theme.textColor
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            Kirigami.Icon {
-                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "kde" && mlRowItemV.modelData.glyph.length > 0
-                                source: mlRowItemV.modelData.glyph
-                                implicitWidth: compactRoot.svgIconPx
-                                implicitHeight: compactRoot.svgIconPx
+                            WeatherIcon {
+                                visible: mlRowItemV.modelData.iconVis
+                                iconInfo: mlRowItemV.modelData.iconInfo
+                                iconSize: (mlRowItemV.modelData.iconInfo.type || "") === "wi" ? Math.round(scrollColV.rowFontPx * 1.3) : compactRoot.svgIconPx
+                                wiFontFamily: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                                wiFontReady: wiFontPanel.status === FontLoader.Ready
                                 Layout.alignment: Qt.AlignVCenter
-                            }
-                            Kirigami.Icon {
-                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "kirigami" && mlRowItemV.modelData.glyph.length > 0
-                                source: mlRowItemV.modelData.glyph
-                                implicitWidth: scrollColV.rowFontPx
-                                implicitHeight: scrollColV.rowFontPx
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-                            Item {
-                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "svg" && mlRowItemV.modelData.glyph.length > 0
-                                implicitWidth: compactRoot.svgIconPx
-                                implicitHeight: compactRoot.svgIconPx
-                                Layout.alignment: Qt.AlignVCenter
-                                Kirigami.Icon {
-                                    anchors.fill: parent
-                                    source: mlRowItemV.modelData.glyphKdeFallback || ""
-                                    visible: (mlRowItemV.modelData.glyphKdeFallback || "").length > 0
-                                }
-                                Kirigami.Icon {
-                                    anchors.fill: parent
-                                    source: mlRowItemV.modelData.glyph
-                                    isMask: compactRoot.iconTheme === "symbolic"
-                                    color: Kirigami.Theme.textColor
-                                }
                             }
                             Label {
                                 text: mlRowItemV.modelData.text
@@ -1093,6 +974,9 @@ PlasmaCore.ToolTipArea {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────
+    // Icons base directory — resolved once for IconResolver calls
+    readonly property string _iconsBaseDir: Qt.resolvedUrl("../icons/") + ""
+
     function _buildItems() {
         var r = weatherRoot;
         if (!r)
@@ -1100,10 +984,8 @@ PlasmaCore.ToolTipArea {
         if (!r.hasSelectedTown)
             return [
                 {
-                    glyph: "\uF041",
-                    glyphVis: true,
-                    glyphType: "wi",
-                    glyphKdeFallback: "",
+                    iconInfo: { type: "wi", source: "\uF041", svgFallback: "", isMask: false },
+                    iconVis: true,
                     text: i18n("Add a location"),
                     isSep: false
                 }
@@ -1119,30 +1001,24 @@ PlasmaCore.ToolTipArea {
 
         function pushSep() {
             result.push({
-                glyph: "",
-                glyphVis: false,
-                glyphType: "wi",
-                glyphKdeFallback: "",
+                iconInfo: { type: "wi", source: "", svgFallback: "", isMask: false },
+                iconVis: false,
                 text: sep,
                 isSep: true
             });
         }
-        function pushItem(src, vis, type, fallback, txt) {
+        function pushInfoItem(info, vis, txt) {
             result.push({
-                glyph: src,
-                glyphVis: vis && src.length > 0,
-                glyphType: type,
-                glyphKdeFallback: fallback || "",
+                iconInfo: info,
+                iconVis: vis && (info.source || "").length > 0,
                 text: txt,
                 isSep: false
             });
         }
         function pushSpaceSep() {
             result.push({
-                glyph: "",
-                glyphVis: false,
-                glyphType: "wi",
-                glyphKdeFallback: "",
+                iconInfo: { type: "wi", source: "", svgFallback: "", isMask: false },
+                iconVis: false,
                 text: " ",
                 isSep: true
             });
@@ -1156,26 +1032,16 @@ PlasmaCore.ToolTipArea {
             if (tok === "suntimes") {
                 var sunMode = Plasmoid.configuration.panelSunTimesMode || "upcoming";
 
-                if (sunMode === "both" && theme === "wi-font") {
-                    if (result.length > 0)
-                        pushSep();
-                    pushItem("\uF051", show, "wi", "", r.sunriseTimeText);
-                    pushSpaceSep();
-                    pushItem("\uF052", show, "wi", "", r.sunsetTimeText);
-                    return;
-                }
-
                 if (sunMode === "both") {
+                    // Both sunrise and sunset on the same line
+                    var iconSz = Plasmoid.configuration.panelIconSize || 22;
+                    var svgTheme = (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light")
+                        ? "symbolic-light" : theme;
+
                     var rInfo, sInfo;
-                    if (theme === "kde") {
-                        rInfo = {
-                            type: "kde",
-                            source: "weather-sunrise"
-                        };
-                        sInfo = {
-                            type: "kde",
-                            source: "weather-sunset"
-                        };
+                    if (theme === "wi-font") {
+                        rInfo = { type: "wi", source: "\uF051", svgFallback: "", isMask: false };
+                        sInfo = { type: "wi", source: "\uF052", svgFallback: "", isMask: false };
                     } else if (theme === "custom") {
                         var cmap = {};
                         (Plasmoid.configuration.panelCustomIcons || "").split(";").forEach(function (p) {
@@ -1183,32 +1049,18 @@ PlasmaCore.ToolTipArea {
                             if (kv.length === 2)
                                 cmap[kv[0].trim()] = kv[1].trim();
                         });
-                        rInfo = {
-                            type: "kde",
-                            source: cmap["suntimes-sunrise"] || "weather-sunrise"
-                        };
-                        sInfo = {
-                            type: "kde",
-                            source: cmap["suntimes-sunset"] || "weather-sunset"
-                        };
+                        rInfo = { type: "kde", source: cmap["suntimes-sunrise"] || "weather-sunrise", svgFallback: "", isMask: false };
+                        sInfo = { type: "kde", source: cmap["suntimes-sunset"] || "weather-sunset", svgFallback: "", isMask: false };
                     } else {
-                        var sz = Plasmoid.configuration.panelIconSize || 22;
-                        var rt = (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light") ? "symbolic-light" : theme;
-                        var base = Qt.resolvedUrl("../icons/" + rt + "/" + sz + "/wi-");
-                        rInfo = {
-                            type: "svg",
-                            source: base + "sunrise.svg"
-                        };
-                        sInfo = {
-                            type: "svg",
-                            source: base + "sunset.svg"
-                        };
+                        rInfo = IconResolver.resolve("suntimes-sunrise", iconSz, compactRoot._iconsBaseDir, svgTheme);
+                        sInfo = IconResolver.resolve("suntimes-sunset", iconSz, compactRoot._iconsBaseDir, svgTheme);
                     }
+
                     if (result.length > 0)
                         pushSep();
-                    pushItem(rInfo.source, show, rInfo.type, "", r.sunriseTimeText);
+                    pushInfoItem(rInfo, show, r.formatTimeForDisplay(r.sunriseTimeText));
                     pushSpaceSep();
-                    pushItem(sInfo.source, show, sInfo.type, "", r.sunsetTimeText);
+                    pushInfoItem(sInfo, show, r.formatTimeForDisplay(r.sunsetTimeText));
                     return;
                 }
 
@@ -1218,7 +1070,7 @@ PlasmaCore.ToolTipArea {
                     return;
                 if (result.length > 0)
                     pushSep();
-                pushItem(iconInfo.source, show, iconInfo.type, iconInfo.kdeFallback, stx);
+                pushInfoItem(iconInfo, show, stx);
                 return;
             }
 
@@ -1227,7 +1079,7 @@ PlasmaCore.ToolTipArea {
                 return;
             if (result.length > 0)
                 pushSep();
-            pushItem(iconInfo.source, show, iconInfo.type, iconInfo.kdeFallback, txt);
+            pushInfoItem(iconInfo, show, txt);
         });
 
         return result;
