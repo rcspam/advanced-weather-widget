@@ -67,68 +67,89 @@ Item {
 
     /** Returns "sunrise" or "sunset" depending on which is next (for upcoming mode) */
     function upcomingSunEvent() {
-        if (!weatherRoot) return "sunrise";
-        var nowM = (new Date()).getHours()*60+(new Date()).getMinutes();
+        if (!weatherRoot)
+            return "sunrise";
+        var utcOff = weatherRoot.locationUtcOffsetMins || 0;
+        var nowM = SunPath.nowMinsAt(utcOff);
         var riseM = SunPath.parseMins(weatherRoot.sunriseTimeText);
-        var setM  = SunPath.parseMins(weatherRoot.sunsetTimeText);
-        if (riseM >= 0 && nowM < riseM) return "sunrise";
-        if (setM  >= 0 && nowM < setM)  return "sunset";
+        var setM = SunPath.parseMins(weatherRoot.sunsetTimeText);
+        if (riseM >= 0 && nowM < riseM)
+            return "sunrise";
+        if (setM >= 0 && nowM < setM)
+            return "sunset";
         return "sunrise";
     }
 
     /** Returns "moonrise" or "moonset" depending on which is next (for upcoming mode) */
     function upcomingMoonEvent(riseText, setText) {
-        var nowM = (new Date()).getHours()*60+(new Date()).getMinutes();
+        var utcOff = (weatherRoot ? weatherRoot.locationUtcOffsetMins : 0) || 0;
+        var nowM = SunPath.nowMinsAt(utcOff);
         var riseM = SunPath.parseMins(riseText);
-        var setM  = SunPath.parseMins(setText);
-        if (riseM >= 0 && nowM < riseM) return "moonrise";
-        if (setM  >= 0 && nowM < setM)  return "moonset";
+        var setM = SunPath.parseMins(setText);
+        if (riseM >= 0 && nowM < riseM)
+            return "moonrise";
+        if (setM >= 0 && nowM < setM)
+            return "moonset";
         return "moonrise";
     }
 
     /** Whether to show sunrise items in sun collapsed/list row */
     function showSunrise() {
         var m = sunTimesMode;
-        if (m === "both") return true;
-        if (m === "sunrise") return true;
-        if (m === "sunset") return false;
+        if (m === "both")
+            return true;
+        if (m === "sunrise")
+            return true;
+        if (m === "sunset")
+            return false;
         return upcomingSunEvent() === "sunrise"; // upcoming
     }
 
     /** Whether to show sunset items in sun collapsed/list row */
     function showSunset() {
         var m = sunTimesMode;
-        if (m === "both") return true;
-        if (m === "sunrise") return false;
-        if (m === "sunset") return true;
+        if (m === "both")
+            return true;
+        if (m === "sunrise")
+            return false;
+        if (m === "sunset")
+            return true;
         return upcomingSunEvent() === "sunset"; // upcoming
     }
 
     /** Whether to show moonrise items in moon collapsed/list row */
     function showMoonrise(riseText, setText) {
         var m = moonMode;
-        if (m === "full" || m === "times") return true;
-        return upcomingMoonEvent(riseText, setText) === "moonrise"; // upcoming
+        if (m === "full" || m === "times" || m === "moonrise")
+            return true;
+        if (m === "moonset" || m === "phase")
+            return false;
+        // "upcoming" and "upcoming-times"
+        return upcomingMoonEvent(riseText, setText) === "moonrise";
     }
 
     /** Whether to show moonset items in moon collapsed/list row */
     function showMoonset(riseText, setText) {
         var m = moonMode;
-        if (m === "full" || m === "times") return true;
-        return upcomingMoonEvent(riseText, setText) === "moonset"; // upcoming
+        if (m === "full" || m === "times" || m === "moonset")
+            return true;
+        if (m === "moonrise" || m === "phase")
+            return false;
+        // "upcoming" and "upcoming-times"
+        return upcomingMoonEvent(riseText, setText) === "moonset";
     }
 
     /** Whether to show the moon phase name in collapsed/list row */
     function showMoonPhase() {
-        return moonMode !== "times";
+        var m = moonMode;
+        return m !== "times" && m !== "moonrise" && m !== "moonset" && m !== "upcoming-times";
     }
 
     // Collapse state for the two arc cards.
     property bool _sunExpanded: true
     property bool _moonExpanded: true
 
-    readonly property int regularCardHeight: Plasmoid.configuration.widgetCardsHeightAuto ? 30
-    : (Plasmoid.configuration.widgetCardsHeight || 30)
+    readonly property int regularCardHeight: Plasmoid.configuration.widgetCardsHeightAuto ? 30 : (Plasmoid.configuration.widgetCardsHeight || 30)
 
     // ── Resolved icons base URL ───────────────────────────────────────────
     readonly property string iconsBaseDir: Qt.resolvedUrl("../icons/")
@@ -137,9 +158,10 @@ Item {
     /** Returns a saved custom icon name for the given item, or "" */
     function getDetailsCustomIcon(itemId) {
         var raw = Plasmoid.configuration.widgetDetailsCustomIcons || "";
-        if (raw.length === 0) return "";
+        if (raw.length === 0)
+            return "";
         var m = {};
-        raw.split(";").forEach(function(pair) {
+        raw.split(";").forEach(function (pair) {
             var kv = pair.split("=");
             if (kv.length === 2 && kv[0].trim().length > 0)
                 m[kv[0].trim()] = kv[1].trim();
@@ -151,7 +173,12 @@ Item {
         if (root.iconTheme === "kde" || root.iconTheme === "kde-symbolic") {
             var custom = getDetailsCustomIcon(itemId);
             if (custom.length > 0)
-                return { type: "kde", source: custom, svgFallback: "", isMask: (root.iconTheme === "kde-symbolic") };
+                return {
+                    type: "kde",
+                    source: custom,
+                    svgFallback: "",
+                    isMask: (root.iconTheme === "kde-symbolic")
+                };
         }
         return IconResolver.resolve(itemId, root.iconSize, root.iconsBaseDir, root.iconTheme);
     }
@@ -188,7 +215,7 @@ Item {
                 suntimes: i18n("Sunrise/Sunset"),
                 dewpoint: i18n("Dew Point"),
                 visibility: i18n("Visibility"),
-                moonphase: i18n("Moon Phase"),
+                moonphase: i18n("Moon"),
                 condition: i18n("Condition")
             })[id] || id;
     }
@@ -229,9 +256,10 @@ Item {
     readonly property var iconShowMap: {
         var map = {};
         var raw = Plasmoid.configuration.widgetDetailsItemIcons || "";
-        raw.split(";").forEach(function(pair) {
+        raw.split(";").forEach(function (pair) {
             var kv = pair.split("=");
-            if (kv.length === 2) map[kv[0].trim()] = (kv[1].trim() === "1");
+            if (kv.length === 2)
+                map[kv[0].trim()] = (kv[1].trim() === "1");
         });
         return map;
     }
@@ -506,7 +534,18 @@ Item {
                                     // }
 
                                     WeatherIcon {
-                                        iconInfo: root.showIconFor("suntimes") ? root.resolveIcon("suntimes") : null
+                                        iconInfo: {
+                                            if (!root.showIconFor("suntimes"))
+                                                return null;
+                                            var m = root.sunTimesMode;
+                                            if (m === "sunrise")
+                                                return root.resolveIcon("suntimes-sunrise");
+                                            if (m === "sunset")
+                                                return root.resolveIcon("suntimes-sunset");
+                                            if (m === "upcoming")
+                                                return root.resolveIcon(root.upcomingSunEvent() === "sunrise" ? "suntimes-sunrise" : "suntimes-sunset");
+                                            return root.resolveIcon("suntimes");
+                                        }
                                         iconSize: root.iconSize
                                         iconColor: root.iconColorFor(root.accentFor("suntimes"))
                                         Layout.alignment: Qt.AlignVCenter
@@ -515,8 +554,10 @@ Item {
                                     Label {
                                         text: {
                                             var m = root.sunTimesMode;
-                                            if (m === "sunrise") return i18n("Sunrise") + ":";
-                                            if (m === "sunset")  return i18n("Sunset") + ":";
+                                            if (m === "sunrise")
+                                                return i18n("Sunrise") + ":";
+                                            if (m === "sunset")
+                                                return i18n("Sunset") + ":";
                                             if (m === "upcoming")
                                                 return (root.upcomingSunEvent() === "sunrise" ? i18n("Sunrise") : i18n("Sunset")) + ":";
                                             return root.labelFor("suntimes") + ":";
@@ -533,16 +574,21 @@ Item {
                                     // Bold value — sunrise / sunset times
                                     Label {
                                         text: {
-                                            if (!root.weatherRoot) return "--";
+                                            if (!root.weatherRoot)
+                                                return "--";
                                             var m = root.sunTimesMode, r = root.weatherRoot;
-                                            if (m === "sunrise") return r.formatTimeForDisplay(r.sunriseTimeText);
-                                            if (m === "sunset")  return r.formatTimeForDisplay(r.sunsetTimeText);
+                                            if (m === "sunrise")
+                                                return r.formatTimeForDisplay(r.sunriseTimeText);
+                                            if (m === "sunset")
+                                                return r.formatTimeForDisplay(r.sunsetTimeText);
                                             if (m === "upcoming") {
-                                                var nowM = (new Date()).getHours()*60+(new Date()).getMinutes();
+                                                var nowM = (new Date()).getHours() * 60 + (new Date()).getMinutes();
                                                 var riseM = SunPath.parseMins(r.sunriseTimeText);
-                                                var setM  = SunPath.parseMins(r.sunsetTimeText);
-                                                if (riseM >= 0 && nowM < riseM) return r.formatTimeForDisplay(r.sunriseTimeText);
-                                                if (setM  >= 0 && nowM < setM)  return r.formatTimeForDisplay(r.sunsetTimeText);
+                                                var setM = SunPath.parseMins(r.sunsetTimeText);
+                                                if (riseM >= 0 && nowM < riseM)
+                                                    return r.formatTimeForDisplay(r.sunriseTimeText);
+                                                if (setM >= 0 && nowM < setM)
+                                                    return r.formatTimeForDisplay(r.sunsetTimeText);
                                                 return r.formatTimeForDisplay(r.sunriseTimeText);
                                             }
                                             return r.formatTimeForDisplay(r.sunriseTimeText) + " / " + r.formatTimeForDisplay(r.sunsetTimeText);
@@ -724,7 +770,9 @@ Item {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
                                         Rectangle {
-                                            width: 6; height: 6; radius: 3
+                                            width: 6
+                                            height: 6
+                                            radius: 3
                                             color: suntimesCard._isNight ? suntimesCard._nightLeft : root.accentGold
                                             anchors.horizontalCenter: parent.horizontalCenter
                                         }
@@ -803,7 +851,9 @@ Item {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
                                         Rectangle {
-                                            width: 6; height: 6; radius: 3
+                                            width: 6
+                                            height: 6
+                                            radius: 3
                                             color: suntimesCard._isNight ? suntimesCard._nightRight : root.accentOrange
                                             anchors.horizontalCenter: parent.horizontalCenter
                                         }
@@ -836,7 +886,18 @@ Item {
                                 spacing: 8
 
                                 WeatherIcon {
-                                    iconInfo: root.showIconFor("suntimes") ? root.resolveIcon("suntimes") : null
+                                    iconInfo: {
+                                        if (!root.showIconFor("suntimes"))
+                                            return null;
+                                        var m = root.sunTimesMode;
+                                        if (m === "sunrise")
+                                            return root.resolveIcon("suntimes-sunrise");
+                                        if (m === "sunset")
+                                            return root.resolveIcon("suntimes-sunset");
+                                        if (m === "upcoming")
+                                            return root.resolveIcon(root.upcomingSunEvent() === "sunrise" ? "suntimes-sunrise" : "suntimes-sunset");
+                                        return root.resolveIcon("suntimes");
+                                    }
                                     iconSize: root.iconSize
                                     iconColor: root.iconColorFor(root.accentFor("suntimes"))
                                     Layout.alignment: Qt.AlignVCenter
@@ -844,8 +905,10 @@ Item {
                                 Label {
                                     text: {
                                         var m = root.sunTimesMode;
-                                        if (m === "sunrise") return i18n("Sunrise") + ":";
-                                        if (m === "sunset")  return i18n("Sunset") + ":";
+                                        if (m === "sunrise")
+                                            return i18n("Sunrise") + ":";
+                                        if (m === "sunset")
+                                            return i18n("Sunset") + ":";
                                         if (m === "upcoming")
                                             return (root.upcomingSunEvent() === "sunrise" ? i18n("Sunrise") : i18n("Sunset")) + ":";
                                         return root.labelFor("suntimes") + ":";
@@ -935,7 +998,22 @@ Item {
                                     spacing: 8
 
                                     WeatherIcon {
-                                        iconInfo: root.showIconFor("moonphase") ? root.resolveMoonPhaseIcon() : null
+                                        iconInfo: {
+                                            if (!root.showIconFor("moonphase"))
+                                                return null;
+                                            var m = root.moonMode;
+                                            if (m === "moonrise")
+                                                return root.resolveIcon("moonrise");
+                                            if (m === "moonset")
+                                                return root.resolveIcon("moonset");
+                                            if (m === "times")
+                                                return root.resolveIcon("moonrise");
+                                            if (m === "upcoming-times")
+                                                return root.resolveIcon(root.upcomingMoonEvent(moonCard._moonriseText, moonCard._moonsetText) === "moonrise" ? "moonrise" : "moonset");
+                                            if (m === "upcoming")
+                                                return root.resolveMoonPhaseIcon();
+                                            return root.resolveMoonPhaseIcon();
+                                        }
                                         iconSize: root.iconSize
                                         iconColor: root.iconColorFor(root.accentViolet)
                                         Layout.alignment: Qt.AlignVCenter
@@ -944,11 +1022,18 @@ Item {
                                     Label {
                                         text: {
                                             var m = root.moonMode;
-                                            if (m === "times") return i18n("Moonrise/Moonset") + ":";
-                                            if (m === "upcoming") {
-                                                var ev = root.upcomingMoonEvent(moonCard._moonriseText, moonCard._moonsetText);
-                                                return (ev === "moonrise" ? i18n("Moonrise") : i18n("Moonset")) + ":";
+                                            if (m === "times")
+                                                return i18n("Moonrise/Moonset") + ":";
+                                            if (m === "moonrise")
+                                                return i18n("Moonrise") + ":";
+                                            if (m === "moonset")
+                                                return i18n("Moonset") + ":";
+                                            if (m === "upcoming-times") {
+                                                var ev2 = root.upcomingMoonEvent(moonCard._moonriseText, moonCard._moonsetText);
+                                                return (ev2 === "moonrise" ? i18n("Moonrise") : i18n("Moonset")) + ":";
                                             }
+                                            if (m === "upcoming")
+                                                return root.labelFor("moonphase") + ":";
                                             return root.labelFor("moonphase") + ":";
                                         }
                                         color: Kirigami.Theme.textColor
@@ -962,16 +1047,31 @@ Item {
                                     }
                                     Label {
                                         text: {
-                                            if (!root.weatherRoot) return "--";
+                                            if (!root.weatherRoot)
+                                                return "--";
                                             var m = root.moonMode;
-                                            if (m === "times") {
-                                                return root.weatherRoot.formatTimeForDisplay(moonCard._moonriseText) + " / " + root.weatherRoot.formatTimeForDisplay(moonCard._moonsetText);
+                                            var r = root.weatherRoot;
+                                            if (m === "full") {
+                                                return r.moonPhaseLabel() + "  " + r.formatTimeForDisplay(moonCard._moonriseText) + " / " + r.formatTimeForDisplay(moonCard._moonsetText);
                                             }
+                                            if (m === "times") {
+                                                return r.formatTimeForDisplay(moonCard._moonriseText) + " / " + r.formatTimeForDisplay(moonCard._moonsetText);
+                                            }
+                                            if (m === "moonrise")
+                                                return r.formatTimeForDisplay(moonCard._moonriseText);
+                                            if (m === "moonset")
+                                                return r.formatTimeForDisplay(moonCard._moonsetText);
                                             if (m === "upcoming") {
                                                 var ev = root.upcomingMoonEvent(moonCard._moonriseText, moonCard._moonsetText);
-                                                return root.weatherRoot.formatTimeForDisplay(ev === "moonrise" ? moonCard._moonriseText : moonCard._moonsetText);
+                                                return r.moonPhaseLabel() + "  " + r.formatTimeForDisplay(ev === "moonrise" ? moonCard._moonriseText : moonCard._moonsetText);
                                             }
-                                            return root.weatherRoot.moonPhaseLabel();
+                                            if (m === "upcoming-times") {
+                                                var ev3 = root.upcomingMoonEvent(moonCard._moonriseText, moonCard._moonsetText);
+                                                return r.formatTimeForDisplay(ev3 === "moonrise" ? moonCard._moonriseText : moonCard._moonsetText);
+                                            }
+                                            if (m === "phase")
+                                                return r.moonPhaseLabel();
+                                            return r.moonPhaseLabel();
                                         }
                                         color: root.accentViolet
                                         font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({
@@ -1130,7 +1230,9 @@ Item {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
                                         Rectangle {
-                                            width: 6; height: 6; radius: 3
+                                            width: 6
+                                            height: 6
+                                            radius: 3
                                             color: root.accentViolet
                                             anchors.horizontalCenter: parent.horizontalCenter
                                         }
@@ -1176,7 +1278,9 @@ Item {
                                         spacing: 1
                                         Layout.alignment: Qt.AlignVCenter
                                         Rectangle {
-                                            width: 6; height: 6; radius: 3
+                                            width: 6
+                                            height: 6
+                                            radius: 3
                                             color: root.accentViolet
                                             opacity: 0.70
                                             anchors.horizontalCenter: parent.horizontalCenter
@@ -1243,7 +1347,22 @@ Item {
                                     spacing: 8
 
                                     WeatherIcon {
-                                        iconInfo: root.showIconFor("moonphase") ? root.resolveMoonPhaseIcon() : null
+                                        iconInfo: {
+                                            if (!root.showIconFor("moonphase"))
+                                                return null;
+                                            var m = root.moonMode;
+                                            if (m === "moonrise")
+                                                return root.resolveIcon("moonrise");
+                                            if (m === "moonset")
+                                                return root.resolveIcon("moonset");
+                                            if (m === "times")
+                                                return root.resolveIcon("moonrise");
+                                            if (m === "upcoming-times")
+                                                return root.resolveIcon(root.upcomingMoonEvent(listMoonRow._riseText, listMoonRow._setText) === "moonrise" ? "moonrise" : "moonset");
+                                            if (m === "upcoming")
+                                                return root.resolveMoonPhaseIcon();
+                                            return root.resolveMoonPhaseIcon();
+                                        }
                                         iconSize: root.iconSize
                                         iconColor: root.iconColorFor(root.accentViolet)
                                         Layout.alignment: Qt.AlignVCenter
@@ -1253,11 +1372,18 @@ Item {
                                     Label {
                                         text: {
                                             var m = root.moonMode;
-                                            if (m === "times") return i18n("Moonrise/Moonset") + ":";
-                                            if (m === "upcoming") {
-                                                var ev = root.upcomingMoonEvent(listMoonRow._riseText, listMoonRow._setText);
-                                                return (ev === "moonrise" ? i18n("Moonrise") : i18n("Moonset")) + ":";
+                                            if (m === "times")
+                                                return i18n("Moonrise/Moonset") + ":";
+                                            if (m === "moonrise")
+                                                return i18n("Moonrise") + ":";
+                                            if (m === "moonset")
+                                                return i18n("Moonset") + ":";
+                                            if (m === "upcoming-times") {
+                                                var ev2 = root.upcomingMoonEvent(listMoonRow._riseText, listMoonRow._setText);
+                                                return (ev2 === "moonrise" ? i18n("Moonrise") : i18n("Moonset")) + ":";
                                             }
+                                            if (m === "upcoming")
+                                                return root.labelFor("moonphase") + ":";
                                             return root.labelFor("moonphase") + ":";
                                         }
                                         color: Kirigami.Theme.textColor

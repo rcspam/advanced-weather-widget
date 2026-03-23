@@ -19,10 +19,9 @@ KCM.AbstractKCM {
     // Resolved from this file's location (ui/config/) so sub-pages
     // can access the correct paths via configRoot without needing to
     // know their own directory depth.
-    readonly property url  iconsBase:   Qt.resolvedUrl("../../icons/")
-    readonly property bool wiFontReady:  wiFont.status === FontLoader.Ready
-    readonly property string wiFontFamily: wiFont.status === FontLoader.Ready
-        ? wiFont.font.family : ""
+    readonly property url iconsBase: Qt.resolvedUrl("../../icons/")
+    readonly property bool wiFontReady: wiFont.status === FontLoader.Ready
+    readonly property string wiFontFamily: wiFont.status === FontLoader.Ready ? wiFont.font.family : ""
 
     // ── Shared icon-config dialog for the Custom icon theme ─────────────────
     // Opens when the user clicks the configure button on a panel item.
@@ -413,8 +412,10 @@ KCM.AbstractKCM {
         property string context: "panel"   // "panel" | "tooltip" | "details"
 
         function getIcon(id) {
-            if (context === "tooltip") return root.getTooltipCustomIcon(id);
-            if (context === "details") return root.getDetailsCustomIcon(id);
+            if (context === "tooltip")
+                return root.getTooltipCustomIcon(id);
+            if (context === "details")
+                return root.getDetailsCustomIcon(id);
             return root.getCustomIcon(id);
         }
         function setIcon(id, name) {
@@ -427,8 +428,10 @@ KCM.AbstractKCM {
         }
         // Which icon strings to watch for reactive re-evaluation
         function watchRaw() {
-            if (context === "tooltip") return root.cfg_tooltipCustomIcons;
-            if (context === "details") return root.cfg_widgetDetailsCustomIcons;
+            if (context === "tooltip")
+                return root.cfg_tooltipCustomIcons;
+            if (context === "details")
+                return root.cfg_widgetDetailsCustomIcons;
             return root.cfg_panelCustomIcons;
         }
 
@@ -438,6 +441,28 @@ KCM.AbstractKCM {
         anchors.centerIn: parent
         standardButtons: Dialog.Ok | Dialog.Close
         width: Math.min(implicitWidth + 40, 480)
+
+        onOpened: {
+            // Re-sync mode combos when dialog opens (may have different context)
+            if (isSuntimes) {
+                var sunCur = sunModeDialogCombo._currentMode();
+                for (var i = 0; i < sunModeDialogCombo.model.length; ++i) {
+                    if (sunModeDialogCombo.model[i].value === sunCur) {
+                        sunModeDialogCombo.currentIndex = i;
+                        break;
+                    }
+                }
+            }
+            if (isMoonphase) {
+                var moonCur = moonModeDialogCombo._currentMode();
+                for (var j = 0; j < moonModeDialogCombo.model.length; ++j) {
+                    if (moonModeDialogCombo.model[j].value === moonCur) {
+                        moonModeDialogCombo.currentIndex = j;
+                        break;
+                    }
+                }
+            }
+        }
 
         contentItem: ColumnLayout {
             spacing: Kirigami.Units.largeSpacing
@@ -533,14 +558,30 @@ KCM.AbstractKCM {
                             value: "sunset"
                         }
                     ]
+                    function _currentMode() {
+                        if (iconConfigDialog.context === "details")
+                            return root.cfg_widgetSunTimesMode;
+                        if (iconConfigDialog.context === "tooltip")
+                            return root.cfg_tooltipSunTimesMode;
+                        return root.cfg_panelSunTimesMode;
+                    }
                     Component.onCompleted: {
+                        var cur = _currentMode();
                         for (var i = 0; i < model.length; ++i)
-                            if (model[i].value === root.cfg_panelSunTimesMode) {
+                            if (model[i].value === cur) {
                                 currentIndex = i;
                                 break;
                             }
                     }
-                    onActivated: root.cfg_panelSunTimesMode = model[currentIndex].value
+                    onActivated: {
+                        var v = model[currentIndex].value;
+                        if (iconConfigDialog.context === "details")
+                            root.cfg_widgetSunTimesMode = v;
+                        else if (iconConfigDialog.context === "tooltip")
+                            root.cfg_tooltipSunTimesMode = v;
+                        else
+                            root.cfg_panelSunTimesMode = v;
+                    }
                 }
 
                 Kirigami.Separator {
@@ -636,11 +677,79 @@ KCM.AbstractKCM {
                 }
             }
 
-            // ── Moonphase picker (moonrise + moonset) ─────────────────────
+            // ── Moonphase picker (moonrise + moonset + mode) ────────────────
             ColumnLayout {
                 visible: iconConfigDialog.isMoonphase
                 spacing: Kirigami.Units.smallSpacing
                 Layout.fillWidth: true
+
+                // Mode selector
+                Label {
+                    text: i18n("Display mode:")
+                    font.bold: true
+                    opacity: 0.85
+                }
+                ComboBox {
+                    id: moonModeDialogCombo
+                    Layout.fillWidth: true
+                    textRole: "text"
+                    model: [
+                        {
+                            text: i18n("Phase + moonrise & moonset"),
+                            value: "full"
+                        },
+                        {
+                            text: i18n("Phase + upcoming rise/set"),
+                            value: "upcoming"
+                        },
+                        {
+                            text: i18n("Upcoming rise/set only"),
+                            value: "upcoming-times"
+                        },
+                        {
+                            text: i18n("Moon phase only"),
+                            value: "phase"
+                        },
+                        {
+                            text: i18n("Moonrise & moonset only"),
+                            value: "times"
+                        },
+                        {
+                            text: i18n("Moonrise only"),
+                            value: "moonrise"
+                        },
+                        {
+                            text: i18n("Moonset only"),
+                            value: "moonset"
+                        }
+                    ]
+                    function _currentMode() {
+                        if (iconConfigDialog.context === "details")
+                            return root.cfg_widgetMoonMode;
+                        return root.cfg_widgetMoonMode;
+                    }
+                    Component.onCompleted: {
+                        var cur = _currentMode();
+                        for (var i = 0; i < model.length; ++i)
+                            if (model[i].value === cur) {
+                                currentIndex = i;
+                                break;
+                            }
+                    }
+                    onActivated: {
+                        var v = model[currentIndex].value;
+                        if (iconConfigDialog.context === "details")
+                            root.cfg_widgetMoonMode = v;
+                        else
+                            root.cfg_widgetMoonMode = v;
+                    }
+                }
+
+                Kirigami.Separator {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    Layout.bottomMargin: 4
+                }
 
                 // Moonrise icon
                 Label {
@@ -1041,8 +1150,8 @@ KCM.AbstractKCM {
         },
         {
             itemId: "moonphase",
-            label: i18n("Moon Phase"),
-            description: i18n("Current moon phase"),
+            label: i18n("Moon phase and moonrise/moonset"),
+            description: i18n("Moon phase, moonrise & moonset"),
             wiChar: "\uF0D0",
             iconFallback: "weather-clear-night"
         }
@@ -1101,8 +1210,8 @@ KCM.AbstractKCM {
         },
         {
             itemId: "moonphase",
-            label: i18n("Moon Phase"),
-            description: i18n("Current moon phase"),
+            label: i18n("Moon phase and moonrise/moonset"),
+            description: i18n("Moon phase, moonrise & moonset"),
             wiChar: "\uF0D0",
             iconFallback: "weather-clear-night"
         }
@@ -1147,29 +1256,41 @@ KCM.AbstractKCM {
      */
     function _initItemModel(model, defs, orderStr, extraFn) {
         model.clear();
-        var enabled = orderStr.split(";").map(function(t){return t.trim();}).filter(function(t){return t.length>0;});
-        enabled.forEach(function(tok) {
+        var enabled = orderStr.split(";").map(function (t) {
+            return t.trim();
+        }).filter(function (t) {
+            return t.length > 0;
+        });
+        enabled.forEach(function (tok) {
             for (var j = 0; j < defs.length; ++j) {
                 if (defs[j].itemId === tok) {
                     var entry = {
-                        itemId: defs[j].itemId, itemLabel: defs[j].label,
-                        itemDesc: defs[j].description, itemEnabled: true,
-                        itemWiChar: defs[j].wiChar, itemFallback: defs[j].iconFallback
+                        itemId: defs[j].itemId,
+                        itemLabel: defs[j].label,
+                        itemDesc: defs[j].description,
+                        itemEnabled: true,
+                        itemWiChar: defs[j].wiChar,
+                        itemFallback: defs[j].iconFallback
                     };
-                    if (extraFn) Object.assign(entry, extraFn(defs[j], tok));
+                    if (extraFn)
+                        Object.assign(entry, extraFn(defs[j], tok));
                     model.append(entry);
                     break;
                 }
             }
         });
-        defs.forEach(function(def) {
+        defs.forEach(function (def) {
             if (enabled.indexOf(def.itemId) < 0) {
                 var entry = {
-                    itemId: def.itemId, itemLabel: def.label,
-                    itemDesc: def.description, itemEnabled: false,
-                    itemWiChar: def.wiChar, itemFallback: def.iconFallback
+                    itemId: def.itemId,
+                    itemLabel: def.label,
+                    itemDesc: def.description,
+                    itemEnabled: false,
+                    itemWiChar: def.wiChar,
+                    itemFallback: def.iconFallback
                 };
-                if (extraFn) Object.assign(entry, extraFn(def, def.itemId));
+                if (extraFn)
+                    Object.assign(entry, extraFn(def, def.itemId));
                 model.append(entry);
             }
         });
@@ -1177,8 +1298,11 @@ KCM.AbstractKCM {
 
     function initPanelModel() {
         var iconMap = parsePanelItemIcons();
-        _initItemModel(panelWorkingModel, allPanelItemDefs, cfg_panelItemOrder,
-            function(def, tok) { return { itemShowIcon: (tok in iconMap) ? iconMap[tok] : true }; });
+        _initItemModel(panelWorkingModel, allPanelItemDefs, cfg_panelItemOrder, function (def, tok) {
+            return {
+                itemShowIcon: (tok in iconMap) ? iconMap[tok] : true
+            };
+        });
     }
     function firstPanelDisabledIndex() {
         for (var i = 0; i < panelWorkingModel.count; ++i)
@@ -1227,12 +1351,21 @@ KCM.AbstractKCM {
     }
     function initDetailsModel() {
         // Ensure arc cards always present (migrate old configs)
-        var raw = cfg_widgetDetailsOrder.split(";").map(function(t){return t.trim();}).filter(function(t){return t.length>0;});
-        if (raw.indexOf("suntimes")  < 0) raw.push("suntimes");
-        if (raw.indexOf("moonphase") < 0) raw.push("moonphase");
+        var raw = cfg_widgetDetailsOrder.split(";").map(function (t) {
+            return t.trim();
+        }).filter(function (t) {
+            return t.length > 0;
+        });
+        if (raw.indexOf("suntimes") < 0)
+            raw.push("suntimes");
+        if (raw.indexOf("moonphase") < 0)
+            raw.push("moonphase");
         var iconMap = parseDetailsItemIcons();
-        _initItemModel(detailsWorkingModel, allDetailsDefs, raw.join(";"),
-            function(def, tok) { return { itemShowIcon: (tok in iconMap) ? iconMap[tok] : true }; });
+        _initItemModel(detailsWorkingModel, allDetailsDefs, raw.join(";"), function (def, tok) {
+            return {
+                itemShowIcon: (tok in iconMap) ? iconMap[tok] : true
+            };
+        });
     }
     function applyDetailsItems() {
         var ids = [], iconMap = {};
@@ -1287,8 +1420,11 @@ KCM.AbstractKCM {
     }
     function initTooltipModel() {
         var iconMap = parseTooltipItemIcons();
-        _initItemModel(tooltipWorkingModel, allTooltipDefs, cfg_tooltipItemOrder,
-            function(def, tok) { return { itemShowIcon: (tok in iconMap) ? iconMap[tok] : true }; });
+        _initItemModel(tooltipWorkingModel, allTooltipDefs, cfg_tooltipItemOrder, function (def, tok) {
+            return {
+                itemShowIcon: (tok in iconMap) ? iconMap[tok] : true
+            };
+        });
     }
     function applyTooltipItems() {
         var ids = [], iconMap = {};
@@ -1390,7 +1526,9 @@ KCM.AbstractKCM {
     // Panel items sub-page — extracted to ConfigPanelSubPage.qml
     Component {
         id: panelSubPage
-        ConfigPanelSubPage { configRoot: root }
+        ConfigPanelSubPage {
+            configRoot: root
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1399,7 +1537,9 @@ KCM.AbstractKCM {
     // Details items sub-page — extracted to ConfigDetailsSubPage.qml
     Component {
         id: detailsSubPage
-        ConfigDetailsSubPage { configRoot: root }
+        ConfigDetailsSubPage {
+            configRoot: root
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1408,6 +1548,8 @@ KCM.AbstractKCM {
     // Tooltip items sub-page — extracted to ConfigTooltipSubPage.qml
     Component {
         id: tooltipSubPage
-        ConfigTooltipSubPage { configRoot: root }
+        ConfigTooltipSubPage {
+            configRoot: root
+        }
     }
 }
