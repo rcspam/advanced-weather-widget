@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * WeatherService.qml — Weather API service layer
  *
@@ -14,6 +31,7 @@ import "providers/openMeteo.js" as OpenMeteoJS
 import "providers/openWeather.js" as OpenWeatherJS
 import "providers/weatherApi.js" as WeatherApiJS
 import "providers/metNo.js" as MetNoJS
+import "providers/alerts.js" as AlertsJS
 
 QtObject {
     id: service
@@ -28,6 +46,8 @@ QtObject {
     readonly property string timezone: (Plasmoid.configuration.timezone || "").trim()
     readonly property int forecastDays: Plasmoid.configuration.forecastDays
     readonly property real altitude: Plasmoid.configuration.altitude
+    readonly property string countryCode: (Plasmoid.configuration.countryCode || "").toUpperCase()
+    readonly property string locationName: Plasmoid.configuration.locationName || ""
 
     // ── Private: API key helpers ─────────────────────────────────────────
     function _owKey() {
@@ -53,6 +73,12 @@ QtObject {
             r.humidityPercent = NaN;
             r.visibilityKm = NaN;
             r.dewPointC = NaN;
+            r.precipMmh = NaN;
+            r.uvIndex = NaN;
+            r.airQualityIndex = NaN;
+            r.airQualityLabel = "";
+            r.weatherAlerts = [];
+            r.snowDepthCm = NaN;
             r.sunriseTimeText = "--";
             r.sunsetTimeText = "--";
             r.weatherCode = -1;
@@ -62,6 +88,7 @@ QtObject {
             return;
         }
         r.loading = true;
+        r.weatherAlerts = [];  // reset before parallel fetch
 
         var provider = Plasmoid.configuration.weatherProvider || "adaptive";
         var chain = (provider === "adaptive")
@@ -69,6 +96,9 @@ QtObject {
             : [provider];
 
         _tryProvider(chain, 0);
+
+        // Fetch alerts independently (MeteoAlarm → met.no fallback)
+        AlertsJS.fetchAlerts(service);
     }
 
     /** Hourly data fetch for a specific date string (yyyy-MM-dd) */

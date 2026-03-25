@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * iconResolver.js — Unified icon resolution for the weather widget
  *
@@ -33,7 +50,12 @@ var _kdeIcons = {
     moonset:      "weather-clear-night",
     condition:    "weather-few-clouds",
     location:     "mark-location",
-    umbrella:     "weather-showers"
+    umbrella:     "weather-showers",
+    preciprate:   "weather-showers",
+    uvindex:      "weather-clear",
+    airquality:   "weather-many-clouds",
+    alerts:       "weather-storm",
+    snowcover:    "weather-snow-scattered"
 };
 
 // ── Bundled SVG filenames (without "wi-" prefix and ".svg" suffix) ───────────
@@ -56,7 +78,12 @@ var _svgStems = {
     moonset:      "moonset",
     condition:    "day-sunny",
     location:     "wind-deg",
-    umbrella:     "umbrella"
+    umbrella:     "umbrella",
+    preciprate:   "raindrop",
+    uvindex:      "hot",
+    airquality:   "smog",
+    alerts:       "storm-warning",
+    snowcover:    "snowflake-cold"
 };
 
 // ── Wi-font glyph code points ───────────────────────────────────────────────
@@ -80,7 +107,12 @@ var _wiGlyphs = {
     moonset:      "\uF0CA",
     condition:    "\uF013",
     location:     "\uF0B1",
-    umbrella:     "\uF084"
+    umbrella:     "\uF084",
+    preciprate:   "\uF04E",
+    uvindex:      "\uF072",
+    airquality:   "\uF075",
+    alerts:       "\uF0CE",
+    snowcover:    "\uF076"
 };
 
 // ══════════════════════════════════════════════════════════════════════════════

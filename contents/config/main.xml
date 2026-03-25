@@ -1,4 +1,51 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright 2026  Petar Nedyalkov
+
+  This program is free software; you can redistribute it and/or
+  modify it under the terms of the GNU General Public License as
+  published by the Free Software Foundation; either version 2 of
+  the License, or (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+<!--
+  Copyright 2026  Petar Nedyalkov
+
+  This program is free software; you can redistribute it and/or
+  modify it under the terms of the GNU General Public License as
+  published by the Free Software Foundation; either version 2 of
+  the License, or (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+<!--
+  Copyright 2026  Petar Nedyalkov
+
+  This program is free software; you can redistribute it and/or
+  modify it under the terms of the GNU General Public License as
+  published by the Free Software Foundation; either version 2 of
+  the License, or (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
 <kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
@@ -20,6 +67,7 @@
     <entry name="longitude"          type="Double"><default>0.0</default></entry>
     <entry name="altitude"           type="Int"><default>0</default></entry>
     <entry name="timezone"           type="String"><default></default></entry>
+    <entry name="countryCode"        type="String"><default></default></entry>
     <entry name="weatherProvider"    type="String"><default>adaptive</default></entry>
     <!-- User API keys: empty = use widget's bundled key -->
     <entry name="owApiKey"           type="String"><default></default></entry>
@@ -40,7 +88,7 @@
     <!-- panelInfoMode: "single" | "multiline" | "simple" -->
     <entry name="panelInfoMode"    type="String"><default>single</default></entry>
     <entry name="panelItemOrder"   type="String"><default>location;temperature;humidity</default></entry>
-    <entry name="panelItemIcons"   type="String"><default>location=1;condition=1;temperature=1;suntimes=1;wind=1;feelslike=1;humidity=1;pressure=1;moonphase=1</default></entry>
+    <entry name="panelItemIcons"   type="String"><default>location=1;condition=1;temperature=1;suntimes=1;wind=1;feelslike=1;humidity=1;pressure=1;moonphase=1;preciprate=1;uvindex=1;airquality=1;alerts=1;snowcover=1</default></entry>
     <entry name="panelSeparator"   type="String"><default> • </default></entry>
     <entry name="panelItemSpacing" type="Int"><default>5</default><min>0</min><max>32</max></entry>
     <entry name="panelFillWidth"   type="Bool"><default>false</default></entry>
@@ -101,7 +149,7 @@
 
     <!-- ── Widget — details view ──────────────────────────────────────── -->
     <entry name="widgetDetailsOrder"    type="String"><default>feelslike;humidity;pressure;wind;dewpoint;visibility;moonphase;suntimes</default></entry>
-    <entry name="widgetDetailsItemIcons" type="String"><default>feelslike=1;humidity=1;pressure=1;wind=1;suntimes=1;dewpoint=1;visibility=1;moonphase=1</default></entry>
+    <entry name="widgetDetailsItemIcons" type="String"><default>feelslike=1;humidity=1;pressure=1;wind=1;suntimes=1;dewpoint=1;visibility=1;moonphase=1;preciprate=1;uvindex=1;airquality=1;alerts=1;snowcover=1</default></entry>
     <entry name="widgetDetailsCustomIcons" type="String"><default></default></entry>
     <entry name="widgetDetailsLayout"   type="String"><default>cards2</default></entry>
     <entry name="widgetSunTimesMode"    type="String"><default>both</default></entry>
@@ -139,7 +187,7 @@
     <entry name="tooltipEnabled"    type="Bool"><default>true</default></entry>
     <entry name="tooltipStyle"      type="String"><default>verbose</default></entry>
     <entry name="tooltipItemOrder"  type="String"><default>temperature;wind;humidity;pressure;suntimes</default></entry>
-    <entry name="tooltipItemIcons"  type="String"><default>temperature=1;condition=1;feelslike=1;wind=1;humidity=1;pressure=1;suntimes=1;moonphase=1</default></entry>
+    <entry name="tooltipItemIcons"  type="String"><default>temperature=1;condition=1;feelslike=1;wind=1;humidity=1;pressure=1;suntimes=1;moonphase=1;preciprate=1;uvindex=1;airquality=1;alerts=1;snowcover=1</default></entry>
     <entry name="tooltipSunTimesMode" type="String"><default>both</default></entry>
     <entry name="tooltipMoonPhaseMode" type="String"><default>full</default></entry>
     <!-- tooltipIconTheme: "symbolic" | "wi-font" | "flat-color" | "3d-oxygen" | "kde" | "custom" -->

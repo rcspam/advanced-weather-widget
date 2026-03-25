@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * weatherApi.js — WeatherAPI.com current + hourly fetcher
  *
@@ -16,6 +33,16 @@ function _calcDewPoint(T, rh) {
     var b = 17.67, c = 243.5;
     var gamma = Math.log(rh / 100.0) + (b * T) / (c + T);
     return Math.round((c * gamma) / (b - gamma) * 10) / 10;
+}
+
+function _waAqiLabel(epa) {
+    if (epa === 1) return "Good";
+    if (epa === 2) return "Moderate";
+    if (epa === 3) return "Unhealthy for Sensitive";
+    if (epa === 4) return "Unhealthy";
+    if (epa === 5) return "Very Unhealthy";
+    if (epa === 6) return "Hazardous";
+    return "";
 }
 
 function _apiTimeTo24h(s) {
@@ -52,7 +79,7 @@ function fetchCurrent(service, W, chain, idx) {
         + encodeURIComponent(key)
         + "&q=" + encodeURIComponent(
             service.latitude + "," + service.longitude)
-        + "&days=" + days + "&aqi=no&alerts=no";
+        + "&days=" + days + "&aqi=yes&alerts=no";
 
     var req = new XMLHttpRequest();
     req.open("GET", url);
@@ -78,6 +105,19 @@ function fetchCurrent(service, W, chain, idx) {
             ? d.current.dewpoint_c
             : _calcDewPoint(d.current.temp_c, d.current.humidity);
         r.visibilityKm = d.current.vis_km;
+        r.precipMmh = (d.current.precip_mm !== undefined) ? d.current.precip_mm : NaN;
+        r.uvIndex = (d.current.uv !== undefined) ? d.current.uv : NaN;
+        r.snowDepthCm = NaN;  // not available as current cover
+        // Air quality
+        if (d.current.air_quality) {
+            var aq = d.current.air_quality;
+            var epa = aq["us-epa-index"];
+            r.airQualityIndex = (epa !== undefined) ? epa : NaN;
+            r.airQualityLabel = _waAqiLabel(epa);
+        } else {
+            r.airQualityIndex = NaN;
+            r.airQualityLabel = "";
+        }
         r.weatherCode = d.current.condition
             ? W.weatherApiCodeToWmo(d.current.condition.code) : 2;
         r.isDay = (d.current.is_day !== undefined) ? d.current.is_day : -1;
@@ -100,7 +140,9 @@ function fetchCurrent(service, W, chain, idx) {
                     dateStr: f.date,
                     maxC: f.day.maxtemp_c,
                     minC: f.day.mintemp_c,
-                    code: W.weatherApiCodeToWmo(f.day.condition.code)
+                    code: W.weatherApiCodeToWmo(f.day.condition.code),
+                    precipMm: (f.day.totalprecip_mm !== undefined) ? f.day.totalprecip_mm : NaN,
+                    snowCm: (f.day.totalsnow_cm !== undefined) ? f.day.totalsnow_cm : NaN
                 });
             }
         }

@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -20,6 +37,7 @@ KCM.SimpleKCM {
     property real   cfg_longitude: 0.0
     property int    cfg_altitude: 0
     property string cfg_timezone: ""
+    property string cfg_countryCode: ""
     property string cfg_altitudeUnit: "m"
     property string cfg_weatherProvider: "adaptive"
 
@@ -31,6 +49,7 @@ KCM.SimpleKCM {
     property real   detectedLongitude: 0.0
     property int    detectedAltitude: 0
     property string detectedTimezone: ""
+    property string detectedCountryCode: ""
     property bool   showDetectedLocationDialog: false
 
     function shouldConfirmAutoDetectedLocation() {
@@ -54,6 +73,8 @@ KCM.SimpleKCM {
             Plasmoid.configuration.altitude = detectedAltitude
         if (detectedLocationName && detectedLocationName.length > 0)
             Plasmoid.configuration.locationName = detectedLocationName
+        if (detectedCountryCode && detectedCountryCode.length > 0)
+            Plasmoid.configuration.countryCode = detectedCountryCode
         // Sync cfg_ back so the config dialog display stays consistent
         cfg_autoDetectLocation = Plasmoid.configuration.autoDetectLocation
         cfg_latitude           = Plasmoid.configuration.latitude
@@ -61,6 +82,7 @@ KCM.SimpleKCM {
         cfg_timezone           = Plasmoid.configuration.timezone
         cfg_altitude           = Plasmoid.configuration.altitude
         cfg_locationName       = Plasmoid.configuration.locationName
+        cfg_countryCode        = Plasmoid.configuration.countryCode
 
         // Verify the detected location is available on the current provider
         verifyProviderLocation(detectedLatitude, detectedLongitude)
@@ -257,11 +279,18 @@ KCM.SimpleKCM {
                             root.detectedLocationName = name
                             root.showDetectedLocationDialog = true
                         } else {
-                            // Persist directly to Plasmoid.configuration so the
-                            // widget updates immediately and the change survives
-                            // dialog close before the async response arrived.
                             cfg_locationName = name
                             Plasmoid.configuration.locationName = name
+                        }
+                    }
+                    // Capture country code for MeteoAlarm alerts
+                    var cc = (a.country_code || "").toUpperCase()
+                    if (cc.length > 0) {
+                        if (shouldConfirmAutoDetectedLocation()) {
+                            root.detectedCountryCode = cc
+                        } else {
+                            cfg_countryCode = cc
+                            Plasmoid.configuration.countryCode = cc
                         }
                     }
                 }
@@ -308,6 +337,10 @@ KCM.SimpleKCM {
         cfg_latitude  = parseFloat(item.latitude)
         cfg_longitude = parseFloat(item.longitude)
         cfg_timezone  = item.timezone ? item.timezone : cfg_timezone
+
+        // Country code for MeteoAlarm alerts
+        if (item.countryCode && item.countryCode.length > 0)
+            cfg_countryCode = item.countryCode.toUpperCase()
 
         // Always fetch accurate elevation from Open-Meteo elevation API.
         // Nominatim does not return elevation at all; Open-Meteo geocoder

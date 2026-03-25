@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * main.qml — Advanced Weather Widget root
  *
@@ -47,6 +64,12 @@ PlasmoidItem {
     property real humidityPercent: NaN
     property real visibilityKm: NaN
     property real dewPointC: NaN
+    property real precipMmh: NaN           // Current precipitation rate (mm/h)
+    property real uvIndex: NaN             // UV index (0–11+)
+    property real airQualityIndex: NaN     // AQI numeric value (provider scale)
+    property string airQualityLabel: ""    // "Good", "Moderate", etc.
+    property var weatherAlerts: []         // [{headline, severity, description}]
+    property real snowDepthCm: NaN         // Current snow depth (cm)
     property string sunriseTimeText: "--"
     property string sunsetTimeText: "--"
     property string moonriseTimeText: "--"
@@ -228,6 +251,39 @@ PlasmoidItem {
     }
     function pressureValue(hpa) {
         return W.formatPressure(hpa, _pressureUnit());
+    }
+
+    function precipValue(mmh) {
+        if (isNaN(mmh)) return "--";
+        return mmh.toFixed(1) + " mm/h";
+    }
+
+    function uvIndexText(uv) {
+        if (isNaN(uv)) return "--";
+        var v = Math.round(uv * 10) / 10;
+        if (v <= 2) return v + " (" + i18n("Low") + ")";
+        if (v <= 5) return v + " (" + i18n("Moderate") + ")";
+        if (v <= 7) return v + " (" + i18n("High") + ")";
+        if (v <= 10) return v + " (" + i18n("Very High") + ")";
+        return v + " (" + i18n("Extreme") + ")";
+    }
+
+    function airQualityText() {
+        if (isNaN(airQualityIndex)) return "--";
+        if (airQualityLabel.length > 0)
+            return airQualityIndex + " — " + airQualityLabel;
+        return "" + airQualityIndex;
+    }
+
+    function snowDepthText(cm) {
+        if (isNaN(cm)) return "--";
+        return cm.toFixed(1) + " cm";
+    }
+
+    function alertsText() {
+        if (!weatherAlerts || weatherAlerts.length === 0) return i18n("None");
+        if (weatherAlerts.length === 1) return weatherAlerts[0].displayName || weatherAlerts[0].headline || i18n("1 Alert");
+        return weatherAlerts.length + " " + i18n("Alerts");
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -560,6 +616,16 @@ PlasmoidItem {
             }
             return "\uF051";
         }
+        if (tok === "preciprate")
+            return "\uF04E";        // wi-sprinkle (rain drop)
+        if (tok === "uvindex")
+            return "\uF072";        // wi-hot
+        if (tok === "airquality")
+            return "\uF075";        // wi-smog
+        if (tok === "alerts")
+            return "\uF0CE";        // wi-gale-warning
+        if (tok === "snowcover")
+            return "\uF076";        // wi-snowflake-cold
         return "";
     }
 
@@ -605,7 +671,12 @@ PlasmoidItem {
                 pressure: "weather-overcast",
                 wind: "weather-windy",
                 moonphase: "weather-clear-night",
-                location: "mark-location"
+                location: "mark-location",
+                preciprate: "weather-showers",
+                uvindex: "weather-clear",
+                airquality: "weather-many-clouds",
+                alerts: "weather-storm",
+                snowcover: "weather-snow-scattered"
             };
 
             if (tok === "condition") {
@@ -797,6 +868,16 @@ PlasmoidItem {
                 return formatTimeForDisplay(sunsetTimeText);
             return formatTimeForDisplay(sunriseTimeText) + " / " + formatTimeForDisplay(sunsetTimeText);
         }
+        if (tok === "preciprate")
+            return precipValue(precipMmh);
+        if (tok === "uvindex")
+            return uvIndexText(uvIndex);
+        if (tok === "airquality")
+            return airQualityText();
+        if (tok === "alerts")
+            return alertsText();
+        if (tok === "snowcover")
+            return snowDepthText(snowDepthCm);
         return "";
     }
 

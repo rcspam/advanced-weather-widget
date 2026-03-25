@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * DetailsView.qml — Dynamic "Details" tab content for the popup
  */
@@ -6,6 +23,7 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 
 import "js/weather.js" as W
 import "js/moonphase.js" as Moon
@@ -199,7 +217,12 @@ Item {
                 dewpoint: root.accentTeal,
                 visibility: Kirigami.Theme.textColor,
                 moonphase: root.accentViolet,
-                condition: Kirigami.Theme.textColor
+                condition: Kirigami.Theme.textColor,
+                preciprate: root.accentBlue,
+                uvindex: root.accentOrange,
+                airquality: root.accentTeal,
+                alerts: root.accentOrange,
+                snowcover: root.accentBlue
             })[id] || root.accentBlue;
     }
 
@@ -218,7 +241,12 @@ Item {
                 dewpoint: i18n("Dew Point"),
                 visibility: i18n("Visibility"),
                 moonphase: i18n("Moon"),
-                condition: i18n("Condition")
+                condition: i18n("Condition"),
+                preciprate: i18n("Precipitation"),
+                uvindex: i18n("UV Index"),
+                airquality: i18n("Air Quality"),
+                alerts: i18n("Alerts"),
+                snowcover: i18n("Snow Cover")
             })[id] || id;
     }
     function dataValue(id) {
@@ -237,6 +265,16 @@ Item {
             return isNaN(weatherRoot.visibilityKm) ? "--" : weatherRoot.visibilityKm.toFixed(1) + " km";
         case "condition":
             return weatherRoot.weatherCodeToText(weatherRoot.weatherCode, weatherRoot.isNightTime());
+        case "preciprate":
+            return weatherRoot.precipValue(weatherRoot.precipMmh);
+        case "uvindex":
+            return weatherRoot.uvIndexText(weatherRoot.uvIndex);
+        case "airquality":
+            return weatherRoot.airQualityText();
+        case "alerts":
+            return weatherRoot.alertsText();
+        case "snowcover":
+            return weatherRoot.snowDepthText(weatherRoot.snowDepthCm);
         case "wind":
             // Wind is handled specially in the card
             return "";
@@ -338,6 +376,10 @@ Item {
                             // suntimes and moonphase: height scales with card width
                             // so the arc grows when the widget is stretched.
                             readonly property int autoHeight: {
+                                if (card.modelData === "alerts") {
+                                    var n = weatherRoot ? (weatherRoot.weatherAlerts || []).length : 0;
+                                    return n <= 1 ? 30 : (30 + (n - 1) * 22);
+                                }
                                 if (card.modelData === "suntimes" || card.modelData === "moonphase")
                                     return Math.max(165, Math.round(card.width * 0.55));
                                 if (isExpandedCard)
@@ -391,7 +433,7 @@ Item {
                                     rightMargin: 10
                                 }
                                 spacing: 8
-                                visible: !card.isExpandedCard && card.modelData !== "wind"
+                                visible: !card.isExpandedCard && card.modelData !== "wind" && !(card.modelData === "alerts" && weatherRoot && weatherRoot.weatherAlerts && weatherRoot.weatherAlerts.length > 0)
 
                                 WeatherIcon {
                                     iconInfo: root.showIconFor(card.modelData) ? root.resolveIcon(card.modelData) : null
@@ -476,6 +518,113 @@ Item {
                                     }
                                 }
                             } // RowLayout (standard)
+
+                            // ── Alerts display ──────────────────────────────────────
+                            RowLayout {
+                                anchors {
+                                    fill: parent
+                                    leftMargin: 10
+                                    rightMargin: 10
+                                }
+                                spacing: 8
+                                visible: card.modelData === "alerts" && weatherRoot && weatherRoot.weatherAlerts && weatherRoot.weatherAlerts.length > 0
+
+                                // Icon
+                                WeatherIcon {
+                                    iconInfo: root.showIconFor("alerts") ? root.resolveIcon("alerts") : null
+                                    iconSize: root.iconSize
+                                    iconColor: root.iconColorFor(root.accentFor("alerts"))
+                                    Layout.alignment: Qt.AlignVCenter
+                                }
+
+                                // Label
+                                Label {
+                                    text: root.labelFor("alerts") + ":"
+                                    color: Kirigami.Theme.textColor
+                                    opacity: 0.55
+                                    font: weatherRoot ? weatherRoot.wf(11, false) : Qt.font({})
+                                    Layout.alignment: Qt.AlignVCenter
+                                }
+
+                                // Alert values (right side)
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    Layout.alignment: Qt.AlignVCenter
+                                    spacing: 2
+
+                                    // Individual alert rows
+                                    Repeater {
+                                        model: weatherRoot ? (weatherRoot.weatherAlerts || []) : []
+                                        delegate: RowLayout {
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            spacing: 6
+
+                                            // Color severity dot
+                                            Rectangle {
+                                                width: 10
+                                                height: 10
+                                                radius: 5
+                                                color: {
+                                                    var c = (modelData.color || "").toLowerCase();
+                                                    if (c === "yellow") return "#ffc107";
+                                                    if (c === "orange") return "#ff8c00";
+                                                    if (c === "red")    return "#dc3545";
+                                                    return "#999";
+                                                }
+                                                Layout.alignment: Qt.AlignVCenter
+                                            }
+
+                                            // Alert display name
+                                            Label {
+                                                text: modelData.displayName || modelData.headline || ""
+                                                color: {
+                                                    var c = (modelData.color || "").toLowerCase();
+                                                    if (c === "yellow") return root.isDark ? "#ffc107" : "#9a7b00";
+                                                    if (c === "orange") return root.isDark ? "#ff8c00" : "#c04000";
+                                                    if (c === "red")    return root.isDark ? "#ff4444" : "#cc0000";
+                                                    return Kirigami.Theme.textColor;
+                                                }
+                                                font: weatherRoot ? weatherRoot.wf(11, true) : Qt.font({ bold: true })
+                                                elide: Text.ElideRight
+                                                Layout.fillWidth: true
+                                                Layout.alignment: Qt.AlignVCenter
+                                            }
+
+                                            // Info button
+                                            PlasmaCore.ToolTipArea {
+                                                Layout.preferredWidth: 24
+                                                Layout.preferredHeight: 24
+                                                Layout.alignment: Qt.AlignVCenter
+                                                active: true
+                                                mainText: modelData.headline || ""
+                                                subText: {
+                                                    var lines = [];
+                                                    if (modelData.severity)
+                                                        lines.push(i18n("Severity") + ": " + modelData.severity);
+                                                    if (modelData.area)
+                                                        lines.push(i18n("Region") + ": " + modelData.area);
+                                                    if (modelData.action)
+                                                        lines.push(i18n("Action") + ": " + modelData.action);
+                                                    if (modelData.description)
+                                                        lines.push("\n" + modelData.description);
+                                                    lines.push("");
+                                                    lines.push(i18n("Disclaimer") + ": " + i18n("Time delays between this website and meteoalarm.org are possible. For the most up-to-date information about alert levels as published by the participating National Meteorological Services, please visit Meteoalarm."));
+                                                    if (modelData.senderName)
+                                                        lines.push(i18n("Issued by") + ": EUMETNET - MeteoAlarm - " + modelData.senderName);
+                                                    return lines.join("\n");
+                                                }
+                                                Kirigami.Icon {
+                                                    anchors.centerIn: parent
+                                                    width: 16
+                                                    height: 16
+                                                    source: "help-about"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
 
                             // ═══════════════════════════════════════════════════════════════
                             // Suntimes — animated sun/moon arc card

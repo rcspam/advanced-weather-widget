@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * metNo.js — met.no current + hourly fetcher
  *
@@ -21,7 +38,7 @@ function _calcDewPoint(T, rh) {
 function fetchCurrent(service, W, chain, idx) {
     var r = service.weatherRoot;
     var alt = service.altitude;
-    var url = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat="
+    var url = "https://api.met.no/weatherapi/locationforecast/2.0/complete?lat="
         + encodeURIComponent(service.latitude)
         + "&lon=" + encodeURIComponent(service.longitude)
         + ((!isNaN(alt) && alt !== 0) ? "&altitude=" + Math.round(alt) : "");
@@ -62,6 +79,17 @@ function fetchCurrent(service, W, chain, idx) {
             ? det.dew_point_temperature
             : _calcDewPoint(det.air_temperature, det.relative_humidity);
         r.visibilityKm = NaN;
+        // Precipitation from next_1_hours
+        var precipDet = (ts.data && ts.data.next_1_hours && ts.data.next_1_hours.details)
+            ? ts.data.next_1_hours.details : null;
+        r.precipMmh = (precipDet && precipDet.precipitation_amount !== undefined)
+            ? precipDet.precipitation_amount : 0;
+        // UV from complete endpoint
+        r.uvIndex = (det.ultraviolet_index_clear_sky !== undefined)
+            ? det.ultraviolet_index_clear_sky : NaN;
+        r.snowDepthCm = NaN;  // not available
+        r.airQualityIndex = NaN;  // not available
+        r.airQualityLabel = "";
         var sym = (ts.data && ts.data.next_1_hours && ts.data.next_1_hours.summary)
             ? ts.data.next_1_hours.summary.symbol_code : "";
         r.weatherCode = W.metNoSymbolToWmo(sym);
@@ -81,12 +109,17 @@ function fetchCurrent(service, W, chain, idx) {
             if (!det2)
                 return;
             if (!days[dk])
-                days[dk] = { maxC: -Infinity, minC: Infinity, bestHr: -1, bestCode: 0 };
+                days[dk] = { maxC: -Infinity, minC: Infinity, bestHr: -1, bestCode: 0, precipMm: 0 };
             var day = days[dk];
             if (det2.air_temperature > day.maxC)
                 day.maxC = det2.air_temperature;
             if (det2.air_temperature < day.minC)
                 day.minC = det2.air_temperature;
+            // accumulate precipitation
+            var p1h = (t2.data && t2.data.next_1_hours && t2.data.next_1_hours.details)
+                ? t2.data.next_1_hours.details : null;
+            if (p1h && p1h.precipitation_amount !== undefined)
+                day.precipMm += p1h.precipitation_amount;
             // pick entry closest to noon for the weather code
             if (day.bestHr < 0 || Math.abs(hr - 12) < Math.abs(day.bestHr - 12)) {
                 var s2 = (t2.data && t2.data.next_1_hours
@@ -106,7 +139,9 @@ function fetchCurrent(service, W, chain, idx) {
                 dateStr: k,
                 maxC: day.maxC,
                 minC: day.minC,
-                code: day.bestCode
+                code: day.bestCode,
+                precipMm: day.precipMm,
+                snowCm: NaN
             });
         });
         r.dailyData = nd;
@@ -119,7 +154,7 @@ function fetchCurrent(service, W, chain, idx) {
 function fetchHourly(service, W, dateStr) {
     var r = service.weatherRoot;
     var alt = service.altitude;
-    var url = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat="
+    var url = "https://api.met.no/weatherapi/locationforecast/2.0/complete?lat="
         + encodeURIComponent(service.latitude)
         + "&lon=" + encodeURIComponent(service.longitude)
         + ((!isNaN(alt) && alt !== 0) ? "&altitude=" + Math.round(alt) : "");

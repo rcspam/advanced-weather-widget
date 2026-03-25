@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * ConfigLocationSubPage — Location search, extracted from configLocation.qml
  * Requires: required property var configRoot
@@ -77,6 +94,7 @@ ColumnLayout {
                             admin1:               state,
                             district:             district,
                             country:              country,
+                            countryCode:          (a.country_code || "").toUpperCase(),
                             latitude:             parseFloat(item.lat),
                             longitude:            parseFloat(item.lon),
                             timezone:             "",
@@ -107,6 +125,7 @@ ColumnLayout {
                             name:                 it.name || "",
                             admin1:               it.admin1 || "",
                             country:              it.country || "",
+                            countryCode:          (it.country_code || "").toUpperCase(),
                             latitude:             parseFloat(it.latitude),
                             longitude:            parseFloat(it.longitude),
                             timezone:             it.timezone || "",

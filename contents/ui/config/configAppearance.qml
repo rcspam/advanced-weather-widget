@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -901,7 +918,7 @@ KCM.AbstractKCM {
     property int cfg_panelFontSize: 0
     property bool cfg_singlePanelRow: true
     property string cfg_panelItemOrder: "location;temperature;humidity"
-    property string cfg_panelItemIcons: "location=1;condition=1;temperature=1;suntimes=1;wind=1;feelslike=1;humidity=1;pressure=1;moonphase=1"
+    property string cfg_panelItemIcons: "location=1;condition=1;temperature=1;suntimes=1;wind=1;feelslike=1;humidity=1;pressure=1;moonphase=1;preciprate=1;uvindex=1;airquality=1;alerts=1;snowcover=1"
     property string cfg_panelSeparator: " \u2022 "
     property string cfg_panelSunTimesMode: "upcoming"
     property string cfg_panelMoonPhaseMode: "full"   // "full" | "upcoming" | "upcoming-times" | "phase" | "times" | "moonrise" | "moonset"
@@ -934,7 +951,7 @@ KCM.AbstractKCM {
     property bool cfg_showUpdateText: true
     // Issue #7: widgetDetailsOrder replaces individual booleans
     property string cfg_widgetDetailsOrder: "feelslike;humidity;pressure;wind;dewpoint;visibility;moonphase;suntimes"
-    property string cfg_widgetDetailsItemIcons: "feelslike=1;humidity=1;pressure=1;wind=1;suntimes=1;dewpoint=1;visibility=1;moonphase=1"
+    property string cfg_widgetDetailsItemIcons: "feelslike=1;humidity=1;pressure=1;wind=1;suntimes=1;dewpoint=1;visibility=1;moonphase=1;preciprate=1;uvindex=1;airquality=1;alerts=1;snowcover=1"
     property string cfg_widgetDetailsCustomIcons: ""
     property string cfg_widgetDetailsLayout: "cards2"  // "cards2" | "list"
     property string cfg_widgetSunTimesMode: "both"   // "both" | "sunrise" | "sunset" | "upcoming"
@@ -959,7 +976,7 @@ KCM.AbstractKCM {
 
     // ── Tooltip config aliases ────────────────────────────────────────────
     property string cfg_tooltipItemOrder: "temperature;wind;humidity;pressure;suntimes"
-    property string cfg_tooltipItemIcons: "temperature=1;condition=1;feelslike=1;wind=1;humidity=1;pressure=1;suntimes=1;moonphase=1"
+    property string cfg_tooltipItemIcons: "temperature=1;condition=1;feelslike=1;wind=1;humidity=1;pressure=1;suntimes=1;moonphase=1;preciprate=1;uvindex=1;airquality=1;alerts=1;snowcover=1"
     property string cfg_tooltipIconTheme: "symbolic"
     property int cfg_tooltipIconSize: 22
     property string cfg_tooltipCustomIcons: ""
@@ -1154,6 +1171,41 @@ KCM.AbstractKCM {
             description: i18n("Current moon phase"),
             wiChar: "\uF0D0",
             iconFallback: "weather-clear-night"
+        },
+        {
+            itemId: "preciprate",
+            label: i18n("Precipitation"),
+            description: i18n("Precipitation rate (mm/h)"),
+            wiChar: "\uF04E",
+            iconFallback: "weather-showers"
+        },
+        {
+            itemId: "uvindex",
+            label: i18n("UV Index"),
+            description: i18n("Ultraviolet index"),
+            wiChar: "\uF072",
+            iconFallback: "weather-clear"
+        },
+        {
+            itemId: "airquality",
+            label: i18n("Air Quality"),
+            description: i18n("Air quality index"),
+            wiChar: "\uF075",
+            iconFallback: "weather-many-clouds"
+        },
+        {
+            itemId: "alerts",
+            label: i18n("Alerts"),
+            description: i18n("Weather alerts"),
+            wiChar: "\uF0CE",
+            iconFallback: "weather-storm"
+        },
+        {
+            itemId: "snowcover",
+            label: i18n("Snow Cover"),
+            description: i18n("Snow depth (cm)"),
+            wiChar: "\uF076",
+            iconFallback: "weather-snow-scattered"
         }
     ]
 
@@ -1215,6 +1267,41 @@ KCM.AbstractKCM {
             description: i18n("Moon phase, moonrise & moonset"),
             wiChar: "\uF0D0",
             iconFallback: "weather-clear-night"
+        },
+        {
+            itemId: "preciprate",
+            label: i18n("Precipitation"),
+            description: i18n("Precipitation rate (mm/h)"),
+            wiChar: "\uF04E",
+            iconFallback: "weather-showers"
+        },
+        {
+            itemId: "uvindex",
+            label: i18n("UV Index"),
+            description: i18n("Ultraviolet index"),
+            wiChar: "\uF072",
+            iconFallback: "weather-clear"
+        },
+        {
+            itemId: "airquality",
+            label: i18n("Air Quality"),
+            description: i18n("Air quality index"),
+            wiChar: "\uF075",
+            iconFallback: "weather-many-clouds"
+        },
+        {
+            itemId: "alerts",
+            label: i18n("Alerts"),
+            description: i18n("Weather alerts"),
+            wiChar: "\uF0CE",
+            iconFallback: "weather-storm"
+        },
+        {
+            itemId: "snowcover",
+            label: i18n("Snow Cover"),
+            description: i18n("Snow depth (cm)"),
+            wiChar: "\uF076",
+            iconFallback: "weather-snow-scattered"
         }
     ]
 
@@ -1275,6 +1362,41 @@ KCM.AbstractKCM {
             description: i18n("Moon phase, moonrise & moonset"),
             wiChar: "\uF0D0",
             iconFallback: "weather-clear-night"
+        },
+        {
+            itemId: "preciprate",
+            label: i18n("Precipitation"),
+            description: i18n("Precipitation rate (mm/h)"),
+            wiChar: "\uF04E",
+            iconFallback: "weather-showers"
+        },
+        {
+            itemId: "uvindex",
+            label: i18n("UV Index"),
+            description: i18n("Ultraviolet index"),
+            wiChar: "\uF072",
+            iconFallback: "weather-clear"
+        },
+        {
+            itemId: "airquality",
+            label: i18n("Air Quality"),
+            description: i18n("Air quality index"),
+            wiChar: "\uF075",
+            iconFallback: "weather-many-clouds"
+        },
+        {
+            itemId: "alerts",
+            label: i18n("Alerts"),
+            description: i18n("Weather alerts"),
+            wiChar: "\uF0CE",
+            iconFallback: "weather-storm"
+        },
+        {
+            itemId: "snowcover",
+            label: i18n("Snow Cover"),
+            description: i18n("Snow depth (cm)"),
+            wiChar: "\uF076",
+            iconFallback: "weather-snow-scattered"
         }
     ]
 

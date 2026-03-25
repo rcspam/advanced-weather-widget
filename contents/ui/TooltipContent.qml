@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * TooltipContent.qml — Tooltip popup content
  *
@@ -120,7 +137,12 @@ Item {
                 "moonphase-moonrise": "\uF0C9",
                 "moonphase-moonset": "\uF0CA",
                 "suntimes-sunrise": "\uF051",
-                "suntimes-sunset": "\uF052"
+                "suntimes-sunset": "\uF052",
+                preciprate: "\uF04E",
+                uvindex: "\uF072",
+                airquality: "\uF075",
+                alerts: "\uF0CE",
+                snowcover: "\uF076"
             };
             return { type: "wi", source: glyphs[tok] || "", svgFallback: "", isMask: false };
         }
@@ -138,7 +160,12 @@ Item {
                 "moonphase-moonrise": "weather-clear-night",
                 "moonphase-moonset": "weather-clear-night",
                 "suntimes-sunrise": "weather-sunrise",
-                "suntimes-sunset": "weather-sunset"
+                "suntimes-sunset": "weather-sunset",
+                preciprate: "weather-showers",
+                uvindex: "weather-clear",
+                airquality: "weather-many-clouds",
+                alerts: "weather-storm",
+                snowcover: "weather-snow-scattered"
             };
             // Moon phase token: use bundled SVG (shows actual phase) rather than custom icon
             if (tok === "moonphase") {
@@ -401,6 +428,31 @@ Item {
         if (tok === "visibility") {
             var visTxt = isNaN(r.visibilityKm) ? "--" : r.visibilityKm.toFixed(1) + " km";
             return [row("visibility", visTxt, i18n("Visibility:") + " " + visTxt)];
+        }
+
+        if (tok === "preciprate") {
+            var pTxt = r.precipValue(r.precipMmh);
+            return [row("preciprate", pTxt, i18n("Precipitation:") + " " + pTxt)];
+        }
+
+        if (tok === "uvindex") {
+            var uvTxt = r.uvIndexText(r.uvIndex);
+            return [row("uvindex", uvTxt, i18n("UV Index:") + " " + uvTxt)];
+        }
+
+        if (tok === "airquality") {
+            var aqTxt = r.airQualityText();
+            return [row("airquality", aqTxt, i18n("Air Quality:") + " " + aqTxt)];
+        }
+
+        if (tok === "alerts") {
+            var alTxt = r.alertsText();
+            return [row("alerts", alTxt, i18n("Alerts:") + " " + alTxt)];
+        }
+
+        if (tok === "snowcover") {
+            var snTxt = r.snowDepthText(r.snowDepthCm);
+            return [row("snowcover", snTxt, i18n("Snow Cover:") + " " + snTxt)];
         }
 
         if (tok === "moonphase") {

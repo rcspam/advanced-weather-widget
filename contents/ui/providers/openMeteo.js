@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * openMeteo.js — Open-Meteo current + hourly fetcher
  *
@@ -14,8 +31,9 @@ function fetchCurrent(service, chain, idx) {
         + "&timezone=" + encodeURIComponent(tz.length > 0 ? tz : "auto")
         + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
         + "weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,"
-        + "dew_point_2m,visibility,is_day"
-        + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset";
+        + "dew_point_2m,visibility,is_day,precipitation,uv_index"
+        + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,"
+        + "precipitation_sum,snowfall_sum";
 
     var req = new XMLHttpRequest();
     req.open("GET", url);
@@ -42,6 +60,9 @@ function fetchCurrent(service, chain, idx) {
         r.visibilityKm = c.visibility / 1000.0;
         r.weatherCode = c.weather_code;
         r.isDay = (c.is_day !== undefined) ? c.is_day : -1;
+        r.precipMmh = (c.precipitation !== undefined) ? c.precipitation : NaN;
+        r.uvIndex = (c.uv_index !== undefined) ? c.uv_index : NaN;
+        r.snowDepthCm = NaN;  // not available in current endpoint
         r.locationUtcOffsetMins = (d.utc_offset_seconds !== undefined)
             ? Math.round(d.utc_offset_seconds / 60) : 0;
         r.sunriseTimeText = (d.daily && d.daily.sunrise && d.daily.sunrise.length > 0)
@@ -57,12 +78,55 @@ function fetchCurrent(service, chain, idx) {
                     dateStr: d.daily.time[i],
                     maxC: d.daily.temperature_2m_max[i],
                     minC: d.daily.temperature_2m_min[i],
-                    code: d.daily.weather_code[i]
+                    code: d.daily.weather_code[i],
+                    precipMm: d.daily.precipitation_sum ? d.daily.precipitation_sum[i] : NaN,
+                    snowCm: d.daily.snowfall_sum ? d.daily.snowfall_sum[i] : NaN
                 });
         }
         r.dailyData = nd;
         r.loading = false;
         r.updateText = service._formatUpdateText("openMeteo");
+        // Fetch air quality from separate endpoint
+        _fetchAirQuality(service);
+    };
+    req.send();
+}
+
+function _aqiLabel(aqi) {
+    if (aqi <= 20) return "Good";
+    if (aqi <= 40) return "Fair";
+    if (aqi <= 60) return "Moderate";
+    if (aqi <= 80) return "Poor";
+    if (aqi <= 100) return "Very Poor";
+    return "Hazardous";
+}
+
+function _fetchAirQuality(service) {
+    var r = service.weatherRoot;
+    var tz = service.timezone;
+    var url = "https://air-quality-api.open-meteo.com/v1/air-quality"
+        + "?latitude=" + service.latitude
+        + "&longitude=" + service.longitude
+        + "&current=european_aqi"
+        + "&timezone=" + encodeURIComponent(tz.length > 0 ? tz : "auto");
+    var req = new XMLHttpRequest();
+    req.open("GET", url);
+    req.onreadystatechange = function () {
+        if (req.readyState !== XMLHttpRequest.DONE)
+            return;
+        if (req.status !== 200) {
+            r.airQualityIndex = NaN;
+            r.airQualityLabel = "";
+            return;
+        }
+        var d = JSON.parse(req.responseText);
+        if (d.current && d.current.european_aqi !== undefined) {
+            r.airQualityIndex = d.current.european_aqi;
+            r.airQualityLabel = _aqiLabel(d.current.european_aqi);
+        } else {
+            r.airQualityIndex = NaN;
+            r.airQualityLabel = "";
+        }
     };
     req.send();
 }
