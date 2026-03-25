@@ -196,8 +196,13 @@ Item {
         Layout.fillWidth: true
         visible: ttRoot.weatherRoot && ttRoot.weatherRoot.hasSelectedTown && ttRoot.weatherRoot.updateText.length > 0
         text: ttRoot.weatherRoot ? ttRoot.weatherRoot.updateText : ""
+        textFormat: Text.RichText
+        onLinkActivated: function(link) { Qt.openUrlExternally(link) }
         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
         color: Kirigami.Theme.disabledTextColor
+        HoverHandler {
+            cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+        }
     }
 
     // ── No-location hint ─────────────────────────────────────────────────

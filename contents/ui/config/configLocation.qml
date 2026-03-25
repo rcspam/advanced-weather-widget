@@ -23,7 +23,6 @@ KCM.SimpleKCM {
     property string cfg_altitudeUnit: "m"
     property string cfg_weatherProvider: "adaptive"
 
-    property var    searchResults: []
     property bool   autoDetectBusy: false
     property string autoDetectStatus: ""
 
@@ -62,6 +61,9 @@ KCM.SimpleKCM {
         cfg_timezone           = Plasmoid.configuration.timezone
         cfg_altitude           = Plasmoid.configuration.altitude
         cfg_locationName       = Plasmoid.configuration.locationName
+
+        // Verify the detected location is available on the current provider
+        verifyProviderLocation(detectedLatitude, detectedLongitude)
     }
     function chooseManualLocation() {
         cfg_autoDetectLocation = false; showDetectedLocationDialog = false; openSearchPage()
@@ -70,11 +72,68 @@ KCM.SimpleKCM {
     property string preferredLanguage: Qt.locale().name.split("_")[0]
     readonly property string bundledOpenWeatherApiKey: "8003225e8825db83758c237068447229"
     readonly property string bundledWeatherApiKey: "601ba4ac57404ec29ff120510261802"
-    property bool searchBusy: false
-    property int  searchRequestId: 0
-    property int  pageIndex: 0
-
     function displayAltitudeUnit() { return cfg_altitudeUnit === "ft" ? "feet" : "meters" }
+
+    // ── Provider location check state ───────────────────────────────────
+    // 0 = idle, 1 = checking, 2 = ok, 3 = error
+    property int locationCheckState: 0
+    property string locationCheckMessage: ""
+
+    function verifyProviderLocation(lat, lon) {
+        var provider = cfg_weatherProvider;
+        if (provider === "adaptive" || provider === "openMeteo") {
+            locationCheckState = 0;
+            return;  // Open-Meteo always works
+        }
+        locationCheckState = 1;
+        locationCheckMessage = i18n("Checking location availability…");
+
+        var req = new XMLHttpRequest();
+        var url;
+        if (provider === "openWeather") {
+            var owKey = (Plasmoid.configuration.owApiKey || "").trim();
+            if (!owKey) { locationCheckState = 0; return; }
+            url = "https://api.openweathermap.org/data/2.5/weather?lat="
+                + encodeURIComponent(lat) + "&lon=" + encodeURIComponent(lon)
+                + "&units=metric&appid=" + encodeURIComponent(owKey);
+        } else if (provider === "weatherApi") {
+            var waKey = (Plasmoid.configuration.waApiKey || "").trim();
+            if (!waKey) { locationCheckState = 0; return; }
+            url = "https://api.weatherapi.com/v1/current.json?key="
+                + encodeURIComponent(waKey)
+                + "&q=" + encodeURIComponent(lat + "," + lon);
+        } else if (provider === "metno") {
+            url = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat="
+                + encodeURIComponent(lat) + "&lon=" + encodeURIComponent(lon);
+        } else {
+            locationCheckState = 0;
+            return;
+        }
+        req.open("GET", url);
+        if (provider === "metno")
+            req.setRequestHeader("User-Agent",
+                "AdvancedWeatherWidget/1.0 github.com/pnedyalkov91/advanced-weather-widget");
+        req.onreadystatechange = function () {
+            if (req.readyState !== XMLHttpRequest.DONE)
+                return;
+            var pLabel = providerDisplayNameFor(provider);
+            if (req.status === 200) {
+                locationCheckState = 2;
+                locationCheckMessage = i18n("Location is available on %1.", pLabel);
+            } else {
+                locationCheckState = 3;
+                locationCheckMessage = i18n("Location is not available on %1 (HTTP %2). Try a different provider or location.", pLabel, req.status);
+            }
+        };
+        req.send();
+    }
+
+    function providerDisplayNameFor(p) {
+        if (p === "openWeather") return "OpenWeatherMap";
+        if (p === "weatherApi") return "WeatherAPI.com";
+        if (p === "metno") return "met.no";
+        return "Open-Meteo";
+    }
 
     // Returns "(GMT +2)" / "(GMT -5:30)" for any IANA timezone identifier.
     // We compute the UTC offset by formatting the same Date in the target timezone
@@ -136,170 +195,7 @@ KCM.SimpleKCM {
         return cfg_locationName && cfg_locationName.length > 0 ? cfg_locationName : i18n("None Selected")
     }
     function openSearchPage() {
-        searchPanel.selectedResult = null; searchPanel.selectedIndex = -1
-        resultsList.currentIndex = -1; searchField.text = ""
-        searchResults = []; searchBusy = false; root.pageIndex = 1
-    }
-    function closeSearchPage() { root.pageIndex = 0; searchBusy = false }
-
-    function performSearch(query) {
-        if (!query || query.trim().length < 2) {
-            searchResults = []; searchPanel.selectedResult = null
-            searchPanel.selectedIndex = -1; resultsList.currentIndex = -1; searchBusy = false; return
-        }
-        var q = query.trim()
-        var requestId = ++searchRequestId
-        searchBusy = true; searchResults = []; searchPanel.selectedResult = null
-        searchPanel.selectedIndex = -1; resultsList.currentIndex = -1
-        var collected = [], pending = 0
-
-        function queueRequest() { pending += 1 }
-
-        function done() {
-            pending -= 1
-            if (pending > 0) return
-            if (requestId !== searchRequestId) return
-            // Deduplicate by lat/lon rounded to 3 decimal places (~100 m grid).
-            // Results from different sources that refer to the same physical place
-            // will collapse into a single entry (the first one encountered wins).
-            var dedup = {}, finalList = []
-            for (var i = 0; i < collected.length; ++i) {
-                var item = collected[i]
-                var key  = Number(item.latitude).toFixed(3) + "|" + Number(item.longitude).toFixed(3)
-                if (!dedup[key]) { dedup[key] = true; finalList.push(item) }
-            }
-            searchResults = finalList; searchBusy = false
-            searchPanel.selectedResult = null; searchPanel.selectedIndex = -1; resultsList.currentIndex = -1
-        }
-
-        // ── Nominatim (OpenStreetMap) ─────────────────────────────────────
-        // Primary geocoder for every weather provider.
-        //
-        // The query is forwarded exactly as typed — no language forcing,
-        // no country appending, no Cyrillic detection tricks.
-        // Nominatim already understands Bulgarian (and most other scripts)
-        // natively; adding country suffixes only narrows the result set.
-        //
-        // accept-language mirrors the user's system locale so that place
-        // names are returned in that language where OSM has them, falling
-        // back to English.  This is a preference hint, not a filter —
-        // results for locations that have no local-language name will still
-        // appear in whatever language OSM has for them.
-        //
-        // display_name from Nominatim is a fully localised, human-readable
-        // address string (e.g. "Цaревци, община Павликени, …, България")
-        // and is used verbatim as the list label.  The individual address
-        // fields (city, state, country) are also stored so that
-        // applySearchResult can build a shorter saved name.
-        function fetchNominatim() {
-            queueRequest()
-            var req = new XMLHttpRequest()
-            // If the query contains Cyrillic characters, explicitly request
-            // Cyrillic-script names from Nominatim (covering BG/RU/UK/SR/MK).
-            // Otherwise use the system locale with English fallback.
-            // IMPORTANT: accept-language value must NOT be percent-encoded —
-            // the commas and semicolons are syntactically significant to the
-            // parser and encodeURIComponent() breaks the language negotiation,
-            // causing Nominatim to ignore the preference and return English.
-            var hasCyrillic = /[Ѐ-ӿ]/.test(q)
-            var lang = hasCyrillic
-                       ? "bg,ru,uk,sr,mk,en;q=0.3"
-                       : (preferredLanguage.length > 0 ? preferredLanguage + ",en;q=0.8" : "en")
-            var url  = "https://nominatim.openstreetmap.org/search"
-                     + "?q="               + encodeURIComponent(q)
-                     + "&format=json"
-                     + "&limit=20"
-                     + "&addressdetails=1"
-                     + "&accept-language=" + lang   // raw — commas must be literal
-            req.open("GET", url)
-            req.setRequestHeader("User-Agent", "AdvancedWeatherWidget/1.0 (KDE Plasma plasmoid)")
-            req.onreadystatechange = function() {
-                if (req.readyState !== XMLHttpRequest.DONE) return
-                if (requestId !== searchRequestId) return
-                if (req.status === 200) {
-                    JSON.parse(req.responseText).forEach(function(item) {
-                        var a        = item.address || {}
-                        // Most-specific settlement name available
-                        var city     = a.city || a.town || a.village || a.hamlet
-                                     || a.suburb || a.municipality || a.county || ""
-                        // state_district is the municipality/district level (e.g. "Омуртаг")
-                        // state is the province level (e.g. "Търговище")
-                        // Both are preserved so applySearchResult can build the full name.
-                        var district = a.state_district || a.county || ""
-                        var state    = a.state || a.region || ""
-                        var country  = a.country || ""
-                        collected.push({
-                            name:                 city.length > 0 ? city : item.display_name,
-                            admin1:               state,
-                            district:             district,
-                            country:              country,
-                            latitude:             parseFloat(item.lat),
-                            longitude:            parseFloat(item.lon),
-                            timezone:             "",
-                            elevation:            undefined,
-                            provider:             "OpenStreetMap",
-                            providerKey:          "nominatim",
-                            // display_name is the authoritative, fully-localised label.
-                            // It already contains all address levels in the correct order
-                            // and is used both as the list label and as the saved name.
-                            localizedDisplayName: item.display_name
-                        })
-                    })
-                }
-                done()
-            }
-            req.send()
-        }
-
-        // ── Open-Meteo geocoder ───────────────────────────────────────────
-        // Used as a supplement when the selected weather provider is
-        // Open-Meteo, met.no, or adaptive.  These APIs work at the level
-        // of weather-station coverage, so surfacing their station database
-        // helps for rural or remote locations that OSM may rank poorly.
-        // No language parameter: Open-Meteo's geocoder only returns English
-        // names regardless, so passing a language just creates noisy dupes.
-        function fetchOpenMeteo() {
-            queueRequest()
-            var req = new XMLHttpRequest()
-            req.open("GET", "https://geocoding-api.open-meteo.com/v1/search"
-                + "?count=10&format=json&name=" + encodeURIComponent(q))
-            req.onreadystatechange = function() {
-                if (req.readyState !== XMLHttpRequest.DONE) return
-                if (requestId !== searchRequestId) return
-                if (req.status === 200) {
-                    var list = JSON.parse(req.responseText).results || []
-                    list.forEach(function(it) {
-                        collected.push({
-                            name:                 it.name || "",
-                            admin1:               it.admin1 || "",
-                            country:              it.country || "",
-                            latitude:             parseFloat(it.latitude),
-                            longitude:            parseFloat(it.longitude),
-                            timezone:             it.timezone || "",
-                            elevation:            it.elevation,
-                            provider:             "Open-Meteo",
-                            providerKey:          "open-meteo",
-                            localizedDisplayName: (it.name || "")
-                                + (it.admin1  ? ", " + it.admin1  : "")
-                                + (it.country ? ", " + it.country : "")
-                        })
-                    })
-                }
-                done()
-            }
-            req.send()
-        }
-
-        // Nominatim runs for every provider — it is the universal geocoder.
-        fetchNominatim()
-
-        // For providers whose data grids are tied to their own station
-        // databases (Open-Meteo, met.no, adaptive) also query Open-Meteo's
-        // geocoder to surface stations that OSM searches may not rank highly.
-        var prov = cfg_weatherProvider && cfg_weatherProvider.length > 0
-                   ? cfg_weatherProvider : "adaptive"
-        if (prov === "adaptive" || prov === "openMeteo" || prov === "metno")
-            fetchOpenMeteo()
+        stack.push(searchSubPage)
     }
 
     function reverseGeocode(lat, lon) {
@@ -450,6 +346,9 @@ KCM.SimpleKCM {
             }
         }
         tzReq.send()
+
+        // Verify the new location is available on the current provider
+        verifyProviderLocation(lat, lon)
     }
 
     onCfg_autoDetectLocationChanged: {
@@ -491,8 +390,6 @@ KCM.SimpleKCM {
             }
         }
     }
-
-    Timer { id: searchDebounce; interval: 120; repeat: false; onTriggered: root.performSearch(searchField.text) }
 
     Kirigami.Dialog {
         id: detectedLocationDialog
@@ -545,252 +442,190 @@ KCM.SimpleKCM {
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    Item {
-        anchors.fill: parent; clip: true
+    StackView {
+        id: stack
+        anchors.fill: parent
+        initialItem: mainPage
+    }
 
-        Row {
-            id: pageRow; height: parent.height; width: parent.width * 2
-            x: -root.pageIndex * parent.width
-            Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.InOutCubic } }
+    Component {
+        id: mainPage
+        Item {
+            ColumnLayout {
+                anchors.fill: parent; spacing: 10
 
-            // ── PAGE 0: Main location settings ────────────────────────────
-            Item {
-                width: parent.width / 2; height: parent.height
+                ButtonGroup { id: locationModeGroup }
 
+                // ── Auto-detect radio ──────────────────────────────────
                 ColumnLayout {
-                    anchors.fill: parent; spacing: 10
+                    Layout.fillWidth: true; spacing: 4
 
-                    ButtonGroup { id: locationModeGroup }
-
-                    // ── Auto-detect radio ──────────────────────────────────
-                    ColumnLayout {
-                        Layout.fillWidth: true; spacing: 4
-
-                        RadioButton {
-                            text: i18n("Automatically detect location")
-                            checked: root.cfg_autoDetectLocation
-                            ButtonGroup.group: locationModeGroup
-                            onClicked: root.cfg_autoDetectLocation = true
+                    RadioButton {
+                        text: i18n("Automatically detect location")
+                        checked: root.cfg_autoDetectLocation
+                        ButtonGroup.group: locationModeGroup
+                        onClicked: root.cfg_autoDetectLocation = true
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true; Layout.leftMargin: 24; spacing: 8
+                        Label {
+                            Layout.fillWidth: true; wrapMode: Text.WordWrap; opacity: 0.78
+                            text: root.autoDetectBusy ? i18n("Detecting…")
+                                  : (root.autoDetectStatus.length > 0 ? root.autoDetectStatus
+                                  : i18n("Location detection is depending on system configuration and permissions."))
                         }
-                        RowLayout {
-                            Layout.fillWidth: true; Layout.leftMargin: 24; spacing: 8
-                            Label {
-                                Layout.fillWidth: true; wrapMode: Text.WordWrap; opacity: 0.78
-                                text: root.autoDetectBusy ? i18n("Detecting…")
-                                      : (root.autoDetectStatus.length > 0 ? root.autoDetectStatus
-                                      : i18n("Location detection is depending on system configuration and permissions."))
-                            }
-                            Button {
-                                text: i18n("Refresh"); visible: root.cfg_autoDetectLocation
-                                enabled: root.cfg_autoDetectLocation && !root.autoDetectBusy
-                                onClicked: root.refreshAutoDetectedLocation()
-                            }
-                        }
-
-                        // ── Manual radio with inline Change Location button ─
-                        Item { Layout.preferredHeight: 4 }
-                        RadioButton {
-                            text: i18n("Use manual location")
-                            checked: !root.cfg_autoDetectLocation
-                            ButtonGroup.group: locationModeGroup
-                            onClicked: root.cfg_autoDetectLocation = false
-                        }
-                        RowLayout {
-                            Layout.fillWidth: true; Layout.leftMargin: 24; spacing: 8
-                            visible: !root.cfg_autoDetectLocation
-                            Label {
-                                Layout.fillWidth: true; wrapMode: Text.WordWrap; opacity: 0.78
-                                text: i18n("Click \'Change Location\' to search and set your location manually.")
-                            }
-                            Button {
-                                text: i18n("Change Location")
-                                enabled: !root.cfg_autoDetectLocation
-                                onClicked: root.openSearchPage()
-                            }
+                        Button {
+                            text: i18n("Refresh"); visible: root.cfg_autoDetectLocation
+                            enabled: root.cfg_autoDetectLocation && !root.autoDetectBusy
+                            onClicked: root.refreshAutoDetectedLocation()
                         }
                     }
 
-                    // ── Location information section header ─────────────────
+                    // ── Manual radio with inline Change Location button ─
                     Item { Layout.preferredHeight: 4 }
+                    RadioButton {
+                        text: i18n("Use manual location")
+                        checked: !root.cfg_autoDetectLocation
+                        ButtonGroup.group: locationModeGroup
+                        onClicked: root.cfg_autoDetectLocation = false
+                    }
                     RowLayout {
-                        Layout.fillWidth: true; spacing: 8
-                        Kirigami.Heading {
-                            text: i18n("Location information")
-                            level: 4
+                        Layout.fillWidth: true; Layout.leftMargin: 24; spacing: 8
+                        visible: !root.cfg_autoDetectLocation
+                        Label {
+                            Layout.fillWidth: true; wrapMode: Text.WordWrap; opacity: 0.78
+                            text: i18n("Click \'Change Location\' to search and set your location manually.")
                         }
-                        Rectangle {
-                            Layout.fillWidth: true; height: 1
-                            color: Kirigami.Theme.separatorColor
-                            opacity: 0.6
+                        Button {
+                            text: i18n("Change Location")
+                            enabled: !root.cfg_autoDetectLocation
+                            onClicked: root.openSearchPage()
                         }
                     }
+                }
 
-                    // ── Location fields (read-only display) ─────────────────
-                    // All fields use the same TextField style so they look identical.
-                    // Units are embedded in the text value, not external labels.
-                    GridLayout {
+                // ── Location information section header ─────────────────
+                Item { Layout.preferredHeight: 4 }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 8
+                    Kirigami.Heading {
+                        text: i18n("Location information")
+                        level: 4
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true; height: 1
+                        color: Kirigami.Theme.separatorColor
+                        opacity: 0.6
+                    }
+                }
+
+                // ── Location fields (read-only display) ─────────────────
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 2; columnSpacing: 10; rowSpacing: 8
+
+                    Label { text: i18n("Location name:") }
+                    TextField {
                         Layout.fillWidth: true
-                        columns: 2; columnSpacing: 10; rowSpacing: 8
-
-                        Label { text: i18n("Location name:") }
-                        TextField {
-                            Layout.fillWidth: true
-                            id: locationNameField
-                            text: root.cfg_locationName
-                            readOnly: true
-                            background: Rectangle {
-                                color: Qt.rgba(0.5, 0.5, 0.5, 0.15)
-                                border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
-                                border.width: 1; radius: 4
-                            }
-                        }
-
-                        Label { text: i18n("Latitude:") }
-                        TextField {
-                            Layout.fillWidth: true
-                            id: latField
-                            text: {
-                                var v = root.cfg_latitude
-                                if (v === 0.0) return "0°"
-                                return v.toFixed(7).replace(/\.?0+$/, "") + "°"
-                            }
-                            readOnly: true
-                            background: Rectangle {
-                                color: Qt.rgba(0.5, 0.5, 0.5, 0.15)
-                                border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
-                                border.width: 1; radius: 4
-                            }
-                        }
-
-                        Label { text: i18n("Longitude:") }
-                        TextField {
-                            Layout.fillWidth: true
-                            id: lonField
-                            text: {
-                                var v = root.cfg_longitude
-                                if (v === 0.0) return "0°"
-                                return v.toFixed(7).replace(/\.?0+$/, "") + "°"
-                            }
-                            readOnly: true
-                            background: Rectangle {
-                                color: Qt.rgba(0.5, 0.5, 0.5, 0.15)
-                                border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
-                                border.width: 1; radius: 4
-                            }
-                        }
-
-                        Label { text: i18n("Altitude:") }
-                        TextField {
-                            Layout.fillWidth: true
-                            id: altField
-                            text: root.cfg_altitude + " m"
-                            readOnly: true
-                            background: Rectangle {
-                                color: Qt.rgba(0.5, 0.5, 0.5, 0.15)
-                                border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
-                                border.width: 1; radius: 4
-                            }
-                        }
-
-                        Label { text: i18n("Timezone:") }
-                        TextField {
-                            Layout.fillWidth: true
-                            id: timezoneField
-                            text: {
-                                var tz = root.cfg_timezone
-                                if (!tz || tz.length === 0) return ""
-                                var offset = root.gmtOffsetLabel(tz)
-                                return offset.length > 0 ? tz + " " + offset : tz
-                            }
-                            readOnly: true
-                            background: Rectangle {
-                                color: Qt.rgba(0.5, 0.5, 0.5, 0.15)
-                                border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
-                                border.width: 1; radius: 4
-                            }
+                        id: locationNameField
+                        text: root.cfg_locationName
+                        readOnly: true
+                        background: Rectangle {
+                            color: Qt.rgba(0.5, 0.5, 0.5, 0.15)
+                            border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
+                            border.width: 1; radius: 4
                         }
                     }
 
-                    Item { Layout.fillHeight: true }
-                }
-            }
-
-            // ── PAGE 1: Location search ────────────────────────────────────
-            Item {
-                id: searchPanel
-                width: parent.width / 2; height: parent.height
-                property var selectedResult: null
-                property int selectedIndex: -1
-
-                ColumnLayout {
-                    anchors.fill: parent; spacing: 8
-
-                    RowLayout {
-                        Layout.fillWidth: true; spacing: 8
-                        ToolButton { icon.name: "go-previous"; text: i18n("Back"); onClicked: root.closeSearchPage() }
-                        Label { text: i18n("Enter Location"); font.bold: true; font.pixelSize: 16 }
-                        Item { Layout.fillWidth: true }
+                    Label { text: i18n("Latitude:") }
+                    TextField {
+                        Layout.fillWidth: true
+                        id: latField
+                        text: {
+                            var v = root.cfg_latitude
+                            if (v === 0.0) return "0°"
+                            return v.toFixed(7).replace(/\.?0+$/, "") + "°"
+                        }
+                        readOnly: true
+                        background: Rectangle {
+                            color: Qt.rgba(0.5, 0.5, 0.5, 0.15)
+                            border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
+                            border.width: 1; radius: 4
+                        }
                     }
 
-                    Label { text: i18n("Location:") + "  " + root.currentLocationDisplayName(); elide: Text.ElideRight; Layout.fillWidth: true }
-
-                    RowLayout { Layout.fillWidth: true; spacing: 6
-                        TextField {
-                            id: searchField; Layout.fillWidth: true
-                            placeholderText: i18n("Enter Location"); selectByMouse: true
-                            onTextChanged: {
-                                searchPanel.selectedResult = null; searchPanel.selectedIndex = -1; resultsList.currentIndex = -1
-                                if (text.trim().length < 2) { root.searchResults = []; root.searchBusy = false; return }
-                                searchDebounce.restart()
-                            }
-                            onAccepted: root.performSearch(text)
+                    Label { text: i18n("Longitude:") }
+                    TextField {
+                        Layout.fillWidth: true
+                        id: lonField
+                        text: {
+                            var v = root.cfg_longitude
+                            if (v === 0.0) return "0°"
+                            return v.toFixed(7).replace(/\.?0+$/, "") + "°"
                         }
-                        ToolButton { text: "✕"; visible: searchField.text.length > 0
-                                     onClicked: { searchField.clear(); root.searchResults = []; root.searchBusy = false } }
+                        readOnly: true
+                        background: Rectangle {
+                            color: Qt.rgba(0.5, 0.5, 0.5, 0.15)
+                            border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
+                            border.width: 1; radius: 4
+                        }
                     }
 
-                    Item { Layout.fillWidth: true; Layout.fillHeight: true
-                        ListView {
-                            id: resultsList; anchors.fill: parent; clip: true
-                            model: root.searchResults; currentIndex: searchPanel.selectedIndex
-                            visible: root.searchResults.length > 0
-                            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; active: resultsList.moving || hovered }
-                            delegate: Rectangle {
-                                required property var modelData; required property int index
-                                width: ListView.view.width; height: 36
-                                color: index === searchPanel.selectedIndex ? Kirigami.Theme.highlightColor : "transparent"
-                                Label {
-                                    anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
-                                    verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
-                                    text: root.formatResultListItem(modelData)
-                                    color: index === searchPanel.selectedIndex ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: {
-                                        searchPanel.selectedIndex = index; searchPanel.selectedResult = modelData
-                                        resultsList.currentIndex = index; root.applySearchResult(modelData)
-                                    }
-                                }
-                            }
+                    Label { text: i18n("Altitude:") }
+                    TextField {
+                        Layout.fillWidth: true
+                        id: altField
+                        text: root.cfg_altitude + " m"
+                        readOnly: true
+                        background: Rectangle {
+                            color: Qt.rgba(0.5, 0.5, 0.5, 0.15)
+                            border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
+                            border.width: 1; radius: 4
                         }
-                        Column {
-                            anchors.centerIn: parent; width: parent.width - 32; spacing: 10
-                            visible: root.searchBusy || root.searchResults.length === 0
-                            BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; running: root.searchBusy; visible: root.searchBusy }
-                            Label {
-                                anchors.horizontalCenter: parent.horizontalCenter; width: parent.width
-                                horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; opacity: 0.9
-                                font.pixelSize: root.searchBusy ? 18 : 30; font.bold: true
-                                text: root.searchBusy ? i18n("Loading locations…")
-                                      : (searchField.text.trim().length < 2
-                                         ? i18n("Search a weather station to set your location")
-                                         : i18n("No weather stations found for '%1'").arg(searchField.text.trim()))
-                            }
+                    }
+
+                    Label { text: i18n("Timezone:") }
+                    TextField {
+                        Layout.fillWidth: true
+                        id: timezoneField
+                        text: {
+                            var tz = root.cfg_timezone
+                            if (!tz || tz.length === 0) return ""
+                            var offset = root.gmtOffsetLabel(tz)
+                            return offset.length > 0 ? tz + " " + offset : tz
+                        }
+                        readOnly: true
+                        background: Rectangle {
+                            color: Qt.rgba(0.5, 0.5, 0.5, 0.15)
+                            border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
+                            border.width: 1; radius: 4
                         }
                     }
                 }
+
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: root.locationCheckState === 2
+                    type: Kirigami.MessageType.Positive
+                    text: root.locationCheckMessage
+                }
+
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: root.locationCheckState === 3
+                    type: Kirigami.MessageType.Error
+                    text: root.locationCheckMessage
+                }
+
+                Item { Layout.fillHeight: true }
             }
+        }
+    }
+
+    Component {
+        id: searchSubPage
+        ConfigLocationSubPage {
+            configRoot: root
         }
     }
 }

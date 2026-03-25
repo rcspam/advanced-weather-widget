@@ -403,7 +403,7 @@ Rectangle {
             }
         }
 
-        // ── Footer: "Updated HH:mm (Provider)" ───────────────────────
+        // ── Footer: "Updated HH:mm · Weather provider: <link>" ─────────
         Item {
             Layout.preferredHeight: 6
         }
@@ -411,12 +411,17 @@ Rectangle {
             Layout.fillWidth: true
             visible: Plasmoid.configuration.showUpdateText !== false && weatherRoot && !weatherRoot.loading && (weatherRoot.updateText || "").length > 0
             text: weatherRoot ? weatherRoot.updateText : ""
+            textFormat: Text.RichText
+            onLinkActivated: function(link) { Qt.openUrlExternally(link) }
             // #2
             color: Kirigami.Theme.textColor
             opacity: 0.32
             font: weatherRoot ? weatherRoot.wf(9, false) : Qt.font({})
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
+            HoverHandler {
+                cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+            }
         }
     }
 }

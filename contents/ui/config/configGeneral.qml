@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kcmutils as KCM
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.plasmoid
 
 KCM.SimpleKCM {
     id: root
@@ -25,6 +26,118 @@ KCM.SimpleKCM {
     readonly property bool isOpenWeather: cfg_weatherProvider === "openWeather"
     readonly property bool isWeatherApi: cfg_weatherProvider === "weatherApi"
     readonly property bool needsKeyUi: isOpenWeather || isWeatherApi
+
+    // ── API key test state ────────────────────────────────────────────────
+    // 0 = idle, 1 = testing, 2 = success, 3 = error
+    property int apiTestState: 0
+    property string apiTestMessage: ""
+
+    // ── Provider location check state ───────────────────────────────────
+    // 0 = idle, 1 = checking, 2 = ok, 3 = error
+    property int locationCheckState: 0
+    property string locationCheckMessage: ""
+
+    function verifyProviderLocation() {
+        var lat = Plasmoid.configuration.latitude;
+        var lon = Plasmoid.configuration.longitude;
+        if (!lat && !lon) {
+            locationCheckState = 0;
+            return;
+        }
+        var provider = cfg_weatherProvider;
+        if (provider === "adaptive" || provider === "openMeteo") {
+            locationCheckState = 0;
+            return;  // Open-Meteo/adaptive always works
+        }
+        locationCheckState = 1;
+        locationCheckMessage = i18n("Checking location availability…");
+
+        var req = new XMLHttpRequest();
+        var url;
+        if (provider === "openWeather") {
+            var owKey = (cfg_owApiKey || "").trim();
+            if (!owKey) { locationCheckState = 0; return; }
+            url = "https://api.openweathermap.org/data/2.5/weather?lat="
+                + encodeURIComponent(lat) + "&lon=" + encodeURIComponent(lon)
+                + "&units=metric&appid=" + encodeURIComponent(owKey);
+        } else if (provider === "weatherApi") {
+            var waKey = (cfg_waApiKey || "").trim();
+            if (!waKey) { locationCheckState = 0; return; }
+            url = "https://api.weatherapi.com/v1/current.json?key="
+                + encodeURIComponent(waKey)
+                + "&q=" + encodeURIComponent(lat + "," + lon);
+        } else if (provider === "metno") {
+            url = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat="
+                + encodeURIComponent(lat) + "&lon=" + encodeURIComponent(lon);
+        } else {
+            locationCheckState = 0;
+            return;
+        }
+        req.open("GET", url);
+        if (provider === "metno")
+            req.setRequestHeader("User-Agent",
+                "AdvancedWeatherWidget/1.0 github.com/pnedyalkov91/advanced-weather-widget");
+        req.onreadystatechange = function () {
+            if (req.readyState !== XMLHttpRequest.DONE)
+                return;
+            var pLabel = root.providerDisplayName(provider);
+            if (req.status === 200) {
+                locationCheckState = 2;
+                locationCheckMessage = i18n("Location is available on %1.", pLabel);
+            } else {
+                locationCheckState = 3;
+                locationCheckMessage = i18n("Location is not available on %1 (HTTP %2). Try a different provider or location.", pLabel, req.status);
+            }
+        };
+        req.send();
+    }
+
+    function providerDisplayName(p) {
+        if (p === "openWeather") return "OpenWeatherMap";
+        if (p === "weatherApi") return "WeatherAPI.com";
+        if (p === "metno") return "met.no";
+        return "Open-Meteo";
+    }
+
+    function testApiKey() {
+        var key = apiKeyField.text.trim();
+        if (!key) {
+            apiTestState = 3;
+            apiTestMessage = i18n("API key is empty.");
+            return;
+        }
+        apiTestState = 1;
+        apiTestMessage = i18n("Testing connection…");
+
+        var req = new XMLHttpRequest();
+        var url;
+        if (root.isOpenWeather) {
+            url = "https://api.openweathermap.org/data/2.5/weather?lat=42.7&lon=23.3&units=metric&appid="
+                + encodeURIComponent(key);
+        } else {
+            url = "https://api.weatherapi.com/v1/current.json?key="
+                + encodeURIComponent(key) + "&q=42.7,23.3";
+        }
+        req.open("GET", url);
+        req.onreadystatechange = function () {
+            if (req.readyState !== XMLHttpRequest.DONE)
+                return;
+            if (req.status === 200) {
+                apiTestState = 2;
+                apiTestMessage = root.isOpenWeather
+                    ? i18n("Connection successful! OpenWeatherMap key is valid.")
+                    : i18n("Connection successful! WeatherAPI.com key is valid.");
+                root.verifyProviderLocation();
+            } else if (req.status === 401 || req.status === 403) {
+                apiTestState = 3;
+                apiTestMessage = i18n("Invalid API key. Please check and try again.");
+            } else {
+                apiTestState = 3;
+                apiTestMessage = i18n("Connection failed (HTTP %1).", req.status);
+            }
+        };
+        req.send();
+    }
 
     // Providers without Adaptive — Adaptive is handled by the switch above
     readonly property var providerModel: [
@@ -147,6 +260,9 @@ KCM.SimpleKCM {
                         currentIndex: root.providerIndexFor(root.cfg_weatherProvider)
                         onActivated: {
                             root.cfg_weatherProvider = root.providerModel[currentIndex].value;
+                            root.apiTestState = 0;
+                            root.locationCheckState = 0;
+                            root.verifyProviderLocation();
                         }
                     }
 
@@ -155,15 +271,34 @@ KCM.SimpleKCM {
                         visible: root.isAdaptive === false
                         opacity: 0.6
                         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                        textFormat: Text.RichText
+                        onLinkActivated: function(link) { Qt.openUrlExternally(link) }
                         text: {
                             if (root.isOpenWeather)
-                                return i18n("Standard provider. API key required below.");
+                                return i18n("Standard provider. API key required below.") + "<br/>" + i18n("Provider website:") + " <a href='https://openweathermap.org'>openweathermap.org</a>";
                             if (root.isWeatherApi)
-                                return i18n("Alternative provider. API key required below.");
+                                return i18n("Alternative provider. API key required below.") + "<br/>" + i18n("Provider website:") + " <a href='https://www.weatherapi.com'>weatherapi.com</a>";
                             if (root.cfg_weatherProvider === "metno")
-                                return i18n("Free Norwegian Meteorological Institute service. No API key needed.");
-                            return i18n("Free and open-source. No API key needed. Recommended.");
+                                return i18n("Free Norwegian Meteorological Institute service. No API key needed.") + "<br/>" + i18n("Provider website:") + " <a href='https://met.no'>met.no</a>";
+                            return i18n("Free and open-source. No API key needed. Recommended.") + "<br/>" + i18n("Provider website:") + " <a href='https://open-meteo.com'>open-meteo.com</a>";
                         }
+                        HoverHandler {
+                            cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        }
+                    }
+
+                    Kirigami.InlineMessage {
+                        Layout.fillWidth: true
+                        visible: root.locationCheckState === 2
+                        type: Kirigami.MessageType.Positive
+                        text: root.locationCheckMessage
+                    }
+
+                    Kirigami.InlineMessage {
+                        Layout.fillWidth: true
+                        visible: root.locationCheckState === 3
+                        type: Kirigami.MessageType.Error
+                        text: root.locationCheckMessage
                     }
                 }
 
@@ -191,6 +326,13 @@ KCM.SimpleKCM {
                             text: root.isOpenWeather ? root.cfg_owApiKey : root.cfg_waApiKey
                             echoMode: TextInput.Password
                             selectByMouse: true
+                            onTextEdited: {
+                                root.apiTestState = 0;
+                                if (root.isOpenWeather)
+                                    root.cfg_owApiKey = text;
+                                else
+                                    root.cfg_waApiKey = text;
+                            }
                             onEditingFinished: {
                                 if (root.isOpenWeather)
                                     root.cfg_owApiKey = text.trim();
@@ -213,12 +355,43 @@ KCM.SimpleKCM {
                             visible: apiKeyField.text.length > 0
                             onClicked: {
                                 apiKeyField.text = "";
+                                root.apiTestState = 0;
                                 if (root.isOpenWeather)
                                     root.cfg_owApiKey = "";
                                 else
                                     root.cfg_waApiKey = "";
                             }
                         }
+
+                        Button {
+                            text: root.apiTestState === 1 ? i18n("Testing…") : i18n("Test API Key")
+                            icon.name: "network-connect"
+                            enabled: apiKeyField.text.trim().length > 0 && root.apiTestState !== 1
+                            onClicked: root.testApiKey()
+                        }
+                    }
+
+                    Kirigami.InlineMessage {
+                        Layout.fillWidth: true
+                        visible: root.needsKeyUi && !root.isAdaptive && apiKeyField.text.trim().length === 0
+                        type: Kirigami.MessageType.Warning
+                        text: root.isOpenWeather
+                            ? i18n("An API key is required for OpenWeatherMap. Weather data cannot be retrieved without it.")
+                            : i18n("An API key is required for WeatherAPI.com. Weather data cannot be retrieved without it.")
+                    }
+
+                    Kirigami.InlineMessage {
+                        Layout.fillWidth: true
+                        visible: root.apiTestState === 2
+                        type: Kirigami.MessageType.Positive
+                        text: root.apiTestMessage
+                    }
+
+                    Kirigami.InlineMessage {
+                        Layout.fillWidth: true
+                        visible: root.apiTestState === 3
+                        type: Kirigami.MessageType.Error
+                        text: root.apiTestMessage
                     }
                 }
             }
