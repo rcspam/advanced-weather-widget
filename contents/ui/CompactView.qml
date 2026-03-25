@@ -293,7 +293,7 @@ PlasmaCore.ToolTipArea {
         if (!weatherRoot)
             return [];
         // Touch every reactive property so this re-evaluates when data changes
-        var _deps = weatherRoot.temperatureC + weatherRoot.windKmh + weatherRoot.windDirection + weatherRoot.humidityPercent + weatherRoot.pressureHpa + weatherRoot.weatherCode + weatherRoot.panelScrollIndex + weatherRoot.sunriseTimeText.length + weatherRoot.sunsetTimeText.length + Plasmoid.configuration.panelItemOrder + Plasmoid.configuration.panelItemIcons + Plasmoid.configuration.panelInfoMode + Plasmoid.configuration.panelSeparator + Plasmoid.configuration.panelSunTimesMode + compactRoot.iconTheme + Plasmoid.configuration.panelIconSize;
+        var _deps = weatherRoot.temperatureC + weatherRoot.windKmh + weatherRoot.windDirection + weatherRoot.humidityPercent + weatherRoot.pressureHpa + weatherRoot.weatherCode + weatherRoot.panelScrollIndex + weatherRoot.sunriseTimeText.length + weatherRoot.sunsetTimeText.length + weatherRoot.moonriseTimeText.length + weatherRoot.moonsetTimeText.length + Plasmoid.configuration.panelItemOrder + Plasmoid.configuration.panelItemIcons + Plasmoid.configuration.panelInfoMode + Plasmoid.configuration.panelSeparator + Plasmoid.configuration.panelSunTimesMode + Plasmoid.configuration.panelMoonPhaseMode + compactRoot.iconTheme + Plasmoid.configuration.panelIconSize;
         return _buildItems();
     }
 
@@ -497,15 +497,14 @@ PlasmaCore.ToolTipArea {
                         : "weather-none-available-symbolic"
                     smooth: true
                 }
-                // Colorful
+                // Colorful / custom
                 Kirigami.Icon {
                     width: parent.iconSz
                     height: parent.iconSz
                     anchors.centerIn: parent
                     visible: compactRoot.mlIconStyle !== "symbolic"
                     source: compactRoot.weatherRoot
-                        ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode,
-                            compactRoot.weatherRoot.isNightTime())
+                        ? compactRoot.weatherRoot.getMultilineModeIconSource()
                         : "weather-none-available"
                     smooth: true
                 }
@@ -599,8 +598,7 @@ PlasmaCore.ToolTipArea {
                     anchors.centerIn: parent
                     visible: compactRoot.mlIconStyle !== "symbolic"
                     source: compactRoot.weatherRoot
-                        ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode,
-                            compactRoot.weatherRoot.isNightTime())
+                        ? compactRoot.weatherRoot.getMultilineModeIconSource()
                         : "weather-none-available"
                     smooth: true
                 }
@@ -834,18 +832,18 @@ PlasmaCore.ToolTipArea {
                     width: compactRoot.simpleSymbolicIconSz
                     height: compactRoot.simpleSymbolicIconSz
                     anchors.centerIn: parent
-                    visible: compactRoot.simpleIconStyle !== "colorful"
+                    visible: compactRoot.simpleIconStyle === "symbolic"
                     source: compactRoot.weatherRoot ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode, compactRoot.weatherRoot.isNightTime(), true) : "weather-none-available-symbolic"
                     smooth: true
                 }
-                // Colorful icon: explicit size + centerIn, same as symbolic.
+                // Colorful / custom icon: explicit size + centerIn, same as symbolic.
                 // anchors.fill was constrained to the post-margin cell (~32 px on a
                 // 48 px panel); explicit size uses _cellSz = Window.height correctly.
                 Kirigami.Icon {
                     width: parent._cellSz
                     height: parent._cellSz
                     anchors.centerIn: parent
-                    visible: compactRoot.simpleIconStyle === "colorful"
+                    visible: compactRoot.simpleIconStyle === "colorful" || compactRoot.simpleIconStyle === "custom"
                     source: compactRoot.weatherRoot ? compactRoot.weatherRoot.getSimpleModeIconSource() : ""
                     smooth: true
                 }
@@ -921,19 +919,19 @@ PlasmaCore.ToolTipArea {
                     width: parent.width
                     height: parent.height
                     anchors.centerIn: parent
-                    visible: compactRoot.simpleIconStyle !== "colorful"
+                    visible: compactRoot.simpleIconStyle === "symbolic"
                     source: compactRoot.weatherRoot
                         ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode,
                             compactRoot.weatherRoot.isNightTime(), true)
                         : "weather-none-available-symbolic"
                     smooth: true
                 }
-                // Colorful icon
+                // Colorful / custom icon
                 Kirigami.Icon {
                     width: parent.width
                     height: parent.height
                     anchors.centerIn: parent
-                    visible: compactRoot.simpleIconStyle === "colorful"
+                    visible: compactRoot.simpleIconStyle === "colorful" || compactRoot.simpleIconStyle === "custom"
                     source: compactRoot.weatherRoot ? compactRoot.weatherRoot.getSimpleModeIconSource() : ""
                     smooth: true
                 }
@@ -1071,6 +1069,66 @@ PlasmaCore.ToolTipArea {
                 if (result.length > 0)
                     pushSep();
                 pushInfoItem(iconInfo, show, stx);
+                return;
+            }
+
+            if (tok === "moonphase") {
+                var moonMode = Plasmoid.configuration.panelMoonPhaseMode || "full";
+
+                // Multi-chip modes: "full" = phase + rise + set, "times" = rise + set, "upcoming" = phase + upcoming
+                if (moonMode === "full" || moonMode === "times" || moonMode === "upcoming") {
+                    var iconSzM = Plasmoid.configuration.panelIconSize || 22;
+                    var svgThemeM = (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light")
+                        ? "symbolic-light" : theme;
+
+                    if (result.length > 0)
+                        pushSep();
+
+                    // Phase chip (only for "full" and "upcoming")
+                    if (moonMode === "full" || moonMode === "upcoming") {
+                        pushInfoItem(iconInfo, show, r.moonPhaseLabel());
+                        pushSpaceSep();
+                    }
+
+                    if (moonMode === "upcoming") {
+                        // upcoming: show next rise or set
+                        var upTok = r._moonUpcoming() === "rise" ? "moonphase-moonrise" : "moonphase-moonset";
+                        var upTime = r._moonUpcoming() === "rise" ? r.formatTimeForDisplay(r.moonriseTimeText) : r.formatTimeForDisplay(r.moonsetTimeText);
+                        pushInfoItem(r.panelItemIconInfo(upTok), show, upTime);
+                    } else {
+                        // full / times: show both rise and set
+                        var mrInfo, msInfo;
+                        if (theme === "wi-font") {
+                            mrInfo = { type: "wi", source: "\uF0C9", svgFallback: "", isMask: false };
+                            msInfo = { type: "wi", source: "\uF0CA", svgFallback: "", isMask: false };
+                        } else if (theme === "custom") {
+                            var cmapM = {};
+                            (Plasmoid.configuration.panelCustomIcons || "").split(";").forEach(function (p) {
+                                var kv = p.split("=");
+                                if (kv.length === 2)
+                                    cmapM[kv[0].trim()] = kv[1].trim();
+                            });
+                            mrInfo = { type: "kde", source: cmapM["moonrise"] || "weather-clear-night", svgFallback: "", isMask: false };
+                            msInfo = { type: "kde", source: cmapM["moonset"] || "weather-clear-night", svgFallback: "", isMask: false };
+                        } else {
+                            mrInfo = IconResolver.resolve("moonrise", iconSzM, compactRoot._iconsBaseDir, svgThemeM);
+                            msInfo = IconResolver.resolve("moonset", iconSzM, compactRoot._iconsBaseDir, svgThemeM);
+                        }
+
+                        pushInfoItem(mrInfo, show, r.formatTimeForDisplay(r.moonriseTimeText));
+                        pushSpaceSep();
+                        pushInfoItem(msInfo, show, r.formatTimeForDisplay(r.moonsetTimeText));
+                    }
+                    return;
+                }
+
+                // Single-chip modes: "phase", "moonrise", "moonset", "upcoming-times"
+                var mtx = r.panelItemTextOnly(tok);
+                if (!mtx || mtx.length === 0)
+                    return;
+                if (result.length > 0)
+                    pushSep();
+                pushInfoItem(iconInfo, show, mtx);
                 return;
             }
 

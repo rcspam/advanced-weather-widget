@@ -139,6 +139,7 @@ ColumnLayout {
                             }
                             // Icon — reflects active tooltip icon theme
                             Item {
+                                visible: model.itemId !== "suntimes" && model.itemId !== "moonphase"
                                 implicitWidth: Kirigami.Units.iconSizes.smallMedium
                                 implicitHeight: Kirigami.Units.iconSizes.smallMedium
                                 opacity: model.itemEnabled ? 1.0 : 0.35
@@ -204,6 +205,98 @@ ColumnLayout {
                                     }
                                 }
                             }
+                            // ── Dual icons for suntimes (sunrise | sunset) ───────
+                            Row {
+                                visible: model.itemId === "suntimes"
+                                spacing: 2
+                                opacity: model.itemEnabled ? 1.0 : 0.35
+                                Kirigami.Icon {
+                                    width: Kirigami.Units.iconSizes.smallMedium
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                    source: {
+                                        var th = configRoot.cfg_tooltipIconTheme;
+                                        if (th === "custom") {
+                                            var _w = configRoot.cfg_tooltipCustomIcons;
+                                            var s = configRoot.getTooltipCustomIcon("suntimes-sunrise");
+                                            return s.length > 0 ? s : "weather-sunrise";
+                                        }
+                                        if (th === "kde") return "weather-sunrise";
+                                        if (th === "wi-font") return "weather-sunrise";
+                                        var sz = configRoot.cfg_tooltipIconSize || 22;
+                                        return configRoot.iconsBase + th + "/" + sz + "/wi-sunrise.svg";
+                                    }
+                                    isMask: configRoot.cfg_tooltipIconTheme === "symbolic"
+                                    color: Kirigami.Theme.textColor
+                                }
+                                Kirigami.Separator {
+                                    width: 1
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                }
+                                Kirigami.Icon {
+                                    width: Kirigami.Units.iconSizes.smallMedium
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                    source: {
+                                        var th = configRoot.cfg_tooltipIconTheme;
+                                        if (th === "custom") {
+                                            var _w = configRoot.cfg_tooltipCustomIcons;
+                                            var s = configRoot.getTooltipCustomIcon("suntimes-sunset");
+                                            return s.length > 0 ? s : "weather-sunset";
+                                        }
+                                        if (th === "kde") return "weather-sunset";
+                                        if (th === "wi-font") return "weather-sunset";
+                                        var sz = configRoot.cfg_tooltipIconSize || 22;
+                                        return configRoot.iconsBase + th + "/" + sz + "/wi-sunset.svg";
+                                    }
+                                    isMask: configRoot.cfg_tooltipIconTheme === "symbolic"
+                                    color: Kirigami.Theme.textColor
+                                }
+                            }
+                            // ── Dual icons for moonphase (moonrise | moonset) ────
+                            Row {
+                                visible: model.itemId === "moonphase"
+                                spacing: 2
+                                opacity: model.itemEnabled ? 1.0 : 0.35
+                                Kirigami.Icon {
+                                    width: Kirigami.Units.iconSizes.smallMedium
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                    source: {
+                                        var th = configRoot.cfg_tooltipIconTheme;
+                                        if (th === "custom") {
+                                            var _w = configRoot.cfg_tooltipCustomIcons;
+                                            var s = configRoot.getTooltipCustomIcon("moonrise");
+                                            return s.length > 0 ? s : "weather-clear-night";
+                                        }
+                                        if (th === "kde") return "weather-clear-night";
+                                        if (th === "wi-font") return "weather-clear-night";
+                                        var sz = configRoot.cfg_tooltipIconSize || 22;
+                                        return configRoot.iconsBase + th + "/" + sz + "/wi-moonrise.svg";
+                                    }
+                                    isMask: configRoot.cfg_tooltipIconTheme === "symbolic"
+                                    color: Kirigami.Theme.textColor
+                                }
+                                Kirigami.Separator {
+                                    width: 1
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                }
+                                Kirigami.Icon {
+                                    width: Kirigami.Units.iconSizes.smallMedium
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                    source: {
+                                        var th = configRoot.cfg_tooltipIconTheme;
+                                        if (th === "custom") {
+                                            var _w = configRoot.cfg_tooltipCustomIcons;
+                                            var s = configRoot.getTooltipCustomIcon("moonset");
+                                            return s.length > 0 ? s : "weather-clear-night";
+                                        }
+                                        if (th === "kde") return "weather-clear-night";
+                                        if (th === "wi-font") return "weather-clear-night";
+                                        var sz = configRoot.cfg_tooltipIconSize || 22;
+                                        return configRoot.iconsBase + th + "/" + sz + "/wi-moonset.svg";
+                                    }
+                                    isMask: configRoot.cfg_tooltipIconTheme === "symbolic"
+                                    color: Kirigami.Theme.textColor
+                                }
+                            }
                             // Labels
                             ColumnLayout {
                                 Layout.fillWidth: true
@@ -222,9 +315,9 @@ ColumnLayout {
                                     opacity: 0.55
                                 }
                             }
-                            // Suntimes settings gear (non-custom themes)
+                            // Sun times / Moon phase configure button (all themes)
                             ToolButton {
-                                visible: model.itemId === "suntimes" && configRoot.cfg_tooltipIconTheme !== "custom"
+                                visible: model.itemId === "suntimes" || model.itemId === "moonphase"
                                 enabled: model.itemEnabled
                                 opacity: model.itemEnabled ? 1.0 : 0.3
                                 implicitWidth: Kirigami.Units.iconSizes.medium
@@ -233,12 +326,32 @@ ColumnLayout {
                                 checkable: true
                                 checked: ttDelegateRoot.settingsExpanded
                                 ToolTip.visible: hovered
-                                ToolTip.text: i18n("Sun times options")
+                                ToolTip.text: model.itemId === "suntimes" ? i18n("Sun times options") : i18n("Moon phase options")
                                 onClicked: ttDelegateRoot.settingsExpanded = !ttDelegateRoot.settingsExpanded
                             }
-                            // Configure icon button (custom theme only)
+                            // Configure icon button (custom theme, suntimes/moonphase) — opens icon-config dialog
                             ToolButton {
-                                visible: configRoot.cfg_tooltipIconTheme === "custom"
+                                visible: configRoot.cfg_tooltipIconTheme === "custom" && (model.itemId === "suntimes" || model.itemId === "moonphase")
+                                enabled: model.itemEnabled
+                                opacity: model.itemEnabled ? 1.0 : 0.3
+                                implicitWidth: Kirigami.Units.iconSizes.medium
+                                implicitHeight: Kirigami.Units.iconSizes.medium
+                                icon.name: "color-picker"
+                                ToolTip.visible: hovered
+                                ToolTip.text: i18n("Configure icon…")
+                                onClicked: {
+                                    iconConfigDialog.context = "tooltip";
+                                    iconConfigDialog.itemId = model.itemId;
+                                    iconConfigDialog.itemLabel = model.itemLabel;
+                                    iconConfigDialog.itemFallback = model.itemFallback;
+                                    iconConfigDialog.isSuntimes = (model.itemId === "suntimes");
+                                    iconConfigDialog.isMoonphase = (model.itemId === "moonphase");
+                                    iconConfigDialog.open();
+                                }
+                            }
+                            // Configure icon button (custom theme, other items)
+                            ToolButton {
+                                visible: configRoot.cfg_tooltipIconTheme === "custom" && model.itemId !== "suntimes" && model.itemId !== "moonphase"
                                 enabled: model.itemEnabled
                                 opacity: model.itemEnabled ? 1.0 : 0.3
                                 implicitWidth: Kirigami.Units.iconSizes.medium
@@ -254,12 +367,8 @@ ColumnLayout {
                                         iconConfigDialog.itemId = model.itemId;
                                         iconConfigDialog.itemLabel = model.itemLabel;
                                         iconConfigDialog.itemFallback = model.itemFallback;
-                                        iconConfigDialog.isSuntimes = (model.itemId === "suntimes");
-                                        for (var i = 0; i < sunModeDialogCombo.model.length; ++i)
-                                            if (sunModeDialogCombo.model[i].value === configRoot.cfg_panelSunTimesMode) {
-                                                sunModeDialogCombo.currentIndex = i;
-                                                break;
-                                            }
+                                        iconConfigDialog.isSuntimes = false;
+                                        iconConfigDialog.isMoonphase = false;
                                         iconConfigDialog.open();
                                     }
                                 }
@@ -312,7 +421,7 @@ ColumnLayout {
                     }
                     // Inline suntimes mode (non-custom themes)
                     RowLayout {
-                        visible: model.itemId === "suntimes" && ttDelegateRoot.settingsExpanded && configRoot.cfg_tooltipIconTheme !== "custom"
+                        visible: model.itemId === "suntimes" && ttDelegateRoot.settingsExpanded
                         Layout.fillWidth: true
                         Layout.leftMargin: Kirigami.Units.iconSizes.smallMedium * 2 + Kirigami.Units.largeSpacing * 2
                         Layout.rightMargin: Kirigami.Units.largeSpacing
@@ -352,6 +461,62 @@ ColumnLayout {
                                     }
                             }
                             onActivated: configRoot.cfg_tooltipSunTimesMode = model[currentIndex].value
+                        }
+                    }
+                    // Inline moon phase options (non-custom themes)
+                    RowLayout {
+                        visible: model.itemId === "moonphase" && ttDelegateRoot.settingsExpanded
+                        Layout.fillWidth: true
+                        Layout.leftMargin: Kirigami.Units.iconSizes.smallMedium * 2 + Kirigami.Units.largeSpacing * 2
+                        Layout.rightMargin: Kirigami.Units.largeSpacing
+                        Layout.bottomMargin: Kirigami.Units.smallSpacing
+                        spacing: Kirigami.Units.largeSpacing
+                        Label {
+                            text: i18n("Moon phase mode:")
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.8
+                        }
+                        ComboBox {
+                            Layout.fillWidth: true
+                            model: [
+                                {
+                                    text: i18n("Phase + moonrise & moonset"),
+                                    value: "full"
+                                },
+                                {
+                                    text: i18n("Phase + upcoming rise/set"),
+                                    value: "upcoming"
+                                },
+                                {
+                                    text: i18n("Moon phase only"),
+                                    value: "phase"
+                                },
+                                {
+                                    text: i18n("Moonrise & moonset only"),
+                                    value: "times"
+                                },
+                                {
+                                    text: i18n("Upcoming rise/set only"),
+                                    value: "upcoming-times"
+                                },
+                                {
+                                    text: i18n("Moonrise only"),
+                                    value: "moonrise"
+                                },
+                                {
+                                    text: i18n("Moonset only"),
+                                    value: "moonset"
+                                }
+                            ]
+                            textRole: "text"
+                            Component.onCompleted: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].value === configRoot.cfg_tooltipMoonPhaseMode) {
+                                        currentIndex = i;
+                                        break;
+                                    }
+                            }
+                            onActivated: configRoot.cfg_tooltipMoonPhaseMode = model[currentIndex].value
                         }
                     }
                     Kirigami.Separator {

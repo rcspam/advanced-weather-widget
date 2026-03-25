@@ -97,7 +97,16 @@ Item {
         anchors.fill: parent
         visible: weatherIcon.iconType === "kde" && weatherIcon.iconSource.length > 0 && !weatherIcon.isMask
         source: weatherIcon.iconSource
-        fallback: "dialog-question"
+        fallback: weatherIcon.svgFallback.length > 0 ? "" : "dialog-question"
+    }
+
+    // ── Bundled SVG fallback for colorful KDE icon ───────────────────────
+    Kirigami.Icon {
+        id: kdeFallbackSvg
+        anchors.fill: parent
+        visible: weatherIcon.iconType === "kde" && !weatherIcon.isMask
+                 && weatherIcon.svgFallback.length > 0 && !kdeIcon.valid
+        source: weatherIcon.svgFallback
     }
 
     // ── KDE system icon (symbolic — monochrome mask) ──────────────────────
@@ -108,7 +117,18 @@ Item {
         source: weatherIcon.iconSource
         isMask: true
         color: weatherIcon.iconColor
-        fallback: "dialog-question-symbolic"
+        fallback: weatherIcon.svgFallback.length > 0 ? "" : "dialog-question-symbolic"
+    }
+
+    // ── Bundled SVG fallback for symbolic KDE icon ────────────────────────
+    Kirigami.Icon {
+        id: kdeSymbolicFallbackSvg
+        anchors.fill: parent
+        visible: weatherIcon.iconType === "kde" && weatherIcon.isMask
+                 && weatherIcon.svgFallback.length > 0 && !kdeSymbolicIcon.valid
+        source: weatherIcon.svgFallback
+        isMask: true
+        color: weatherIcon.iconColor
     }
 
     // ── SVG file icon ─────────────────────────────────────────────────────

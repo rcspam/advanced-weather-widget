@@ -182,6 +182,10 @@ Kirigami.FormLayout {
                 {
                     text: i18n("Symbolic"),
                     value: "symbolic"
+                },
+                {
+                    text: i18n("Custom…"),
+                    value: "custom"
                 }
             ]
             Component.onCompleted: {
@@ -192,6 +196,12 @@ Kirigami.FormLayout {
                     }
             }
             onActivated: panelTab.configRoot.cfg_panelSimpleIconStyle = model[currentIndex].value
+        }
+        Button {
+            visible: panelTab.configRoot.cfg_panelSimpleIconStyle === "custom"
+            text: i18n("Configure weather icons…")
+            icon.name: "color-picker"
+            onClicked: panelTab.configRoot.conditionIconDialog.openWithContext("panel")
         }
     }
 
@@ -359,6 +369,10 @@ Kirigami.FormLayout {
                 {
                     text: i18n("Symbolic (follows theme colour)"),
                     value: "symbolic"
+                },
+                {
+                    text: i18n("Custom…"),
+                    value: "custom"
                 }
             ]
             Component.onCompleted: {
@@ -369,6 +383,12 @@ Kirigami.FormLayout {
                     }
             }
             onActivated: panelTab.configRoot.cfg_panelMultilineIconStyle = model[currentIndex].value
+        }
+        Button {
+            visible: panelTab.configRoot.cfg_panelMultilineIconStyle === "custom"
+            text: i18n("Configure…")
+            icon.name: "color-picker"
+            onClicked: panelTab.configRoot.conditionIconDialog.openWithContext("panel")
         }
         ComboBox {
             id: mlIconSizeCombo
@@ -595,15 +615,15 @@ Kirigami.FormLayout {
                     value: "wi-font"
                 },
                 {
-                    text: i18n("Symbolic (SVG)"),
+                    text: i18n("Symbolic (Bundled)"),
                     value: "symbolic"
                 },
                 {
-                    text: i18n("Flat Color (SVG)"),
+                    text: i18n("Flat Color (Bundled)"),
                     value: "flat-color"
                 },
                 {
-                    text: i18n("3D Oxygen (SVG)"),
+                    text: i18n("3D Oxygen (Bundled)"),
                     value: "3d-oxygen"
                 },
                 {

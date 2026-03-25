@@ -72,6 +72,7 @@ Item {
     readonly property int ttIconSize: Plasmoid.configuration.tooltipIconSize || 22
     readonly property bool ttUseIcons: Plasmoid.configuration.tooltipUseIcons !== false
     readonly property string ttSunTimesMode: Plasmoid.configuration.tooltipSunTimesMode || "both"
+    readonly property string ttMoonPhaseMode: Plasmoid.configuration.tooltipMoonPhaseMode || "full"
 
     readonly property string iconsBaseDir: Qt.resolvedUrl("../icons/")
 
@@ -116,6 +117,8 @@ Item {
                 dewpoint: "\uF078",
                 visibility: "\uF0B6",
                 moonphase: Moon.moonPhaseFontIcon(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)),
+                "moonphase-moonrise": "\uF0C9",
+                "moonphase-moonset": "\uF0CA",
                 "suntimes-sunrise": "\uF051",
                 "suntimes-sunset": "\uF052"
             };
@@ -132,10 +135,16 @@ Item {
                 pressure: "weather-overcast",
                 dewpoint: "raindrop",
                 visibility: "weather-fog",
-                moonphase: "weather-clear-night",
+                "moonphase-moonrise": "weather-clear-night",
+                "moonphase-moonset": "weather-clear-night",
                 "suntimes-sunrise": "weather-sunrise",
                 "suntimes-sunset": "weather-sunset"
             };
+            // Moon phase token: use bundled SVG (shows actual phase) rather than custom icon
+            if (tok === "moonphase") {
+                var moonStemC = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
+                return IconResolver.resolveMoonPhase(moonStemC, ttIconSize, ttRoot.iconsBaseDir, "flat-color");
+            }
             var saved = getTooltipCustomIcon(tok);
             return { type: "kde", source: saved.length > 0 ? saved : (defaults[tok] || ""), svgFallback: "", isMask: false };
         }
@@ -153,6 +162,10 @@ Item {
             var moonStem = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
             return IconResolver.resolveMoonPhase(moonStem, ttIconSize, ttRoot.iconsBaseDir, svgTheme);
         }
+        if (tok === "moonphase-moonrise")
+            return IconResolver.resolve("moonrise", ttIconSize, ttRoot.iconsBaseDir, svgTheme);
+        if (tok === "moonphase-moonset")
+            return IconResolver.resolve("moonset", ttIconSize, ttRoot.iconsBaseDir, svgTheme);
 
         return IconResolver.resolve(tok, ttIconSize, ttRoot.iconsBaseDir, svgTheme);
     }
@@ -239,7 +252,7 @@ Item {
                     model: {
                         if (!ttRoot.weatherRoot || !ttRoot.ttUseIcons)
                             return [];
-                        var _ = ttRoot.weatherRoot.temperatureC + ttRoot.weatherRoot.windKmh + ttRoot.weatherRoot.windDirection + ttRoot.weatherRoot.humidityPercent + ttRoot.weatherRoot.pressureHpa + ttRoot.weatherRoot.weatherCode + ttRoot.weatherRoot.sunriseTimeText.length + ttRoot.weatherRoot.sunsetTimeText.length + ttRoot.ttIconTheme + ttRoot.ttIconSize + ttRoot.ttSunTimesMode;
+                        var _ = ttRoot.weatherRoot.temperatureC + ttRoot.weatherRoot.windKmh + ttRoot.weatherRoot.windDirection + ttRoot.weatherRoot.humidityPercent + ttRoot.weatherRoot.pressureHpa + ttRoot.weatherRoot.weatherCode + ttRoot.weatherRoot.sunriseTimeText.length + ttRoot.weatherRoot.sunsetTimeText.length + ttRoot.weatherRoot.moonriseTimeText.length + ttRoot.weatherRoot.moonsetTimeText.length + ttRoot.ttIconTheme + ttRoot.ttIconSize + ttRoot.ttSunTimesMode + ttRoot.ttMoonPhaseMode;
                         return ttRoot._buildTooltipItems();
                     }
 
@@ -282,7 +295,7 @@ Item {
                     model: {
                         if (!ttRoot.weatherRoot || ttRoot.ttUseIcons)
                             return [];
-                        var _ = ttRoot.weatherRoot.temperatureC + ttRoot.weatherRoot.windKmh + ttRoot.weatherRoot.windDirection + ttRoot.weatherRoot.humidityPercent + ttRoot.weatherRoot.pressureHpa + ttRoot.weatherRoot.weatherCode + ttRoot.weatherRoot.sunriseTimeText.length + ttRoot.weatherRoot.sunsetTimeText.length + ttRoot.ttSunTimesMode;
+                        var _ = ttRoot.weatherRoot.temperatureC + ttRoot.weatherRoot.windKmh + ttRoot.weatherRoot.windDirection + ttRoot.weatherRoot.humidityPercent + ttRoot.weatherRoot.pressureHpa + ttRoot.weatherRoot.weatherCode + ttRoot.weatherRoot.sunriseTimeText.length + ttRoot.weatherRoot.sunsetTimeText.length + ttRoot.weatherRoot.moonriseTimeText.length + ttRoot.weatherRoot.moonsetTimeText.length + ttRoot.ttSunTimesMode + ttRoot.ttMoonPhaseMode;
                         return ttRoot._buildTooltipItems();
                     }
 
@@ -387,7 +400,86 @@ Item {
 
         if (tok === "moonphase") {
             var _age = Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase);
-            return [row("moonphase", i18n(Moon.moonPhaseNameKey(_age)), i18n("Moon:") + " " + i18n(Moon.moonPhaseNameKey(_age)))];
+            var phaseName = i18n(Moon.moonPhaseNameKey(_age));
+            var moonMode = ttMoonPhaseMode;
+            var riseTime = r.formatTimeForDisplay(r.moonriseTimeText);
+            var setTime = r.formatTimeForDisplay(r.moonsetTimeText);
+
+            if (moonMode === "phase")
+                return [row("moonphase", phaseName, i18n("Moon:") + " " + phaseName)];
+
+            if (moonMode === "moonrise")
+                return textMode ? [textRow(i18n("Moonrise:") + " " + riseTime)]
+                    : [iconRow("moonphase-moonrise", riseTime)];
+
+            if (moonMode === "moonset")
+                return textMode ? [textRow(i18n("Moonset:") + " " + setTime)]
+                    : [iconRow("moonphase-moonset", setTime)];
+
+            if (moonMode === "upcoming-times") {
+                // Show next moonrise or moonset
+                function parseMoonMins(s) {
+                    if (!s || s.indexOf(":") < 0) return -1;
+                    var pts = s.split(":");
+                    return parseInt(pts[0]) * 60 + parseInt(pts[1]);
+                }
+                var nowMM = (new Date()).getHours() * 60 + (new Date()).getMinutes();
+                var riseMM = parseMoonMins(r.moonriseTimeText);
+                var setMM = parseMoonMins(r.moonsetTimeText);
+                var useSetM = riseMM >= 0 && nowMM >= riseMM && (setMM < 0 || nowMM < setMM);
+                if (useSetM)
+                    return textMode ? [textRow(i18n("Moonset:") + " " + setTime)]
+                        : [iconRow("moonphase-moonset", setTime)];
+                else
+                    return textMode ? [textRow(i18n("Moonrise:") + " " + riseTime)]
+                        : [iconRow("moonphase-moonrise", riseTime)];
+            }
+
+            if (moonMode === "times") {
+                // Moonrise + moonset only
+                if (textMode) {
+                    return [textRow(i18n("Moonrise:") + " " + riseTime), textRow(i18n("Moonset:") + " " + setTime)];
+                }
+                return [
+                    { iconInfo: ttItemIconInfo("moonphase-moonrise"), showIcon: showIcon, text: riseTime },
+                    { iconInfo: ttItemIconInfo("moonphase-moonset"), showIcon: showIcon, text: setTime }
+                ];
+            }
+
+            if (moonMode === "upcoming") {
+                // Phase + upcoming rise/set
+                var rows2 = [row("moonphase", phaseName, i18n("Moon:") + " " + phaseName)];
+                function parseMoonMins2(s) {
+                    if (!s || s.indexOf(":") < 0) return -1;
+                    var pts = s.split(":");
+                    return parseInt(pts[0]) * 60 + parseInt(pts[1]);
+                }
+                var nowMM2 = (new Date()).getHours() * 60 + (new Date()).getMinutes();
+                var riseMM2 = parseMoonMins2(r.moonriseTimeText);
+                var setMM2 = parseMoonMins2(r.moonsetTimeText);
+                var useSetM2 = riseMM2 >= 0 && nowMM2 >= riseMM2 && (setMM2 < 0 || nowMM2 < setMM2);
+                if (useSetM2)
+                    rows2.push(textMode ? textRow(i18n("Moonset:") + " " + setTime)
+                        : { iconInfo: ttItemIconInfo("moonphase-moonset"), showIcon: showIcon, text: setTime });
+                else
+                    rows2.push(textMode ? textRow(i18n("Moonrise:") + " " + riseTime)
+                        : { iconInfo: ttItemIconInfo("moonphase-moonrise"), showIcon: showIcon, text: riseTime });
+                return rows2;
+            }
+
+            // "full" (default): phase + moonrise + moonset
+            if (textMode) {
+                return [
+                    textRow(i18n("Moon:") + " " + phaseName),
+                    textRow(i18n("Moonrise:") + " " + riseTime),
+                    textRow(i18n("Moonset:") + " " + setTime)
+                ];
+            }
+            return [
+                { iconInfo: ttItemIconInfo("moonphase"), showIcon: showIcon, text: phaseName },
+                { iconInfo: ttItemIconInfo("moonphase-moonrise"), showIcon: showIcon, text: riseTime },
+                { iconInfo: ttItemIconInfo("moonphase-moonset"), showIcon: showIcon, text: setTime }
+            ];
         }
 
         if (tok === "suntimes") {

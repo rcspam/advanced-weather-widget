@@ -191,7 +191,9 @@ function getMoonTimes(date, lat, lng, utcOffsetMins) {
     var x1 = moonAlt(0);
     var riseH = -1, setH = -1;
 
-    for (var i = 1; i <= 24; i++) {
+    // Search up to 30 hours (6 h into next day) so moonset/moonrise events
+    // that spill past midnight are still found.
+    for (var i = 1; i <= 30; i++) {
         var x2 = moonAlt(i - 0.5);
         var x3 = moonAlt(i);
 
@@ -214,13 +216,14 @@ function getMoonTimes(date, lat, lng, utcOffsetMins) {
             if (r1 < -1) r1 = r2;
 
             if (roots === 1) {
-                // r1/r2 are in [-1,1] over the interval [i-1, i];
-                // actual hour = (i-1) + (r+1)*0.5 = i - 0.5 + 0.5*r
-                if (x1 < 0) riseH = i - 0.5 + 0.5 * r1;
-                else         setH  = i - 0.5 + 0.5 * r1;
+                var h1 = i - 0.5 + 0.5 * r1;
+                if (x1 < 0) { if (riseH < 0) riseH = h1; }
+                else        { if (setH  < 0) setH  = h1; }
             } else if (roots === 2) {
-                riseH = i - 0.5 + 0.5 * (ye < 0 ? r2 : r1);
-                setH  = i - 0.5 + 0.5 * (ye < 0 ? r1 : r2);
+                var hr = i - 0.5 + 0.5 * (ye < 0 ? r2 : r1);
+                var hs = i - 0.5 + 0.5 * (ye < 0 ? r1 : r2);
+                if (riseH < 0) riseH = hr;
+                if (setH  < 0) setH  = hs;
             }
         }
 

@@ -317,12 +317,54 @@ PlasmoidItem {
         var code  = weatherCode;
         var night = isNightTime();
         var style = Plasmoid.configuration.panelSimpleIconStyle || "symbolic";
+        // Custom style: use per-condition custom icons from panelCustomIcons
+        if (style === "custom") {
+            var customMap = {};
+            var raw = Plasmoid.configuration.panelCustomIcons || "";
+            if (raw.length > 0) {
+                raw.split(";").forEach(function (pair) {
+                    var kv = pair.split("=");
+                    if (kv.length === 2 && kv[0].trim().length > 0)
+                        customMap[kv[0].trim()] = kv[1].trim();
+                });
+            }
+            if (customMap["condition-custom"] === "1") {
+                var condKey = _resolveConditionKey(code, night);
+                if (condKey in customMap && customMap[condKey].length > 0)
+                    return customMap[condKey];
+            }
+            return W.weatherCodeToIcon(code, night);
+        }
         if (style === "colorful" || theme === "kde" || theme === "custom")
             return W.weatherCodeToIcon(code, night);
         var iconSz = Plasmoid.configuration.panelIconSize || 22;
         var resolvedTheme = (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light")
             ? "symbolic-light" : theme;
         return IconResolver.svgUrl(IconResolver._conditionSvgStem(code, night), iconSz, _iconsBaseDir, resolvedTheme);
+    }
+
+    function getMultilineModeIconSource() {
+        var code  = weatherCode;
+        var night = isNightTime();
+        var style = Plasmoid.configuration.panelMultilineIconStyle || "colorful";
+        if (style === "custom") {
+            var customMap = {};
+            var raw = Plasmoid.configuration.panelCustomIcons || "";
+            if (raw.length > 0) {
+                raw.split(";").forEach(function (pair) {
+                    var kv = pair.split("=");
+                    if (kv.length === 2 && kv[0].trim().length > 0)
+                        customMap[kv[0].trim()] = kv[1].trim();
+                });
+            }
+            if (customMap["condition-custom"] === "1") {
+                var condKey = _resolveConditionKey(code, night);
+                if (condKey in customMap && customMap[condKey].length > 0)
+                    return customMap[condKey];
+            }
+            return W.weatherCodeToIcon(code, night);
+        }
+        return W.weatherCodeToIcon(code, night);
     }
 
     function getSimpleModeIconChar() {
@@ -397,6 +439,25 @@ PlasmoidItem {
         return Moon.moonPhaseFontIcon(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
     }
 
+    /** Compute moonrise / moonset using suncalc.js and update root properties */
+    function _computeMoonTimes() {
+        var lat = Plasmoid.configuration.latitude;
+        var lon = Plasmoid.configuration.longitude;
+        if (isNaN(lat) || isNaN(lon) || (lat === 0 && lon === 0)) {
+            moonriseTimeText = "--";
+            moonsetTimeText = "--";
+            return;
+        }
+        var t = SC.getMoonTimes(new Date(), lat, lon, locationUtcOffsetMins);
+        moonriseTimeText = t.rise || "--";
+        moonsetTimeText  = t.set  || "--";
+    }
+
+    onLoadingChanged: {
+        if (!loading && !isNaN(temperatureC))
+            _computeMoonTimes();
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     // Panel item helpers — used by CompactView to build panel chips
     // ══════════════════════════════════════════════════════════════════════
@@ -453,8 +514,17 @@ PlasmoidItem {
             return "\uF079";        // wi-barometer
         if (tok === "location")
             return "\uF0B1";       // wi-direction (F0B1)
-        if (tok === "moonphase")
+        if (tok === "moonphase") {
+            var mm = Plasmoid.configuration.panelMoonPhaseMode || "full";
+            if (mm === "moonrise") return "\uF0C9";
+            if (mm === "moonset") return "\uF0CA";
+            if (mm === "upcoming-times") return _moonUpcoming() === "rise" ? "\uF0C9" : "\uF0CA";
             return moonPhaseGlyph();
+        }
+        if (tok === "moonphase-moonrise")
+            return "\uF0C9";
+        if (tok === "moonphase-moonset")
+            return "\uF0CA";
         if (tok === "wind")
             return W.windDirectionGlyph(windDirection);
         if (tok === "condition") {
@@ -542,21 +612,7 @@ PlasmoidItem {
                 if (customMap["condition-custom"] === "1") {
                     var code2 = weatherCode;
                     var night2 = isNightTime();
-                    var condKey;
-                    if (code2 === 0)
-                        condKey = night2 ? "condition-clear-night" : "condition-clear";
-                    else if (code2 <= 2)
-                        condKey = night2 ? "condition-cloudy-night" : "condition-cloudy-day";
-                    else if (code2 === 3)
-                        condKey = "condition-overcast";
-                    else if (code2 <= 48)
-                        condKey = "condition-fog";
-                    else if (code2 <= 65)
-                        condKey = "condition-rain";
-                    else if (code2 <= 75)
-                        condKey = "condition-snow";
-                    else
-                        condKey = "condition-storm";
+                    var condKey = _resolveConditionKey(code2, night2);
                     var fallback2 = W.weatherCodeToIcon(code2, night2);
                     var condSaved2 = (condKey in customMap && customMap[condKey].length > 0) ? customMap[condKey] : fallback2;
                     return { type: "kde", source: condSaved2, svgFallback: "", isMask: false };
@@ -574,6 +630,35 @@ PlasmoidItem {
                 var sunDef2 = useSet2 ? "weather-sunset" : "weather-sunrise";
                 var sunSaved2 = (sunKey2 in customMap && customMap[sunKey2].length > 0) ? customMap[sunKey2] : sunDef2;
                 return { type: "kde", source: sunSaved2, svgFallback: "", isMask: false };
+            }
+
+            if (tok === "moonphase" || tok === "moonphase-moonrise" || tok === "moonphase-moonset") {
+                if (tok === "moonphase-moonrise") {
+                    var mrSaved = (("moonrise" in customMap) && customMap["moonrise"].length > 0) ? customMap["moonrise"] : "weather-clear-night";
+                    return { type: "kde", source: mrSaved, svgFallback: "", isMask: false };
+                }
+                if (tok === "moonphase-moonset") {
+                    var msSaved = (("moonset" in customMap) && customMap["moonset"].length > 0) ? customMap["moonset"] : "weather-clear-night";
+                    return { type: "kde", source: msSaved, svgFallback: "", isMask: false };
+                }
+                var mm2 = Plasmoid.configuration.panelMoonPhaseMode || "full";
+                if (mm2 === "moonrise") {
+                    var mrS2 = (("moonrise" in customMap) && customMap["moonrise"].length > 0) ? customMap["moonrise"] : "weather-clear-night";
+                    return { type: "kde", source: mrS2, svgFallback: "", isMask: false };
+                }
+                if (mm2 === "moonset") {
+                    var msS2 = (("moonset" in customMap) && customMap["moonset"].length > 0) ? customMap["moonset"] : "weather-clear-night";
+                    return { type: "kde", source: msS2, svgFallback: "", isMask: false };
+                }
+                if (mm2 === "upcoming-times") {
+                    var utKey = _moonUpcoming() === "rise" ? "moonrise" : "moonset";
+                    var utSaved = ((utKey in customMap) && customMap[utKey].length > 0) ? customMap[utKey] : "weather-clear-night";
+                    return { type: "kde", source: utSaved, svgFallback: "", isMask: false };
+                }
+                // Phase-showing modes: use bundled SVG moon phase icon
+                var iconSzC = Plasmoid.configuration.panelIconSize || 22;
+                var moonStemC = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
+                return IconResolver.resolveMoonPhase(moonStemC, iconSzC, _iconsBaseDir, "flat-color");
             }
 
             var iconName = (tok in customMap && customMap[tok].length > 0) ? customMap[tok] : (tok in defaults ? defaults[tok] : "");
@@ -597,7 +682,15 @@ PlasmoidItem {
             return IconResolver.resolve(sunTok, iconSz, _iconsBaseDir, svgTheme);
         }
 
-        if (tok === "moonphase") {
+        if (tok === "moonphase" || tok === "moonphase-moonrise" || tok === "moonphase-moonset") {
+            if (tok === "moonphase-moonrise")
+                return IconResolver.resolve("moonrise", iconSz, _iconsBaseDir, svgTheme);
+            if (tok === "moonphase-moonset")
+                return IconResolver.resolve("moonset", iconSz, _iconsBaseDir, svgTheme);
+            var mm3 = Plasmoid.configuration.panelMoonPhaseMode || "full";
+            if (mm3 === "moonrise") return IconResolver.resolve("moonrise", iconSz, _iconsBaseDir, svgTheme);
+            if (mm3 === "moonset") return IconResolver.resolve("moonset", iconSz, _iconsBaseDir, svgTheme);
+            if (mm3 === "upcoming-times") return IconResolver.resolve(_moonUpcoming() === "rise" ? "moonrise" : "moonset", iconSz, _iconsBaseDir, svgTheme);
             var moonStem = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
             return IconResolver.resolveMoonPhase(moonStem, iconSz, _iconsBaseDir, svgTheme);
         }
@@ -620,6 +713,41 @@ PlasmoidItem {
         return useSet ? "suntimes-sunset" : "suntimes-sunrise";
     }
 
+    /** Returns "rise" or "set" depending on which moon event is next */
+    function _moonUpcoming() {
+        var nowM = (new Date()).getHours() * 60 + (new Date()).getMinutes();
+        var riseM = parseSunTimeMins(moonriseTimeText);
+        var setM = parseSunTimeMins(moonsetTimeText);
+        if (riseM >= 0 && nowM < riseM) return "rise";
+        if (setM >= 0 && nowM < setM) return "set";
+        return "rise";
+    }
+
+    /** Maps a WMO code + night flag to a condition custom icon key */
+    function _resolveConditionKey(code, night) {
+        if (code === 0) return night ? "condition-clear-night" : "condition-clear";
+        if (code === 1) return night ? "condition-few-clouds-night" : "condition-few-clouds";
+        if (code === 2) return night ? "condition-cloudy-night" : "condition-cloudy-day";
+        if (code === 3) return "condition-overcast";
+        if (code === 45 || code === 48) return "condition-fog";
+        if (code === 51 || code === 53 || code === 55 || code === 61 || code === 80)
+            return night ? "condition-showers-scattered-night" : "condition-showers-scattered-day";
+        if (code === 63 || code === 65 || code === 81 || code === 82)
+            return night ? "condition-showers-night" : "condition-showers-day";
+        if (code === 56 || code === 66)
+            return night ? "condition-freezing-scattered-rain-night" : "condition-freezing-scattered-rain-day";
+        if (code === 57 || code === 67)
+            return night ? "condition-freezing-rain-night" : "condition-freezing-rain-day";
+        if (code === 71 || code === 77 || code === 85)
+            return night ? "condition-snow-scattered-night" : "condition-snow-scattered-day";
+        if (code === 73 || code === 75 || code === 86)
+            return night ? "condition-snow-night" : "condition-snow-day";
+        if (code === 95) return night ? "condition-storm-night" : "condition-storm-day";
+        if (code === 96) return night ? "condition-hail-storm-rain-night" : "condition-hail-storm-rain-day";
+        if (code === 99) return night ? "condition-hail-storm-snow-night" : "condition-hail-storm-snow-day";
+        return night ? "condition-clear-night" : "condition-clear";
+    }
+
 
     /** Returns the display text for a panel chip */
     function panelItemTextOnly(tok) {
@@ -638,8 +766,20 @@ PlasmoidItem {
             return isNaN(humidityPercent) ? "--" : Math.round(humidityPercent) + "%";
         if (tok === "pressure")
             return pressureValue(pressureHpa);
-        if (tok === "moonphase")
+        if (tok === "moonphase" || tok === "moonphase-moonrise" || tok === "moonphase-moonset") {
+            if (tok === "moonphase-moonrise")
+                return formatTimeForDisplay(moonriseTimeText);
+            if (tok === "moonphase-moonset")
+                return formatTimeForDisplay(moonsetTimeText);
+            var mm = Plasmoid.configuration.panelMoonPhaseMode || "full";
+            if (mm === "phase") return moonPhaseLabel();
+            if (mm === "moonrise") return formatTimeForDisplay(moonriseTimeText);
+            if (mm === "moonset") return formatTimeForDisplay(moonsetTimeText);
+            if (mm === "upcoming-times")
+                return _moonUpcoming() === "rise" ? formatTimeForDisplay(moonriseTimeText) : formatTimeForDisplay(moonsetTimeText);
+            // "full", "upcoming", "times" — main chip shows phase label; CompactView handles multi-chip
             return moonPhaseLabel();
+        }
         if (tok === "suntimes") {
             var nowMins = (new Date()).getHours() * 60 + (new Date()).getMinutes();
             var riseMins = parseSunTimeMins(sunriseTimeText);

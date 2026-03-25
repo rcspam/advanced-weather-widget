@@ -23,6 +23,9 @@ KCM.AbstractKCM {
     readonly property bool wiFontReady: wiFont.status === FontLoader.Ready
     readonly property string wiFontFamily: wiFont.status === FontLoader.Ready ? wiFont.font.family : ""
 
+    // Expose the condition icon dialog so external tabs (ConfigWidgetTab) can open it
+    property alias conditionIconDialog: conditionIconDialog
+
     // ── Shared icon-config dialog for the Custom icon theme ─────────────────
     // Opens when the user clicks the configure button on a panel item.
     // For suntimes: shows separate sunrise + sunset icon pickers plus mode combo.
@@ -111,6 +114,36 @@ KCM.AbstractKCM {
                 root.setDetailsCustomIcon("moonset", iconName);
         }
     }
+    // ── Panel moonrise/moonset icon dialogs ──────────────────────────────
+    KIconThemes.IconDialog {
+        id: iconDialogMoonrise
+        onIconNameChanged: {
+            if (iconName)
+                root.setCustomIcon("moonrise", iconName);
+        }
+    }
+    KIconThemes.IconDialog {
+        id: iconDialogMoonset
+        onIconNameChanged: {
+            if (iconName)
+                root.setCustomIcon("moonset", iconName);
+        }
+    }
+    // ── Tooltip moonrise/moonset icon dialogs ────────────────────────────
+    KIconThemes.IconDialog {
+        id: iconDialogTooltipMoonrise
+        onIconNameChanged: {
+            if (iconName)
+                root.setTooltipCustomIcon("moonrise", iconName);
+        }
+    }
+    KIconThemes.IconDialog {
+        id: iconDialogTooltipMoonset
+        onIconNameChanged: {
+            if (iconName)
+                root.setTooltipCustomIcon("moonset", iconName);
+        }
+    }
 
     // ── Per-condition icon picker — single shared KIconThemes dialog ──────────
     // Feeds into conditionIconDialog._tempMap; only committed on OK.
@@ -125,7 +158,7 @@ KCM.AbstractKCM {
     }
 
     // ── Condition icon dialog — redesigned ─────────────────────────────────────
-    // KDE vs Custom switch + 9 per-condition rows + OK / Cancel (temp-state pattern).
+    // KDE vs Custom switch + per-condition rows + OK / Cancel (temp-state pattern).
     Dialog {
         id: conditionIconDialog
         property string context: "panel"   // "panel" | "tooltip"
@@ -133,58 +166,55 @@ KCM.AbstractKCM {
         property var _tempMap: ({})
         property string _tempMapStr: ""    // reactive trigger — updated alongside _tempMap
 
-        // The 9 weather-condition slots (order matches Open-Meteo code ranges)
+        // Weather-condition slots — one per distinct KDE icon from _conditionKdeIcon
         readonly property var conditionSlots: [
-            {
-                key: "condition-clear",
-                label: i18n("Clear (day)"),
-                defaultIcon: "weather-clear"
-            },
-            {
-                key: "condition-clear-night",
-                label: i18n("Clear (night)"),
-                defaultIcon: "weather-clear-night"
-            },
-            {
-                key: "condition-cloudy-day",
-                label: i18n("Partly cloudy (day)"),
-                defaultIcon: "weather-few-clouds"
-            },
-            {
-                key: "condition-cloudy-night",
-                label: i18n("Partly cloudy (night)"),
-                defaultIcon: "weather-few-clouds-night"
-            },
-            {
-                key: "condition-overcast",
-                label: i18n("Overcast"),
-                defaultIcon: "weather-overcast"
-            },
-            {
-                key: "condition-fog",
-                label: i18n("Fog"),
-                defaultIcon: "weather-fog"
-            },
-            {
-                key: "condition-rain",
-                label: i18n("Rain"),
-                defaultIcon: "weather-showers"
-            },
-            {
-                key: "condition-snow",
-                label: i18n("Snow"),
-                defaultIcon: "weather-snow"
-            },
-            {
-                key: "condition-storm",
-                label: i18n("Storm / Thunderstorm"),
-                defaultIcon: "weather-storm"
-            }
+            // ── Clear ──
+            { key: "condition-clear",             label: i18n("Clear (day)"),                        defaultIcon: "weather-clear" },
+            { key: "condition-clear-night",       label: i18n("Clear (night)"),                      defaultIcon: "weather-clear-night" },
+            // ── Mainly clear ──
+            { key: "condition-few-clouds",        label: i18n("Mainly clear (day)"),                 defaultIcon: "weather-few-clouds" },
+            { key: "condition-few-clouds-night",  label: i18n("Mainly clear (night)"),               defaultIcon: "weather-few-clouds-night" },
+            // ── Partly cloudy ──
+            { key: "condition-cloudy-day",        label: i18n("Partly cloudy (day)"),                defaultIcon: "weather-clouds-day" },
+            { key: "condition-cloudy-night",      label: i18n("Partly cloudy (night)"),              defaultIcon: "weather-clouds-night" },
+            // ── Overcast ──
+            { key: "condition-overcast",          label: i18n("Overcast"),                           defaultIcon: "weather-many-clouds" },
+            // ── Fog ──
+            { key: "condition-fog",               label: i18n("Fog"),                                defaultIcon: "weather-fog" },
+            // ── Light rain / Drizzle ──
+            { key: "condition-showers-scattered-day",   label: i18n("Light rain / Drizzle (day)"),   defaultIcon: "weather-showers-scattered-day" },
+            { key: "condition-showers-scattered-night",label: i18n("Light rain / Drizzle (night)"),  defaultIcon: "weather-showers-scattered-night" },
+            // ── Rain ──
+            { key: "condition-showers-day",       label: i18n("Rain (day)"),                         defaultIcon: "weather-showers-day" },
+            { key: "condition-showers-night",     label: i18n("Rain (night)"),                       defaultIcon: "weather-showers-night" },
+            // ── Freezing drizzle / Light freezing rain ──
+            { key: "condition-freezing-scattered-rain-day",  label: i18n("Freezing drizzle (day)"),  defaultIcon: "weather-freezing-scattered-rain-day" },
+            { key: "condition-freezing-scattered-rain-night",label: i18n("Freezing drizzle (night)"),defaultIcon: "weather-freezing-scattered-rain-night" },
+            // ── Freezing rain ──
+            { key: "condition-freezing-rain-day",  label: i18n("Freezing rain (day)"),               defaultIcon: "weather-freezing-rain-day" },
+            { key: "condition-freezing-rain-night",label: i18n("Freezing rain (night)"),             defaultIcon: "weather-freezing-rain-night" },
+            // ── Light snow / Snow grains ──
+            { key: "condition-snow-scattered-day", label: i18n("Light snow (day)"),                  defaultIcon: "weather-snow-scattered-day" },
+            { key: "condition-snow-scattered-night",label: i18n("Light snow (night)"),               defaultIcon: "weather-snow-scattered-night" },
+            // ── Snow ──
+            { key: "condition-snow-day",           label: i18n("Snow (day)"),                        defaultIcon: "weather-snow-day" },
+            { key: "condition-snow-night",         label: i18n("Snow (night)"),                      defaultIcon: "weather-snow-night" },
+            // ── Thunderstorm ──
+            { key: "condition-storm-day",          label: i18n("Thunderstorm (day)"),                defaultIcon: "weather-storm-day" },
+            { key: "condition-storm-night",        label: i18n("Thunderstorm (night)"),              defaultIcon: "weather-storm-night" },
+            // ── Thunderstorm with hail ──
+            { key: "condition-hail-storm-rain-day",  label: i18n("Thunderstorm with hail (day)"),   defaultIcon: "weather-showers-scattered-storm-day" },
+            { key: "condition-hail-storm-rain-night",label: i18n("Thunderstorm with hail (night)"), defaultIcon: "weather-showers-scattered-storm-night" },
+            // ── Thunderstorm with heavy hail ──
+            { key: "condition-hail-storm-snow-day",  label: i18n("Thunderstorm, heavy hail (day)"), defaultIcon: "weather-snow-scattered-storm-day" },
+            { key: "condition-hail-storm-snow-night",label: i18n("Thunderstorm, heavy hail (night)"),defaultIcon: "weather-snow-scattered-storm-night" }
         ]
 
         // Raw config string for the active context
         function _rawConfig() {
-            return context === "tooltip" ? root.cfg_tooltipCustomIcons : root.cfg_panelCustomIcons;
+            if (context === "tooltip") return root.cfg_tooltipCustomIcons;
+            if (context === "widget") return root.cfg_widgetConditionCustomIcons;
+            return root.cfg_panelCustomIcons;
         }
 
         // Open and snapshot current saved state into _tempMap
@@ -243,6 +273,8 @@ KCM.AbstractKCM {
             var serialized = root.serializeCustomIcons(m);
             if (context === "tooltip")
                 root.cfg_tooltipCustomIcons = serialized;
+            else if (context === "widget")
+                root.cfg_widgetConditionCustomIcons = serialized;
             else
                 root.cfg_panelCustomIcons = serialized;
         }
@@ -253,6 +285,7 @@ KCM.AbstractKCM {
         anchors.centerIn: parent
         standardButtons: Dialog.NoButton
         width: 480
+        height: Math.min(implicitHeight, 600)
 
         contentItem: ColumnLayout {
             spacing: Kirigami.Units.largeSpacing
@@ -295,89 +328,96 @@ KCM.AbstractKCM {
                 Layout.maximumWidth: 420
             }
 
-            // ── Custom mode: 9 per-condition rows ─────────────────────────
-            ColumnLayout {
+            // ── Custom mode: scrollable per-condition rows ────────────────
+            ScrollView {
                 visible: conditionIconDialog.useCustom
                 Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: availableWidth
 
-                Repeater {
-                    model: conditionIconDialog.conditionSlots
+                ColumnLayout {
+                    width: parent.width
+                    spacing: Kirigami.Units.smallSpacing
 
-                    delegate: RowLayout {
-                        required property var modelData
-                        Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
+                    Repeater {
+                        model: conditionIconDialog.conditionSlots
 
-                        // Icon preview (custom if set, else KDE default for slot)
-                        Kirigami.Icon {
-                            source: {
-                                var _t = conditionIconDialog._tempMapStr;
-                                var saved = conditionIconDialog._getTempIcon(modelData.key);
-                                return saved.length > 0 ? saved : modelData.defaultIcon;
-                            }
-                            implicitWidth: Kirigami.Units.iconSizes.medium
-                            implicitHeight: Kirigami.Units.iconSizes.medium
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-
-                        // Label + current icon name
-                        ColumnLayout {
+                        delegate: RowLayout {
+                            required property var modelData
                             Layout.fillWidth: true
-                            spacing: 0
-                            Label {
-                                text: modelData.label
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
-                            }
-                            Label {
-                                text: {
+                            spacing: Kirigami.Units.smallSpacing
+
+                            // Icon preview (custom if set, else KDE default for slot)
+                            Kirigami.Icon {
+                                source: {
                                     var _t = conditionIconDialog._tempMapStr;
                                     var saved = conditionIconDialog._getTempIcon(modelData.key);
                                     return saved.length > 0 ? saved : modelData.defaultIcon;
                                 }
-                                font: Kirigami.Theme.smallFont
-                                opacity: 0.55
+                                implicitWidth: Kirigami.Units.iconSizes.medium
+                                implicitHeight: Kirigami.Units.iconSizes.medium
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+
+                            // Label + current icon name
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                elide: Text.ElideRight
+                                spacing: 0
+                                Label {
+                                    text: modelData.label
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+                                Label {
+                                    text: {
+                                        var _t = conditionIconDialog._tempMapStr;
+                                        var saved = conditionIconDialog._getTempIcon(modelData.key);
+                                        return saved.length > 0 ? saved : modelData.defaultIcon;
+                                    }
+                                    font: Kirigami.Theme.smallFont
+                                    opacity: 0.55
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
                             }
-                        }
 
-                        // Browse button
-                        Button {
-                            text: i18n("Browse…")
-                            icon.name: "document-open"
-                            onClicked: {
-                                root._editingConditionKey = modelData.key;
-                                iconDialogCondition.open();
+                            // Browse button
+                            Button {
+                                text: i18n("Browse…")
+                                icon.name: "document-open"
+                                onClicked: {
+                                    root._editingConditionKey = modelData.key;
+                                    iconDialogCondition.open();
+                                }
                             }
-                        }
 
-                        // Reset button (reverts slot to its default)
-                        Button {
-                            text: i18n("Reset")
-                            icon.name: "edit-undo"
-                            enabled: {
-                                var _t = conditionIconDialog._tempMapStr;
-                                return conditionIconDialog._getTempIcon(modelData.key).length > 0;
+                            // Reset button (reverts slot to its default)
+                            Button {
+                                text: i18n("Reset")
+                                icon.name: "edit-undo"
+                                enabled: {
+                                    var _t = conditionIconDialog._tempMapStr;
+                                    return conditionIconDialog._getTempIcon(modelData.key).length > 0;
+                                }
+                                onClicked: conditionIconDialog._setTempIcon(modelData.key, "")
                             }
-                            onClicked: conditionIconDialog._setTempIcon(modelData.key, "")
                         }
                     }
-                }
 
-                Kirigami.Separator {
-                    Layout.fillWidth: true
-                    Layout.topMargin: 4
-                }
+                    Kirigami.Separator {
+                        Layout.fillWidth: true
+                        Layout.topMargin: 4
+                    }
 
-                Button {
-                    text: i18n("Reset All to Defaults")
-                    icon.name: "edit-clear-all"
-                    onClicked: {
-                        conditionIconDialog.conditionSlots.forEach(function (s) {
-                            conditionIconDialog._setTempIcon(s.key, "");
-                        });
+                    Button {
+                        text: i18n("Reset All to Defaults")
+                        icon.name: "edit-clear-all"
+                        onClicked: {
+                            conditionIconDialog.conditionSlots.forEach(function (s) {
+                                conditionIconDialog._setTempIcon(s.key, "");
+                            });
+                        }
                     }
                 }
             }
@@ -532,12 +572,14 @@ KCM.AbstractKCM {
 
                 // Mode selector
                 Label {
+                    visible: false
                     text: i18n("Display mode:")
                     font.bold: true
                     opacity: 0.85
                 }
                 ComboBox {
                     id: sunModeDialogCombo
+                    visible: false
                     Layout.fillWidth: true
                     textRole: "text"
                     model: [
@@ -585,6 +627,7 @@ KCM.AbstractKCM {
                 }
 
                 Kirigami.Separator {
+                    visible: false
                     Layout.fillWidth: true
                     Layout.topMargin: 4
                     Layout.bottomMargin: 4
@@ -685,12 +728,14 @@ KCM.AbstractKCM {
 
                 // Mode selector
                 Label {
+                    visible: false
                     text: i18n("Display mode:")
                     font.bold: true
                     opacity: 0.85
                 }
                 ComboBox {
                     id: moonModeDialogCombo
+                    visible: false
                     Layout.fillWidth: true
                     textRole: "text"
                     model: [
@@ -724,8 +769,10 @@ KCM.AbstractKCM {
                         }
                     ]
                     function _currentMode() {
-                        if (iconConfigDialog.context === "details")
-                            return root.cfg_widgetMoonMode;
+                        if (iconConfigDialog.context === "panel")
+                            return root.cfg_panelMoonPhaseMode;
+                        if (iconConfigDialog.context === "tooltip")
+                            return root.cfg_tooltipMoonPhaseMode;
                         return root.cfg_widgetMoonMode;
                     }
                     Component.onCompleted: {
@@ -738,14 +785,17 @@ KCM.AbstractKCM {
                     }
                     onActivated: {
                         var v = model[currentIndex].value;
-                        if (iconConfigDialog.context === "details")
-                            root.cfg_widgetMoonMode = v;
+                        if (iconConfigDialog.context === "panel")
+                            root.cfg_panelMoonPhaseMode = v;
+                        else if (iconConfigDialog.context === "tooltip")
+                            root.cfg_tooltipMoonPhaseMode = v;
                         else
                             root.cfg_widgetMoonMode = v;
                     }
                 }
 
                 Kirigami.Separator {
+                    visible: false
                     Layout.fillWidth: true
                     Layout.topMargin: 4
                     Layout.bottomMargin: 4
@@ -775,8 +825,12 @@ KCM.AbstractKCM {
                         text: i18n("Browse…")
                         icon.name: "document-open"
                         onClicked: {
-                            if (iconConfigDialog.context === "details")
+                            if (iconConfigDialog.context === "tooltip")
+                                iconDialogTooltipMoonrise.open();
+                            else if (iconConfigDialog.context === "details")
                                 iconDialogDetailsMoonrise.open();
+                            else
+                                iconDialogMoonrise.open();
                         }
                     }
                     Button {
@@ -814,8 +868,12 @@ KCM.AbstractKCM {
                         text: i18n("Browse…")
                         icon.name: "document-open"
                         onClicked: {
-                            if (iconConfigDialog.context === "details")
+                            if (iconConfigDialog.context === "tooltip")
+                                iconDialogTooltipMoonset.open();
+                            else if (iconConfigDialog.context === "details")
                                 iconDialogDetailsMoonset.open();
+                            else
+                                iconDialogMoonset.open();
                         }
                     }
                     Button {
@@ -846,6 +904,7 @@ KCM.AbstractKCM {
     property string cfg_panelItemIcons: "location=1;condition=1;temperature=1;suntimes=1;wind=1;feelslike=1;humidity=1;pressure=1;moonphase=1"
     property string cfg_panelSeparator: " \u2022 "
     property string cfg_panelSunTimesMode: "upcoming"
+    property string cfg_panelMoonPhaseMode: "full"   // "full" | "upcoming" | "upcoming-times" | "phase" | "times" | "moonrise" | "moonset"
     property int cfg_panelItemSpacing: 5
     property bool cfg_panelFillWidth: false
     property int cfg_panelWidth: 0      // 0 = auto; >0 = manual width (per-chip for single, text-col for multiline)
@@ -881,8 +940,9 @@ KCM.AbstractKCM {
     property string cfg_widgetSunTimesMode: "both"   // "both" | "sunrise" | "sunset" | "upcoming"
     property string cfg_widgetMoonMode: "full"        // "full" | "upcoming" | "times"
     property int cfg_widgetIconSize: 16
-    property string cfg_widgetIconTheme: "symbolic"   // "kde" | "kde-symbolic" | "wi-font" | "flat-color" | "symbolic" | "3d-oxygen"
+    property string cfg_widgetIconTheme: "symbolic"   // "kde" | "wi-font" | "flat-color" | "symbolic" | "3d-oxygen"
     property string cfg_conditionIconTheme: "kde"      // controls main hero condition icon in widget popup
+    property string cfg_widgetConditionCustomIcons: ""   // custom per-condition icons for the widget popup
     property int cfg_widgetWidth: 0       // 0 = default 540 px
     property int cfg_widgetHeight: 0       // 0 = default 500 px
     property bool cfg_widgetShowFeelsLike: true
@@ -906,6 +966,7 @@ KCM.AbstractKCM {
     property bool cfg_tooltipEnabled: true
     property bool cfg_tooltipUseIcons: true
     property string cfg_tooltipSunTimesMode: "both" // "both" | "sunrise" | "sunset" | "upcoming"
+    property string cfg_tooltipMoonPhaseMode: "full"  // "full" | "upcoming" | "upcoming-times" | "phase" | "times" | "moonrise" | "moonset"
     property string cfg_tooltipLocationWrap: "truncate"  // "truncate" | "wrap"
     property string cfg_tooltipWidthMode: "auto"
     property int cfg_tooltipWidthManual: 320

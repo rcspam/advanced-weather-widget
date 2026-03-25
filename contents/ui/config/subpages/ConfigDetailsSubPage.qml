@@ -81,124 +81,6 @@ ColumnLayout {
     Kirigami.Separator {
         Layout.fillWidth: true
     }
-    // ── Per-item configure dialog (suntimes / moonphase) — KDE themes only ──
-    Dialog {
-        id: itemCfgDialog
-        property string _itemId: ""
-        title: _itemId === "suntimes" ? i18n("Sunrise/Sunset options") : i18n("Moon phase options")
-        modal: true
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        width: Math.min(420, parent ? parent.width * 0.92 : 420)
-        standardButtons: Dialog.Close
-
-        ColumnLayout {
-            width: parent.width
-            spacing: Kirigami.Units.largeSpacing
-
-            Kirigami.InlineMessage {
-                Layout.fillWidth: true
-                type: Kirigami.MessageType.Information
-                text: i18n("This option affects the item when it's collapsed.")
-                visible: true
-            }
-
-            // ── Sunrise/Sunset options ───────────────────────────────
-            ColumnLayout {
-                visible: itemCfgDialog._itemId === "suntimes"
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-                Label {
-                    text: i18n("Show:")
-                    opacity: 0.75
-                }
-                ComboBox {
-                    id: sunModeCfgCombo
-                    Layout.fillWidth: true
-                    textRole: "text"
-                    model: [
-                        {
-                            text: i18n("Both (sunrise & sunset)"),
-                            value: "both"
-                        },
-                        {
-                            text: i18n("Sunrise only"),
-                            value: "sunrise"
-                        },
-                        {
-                            text: i18n("Sunset only"),
-                            value: "sunset"
-                        },
-                        {
-                            text: i18n("Upcoming (auto)"),
-                            value: "upcoming"
-                        }
-                    ]
-                    currentIndex: {
-                        for (var i = 0; i < model.length; ++i)
-                            if (model[i].value === configRoot.cfg_widgetSunTimesMode)
-                                return i;
-                        return 0;
-                    }
-                    onActivated: configRoot.cfg_widgetSunTimesMode = model[currentIndex].value
-                }
-            }
-
-            // ── Moon Phase options ───────────────────────────────────
-            ColumnLayout {
-                visible: itemCfgDialog._itemId === "moonphase"
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-                Label {
-                    text: i18n("Show:")
-                    opacity: 0.75
-                }
-                ComboBox {
-                    id: moonModeCfgCombo
-                    Layout.fillWidth: true
-                    textRole: "text"
-                    model: [
-                        {
-                            text: i18n("Phase + moonrise & moonset"),
-                            value: "full"
-                        },
-                        {
-                            text: i18n("Phase + upcoming rise/set"),
-                            value: "upcoming"
-                        },
-                        {
-                            text: i18n("Upcoming rise/set only"),
-                            value: "upcoming-times"
-                        },
-                        {
-                            text: i18n("Moon phase only"),
-                            value: "phase"
-                        },
-                        {
-                            text: i18n("Moonrise & moonset only"),
-                            value: "times"
-                        },
-                        {
-                            text: i18n("Moonrise only"),
-                            value: "moonrise"
-                        },
-                        {
-                            text: i18n("Moonset only"),
-                            value: "moonset"
-                        }
-                    ]
-                    currentIndex: {
-                        for (var i = 0; i < model.length; ++i)
-                            if (model[i].value === configRoot.cfg_widgetMoonMode)
-                                return i;
-                        return 0;
-                    }
-                    onActivated: configRoot.cfg_widgetMoonMode = model[currentIndex].value
-                }
-            }
-        }
-    }
-
     ScrollView {
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -256,6 +138,7 @@ ColumnLayout {
                             }
                             // ── Item icon — mirrors the active widget icon theme ──
                             Item {
+                                visible: !((model.itemId === "suntimes" || model.itemId === "moonphase") && configRoot.cfg_widgetIconTheme === "kde")
                                 implicitWidth: Kirigami.Units.iconSizes.smallMedium
                                 implicitHeight: Kirigami.Units.iconSizes.smallMedium
                                 opacity: model.itemEnabled ? 1.0 : 0.35
@@ -273,16 +156,18 @@ ColumnLayout {
                                     anchors.fill: parent
                                     source: model.itemFallback
                                     visible: (configRoot.cfg_widgetIconTheme === "wi-font" && (model.itemWiChar.length === 0 || !configRoot.wiFontReady)) || configRoot.cfg_widgetIconTheme === "kde"
+                                    color: Kirigami.Theme.textColor
                                 }
                                 // KDE custom icon (overridden by the user)
                                 Kirigami.Icon {
                                     anchors.fill: parent
-                                    visible: (configRoot.cfg_widgetIconTheme === "kde" || configRoot.cfg_widgetIconTheme === "kde-symbolic") && configRoot.getDetailsCustomIcon(model.itemId).length > 0
+                                    visible: configRoot.cfg_widgetIconTheme === "kde" && configRoot.getDetailsCustomIcon(model.itemId).length > 0
                                     source: {
                                         var _w = configRoot.cfg_widgetDetailsCustomIcons;
                                         var saved = configRoot.getDetailsCustomIcon(model.itemId);
                                         return saved.length > 0 ? saved : "";
                                     }
+                                    color: Kirigami.Theme.textColor
                                 }
                                 // SVG theme icon (symbolic / flat-color / 3d-oxygen)
                                 Kirigami.Icon {
@@ -314,6 +199,66 @@ ColumnLayout {
                                     color: Kirigami.Theme.textColor
                                 }
                             }
+                            // ── Dual icons for suntimes (KDE themes) ─────────────
+                            Row {
+                                visible: model.itemId === "suntimes" && configRoot.cfg_widgetIconTheme === "kde"
+                                spacing: 2
+                                opacity: model.itemEnabled ? 1.0 : 0.35
+                                Kirigami.Icon {
+                                    width: Kirigami.Units.iconSizes.smallMedium
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                    source: {
+                                        var _w = configRoot.cfg_widgetDetailsCustomIcons;
+                                        var saved = configRoot.getDetailsCustomIcon("suntimes-sunrise");
+                                        return saved.length > 0 ? saved : "weather-clear";
+                                    }
+                                    color: Kirigami.Theme.textColor
+                                }
+                                Kirigami.Separator {
+                                    width: 1
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                }
+                                Kirigami.Icon {
+                                    width: Kirigami.Units.iconSizes.smallMedium
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                    source: {
+                                        var _w = configRoot.cfg_widgetDetailsCustomIcons;
+                                        var saved = configRoot.getDetailsCustomIcon("suntimes-sunset");
+                                        return saved.length > 0 ? saved : "weather-clear";
+                                    }
+                                    color: Kirigami.Theme.textColor
+                                }
+                            }
+                            // ── Dual icons for moonphase (KDE themes) ────────────
+                            Row {
+                                visible: model.itemId === "moonphase" && configRoot.cfg_widgetIconTheme === "kde"
+                                spacing: 2
+                                opacity: model.itemEnabled ? 1.0 : 0.35
+                                Kirigami.Icon {
+                                    width: Kirigami.Units.iconSizes.smallMedium
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                    source: {
+                                        var _w = configRoot.cfg_widgetDetailsCustomIcons;
+                                        var saved = configRoot.getDetailsCustomIcon("moonrise");
+                                        return saved.length > 0 ? saved : "weather-clear-night";
+                                    }
+                                    color: Kirigami.Theme.textColor
+                                }
+                                Kirigami.Separator {
+                                    width: 1
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                }
+                                Kirigami.Icon {
+                                    width: Kirigami.Units.iconSizes.smallMedium
+                                    height: Kirigami.Units.iconSizes.smallMedium
+                                    source: {
+                                        var _w = configRoot.cfg_widgetDetailsCustomIcons;
+                                        var saved = configRoot.getDetailsCustomIcon("moonset");
+                                        return saved.length > 0 ? saved : "weather-clear-night";
+                                    }
+                                    color: Kirigami.Theme.textColor
+                                }
+                            }
                             // ── Labels ───────────────────────────────────────────
                             ColumnLayout {
                                 Layout.fillWidth: true
@@ -332,9 +277,9 @@ ColumnLayout {
                                     opacity: 0.55
                                 }
                             }
-                            // ── Configure button (suntimes / moonphase, non-KDE) ──
+                            // ── Configure button (suntimes / moonphase) ──────────
                             ToolButton {
-                                visible: (model.itemId === "suntimes" || model.itemId === "moonphase") && configRoot.cfg_widgetIconTheme !== "kde" && configRoot.cfg_widgetIconTheme !== "kde-symbolic"
+                                visible: model.itemId === "suntimes" || model.itemId === "moonphase"
                                 enabled: model.itemEnabled
                                 opacity: model.itemEnabled ? 1.0 : 0.3
                                 implicitWidth: Kirigami.Units.iconSizes.medium
@@ -346,24 +291,29 @@ ColumnLayout {
                                 ToolTip.text: model.itemId === "suntimes" ? i18n("Sun times options") : i18n("Moon phase options")
                                 onClicked: detailsDelegateRoot.settingsExpanded = !detailsDelegateRoot.settingsExpanded
                             }
-                            // ── Configure icon button (KDE themes) — opens icon-config dialog ──
+                            // ── Configure icon button (KDE themes, suntimes/moonphase) — opens shared iconConfigDialog ──
                             ToolButton {
-                                visible: (configRoot.cfg_widgetIconTheme === "kde" || configRoot.cfg_widgetIconTheme === "kde-symbolic") && (model.itemId === "suntimes" || model.itemId === "moonphase")
+                                visible: configRoot.cfg_widgetIconTheme === "kde" && (model.itemId === "suntimes" || model.itemId === "moonphase")
                                 enabled: model.itemEnabled
                                 opacity: model.itemEnabled ? 1.0 : 0.3
                                 implicitWidth: Kirigami.Units.iconSizes.medium
                                 implicitHeight: Kirigami.Units.iconSizes.medium
-                                icon.name: "configure"
+                                icon.name: "color-picker"
                                 ToolTip.visible: hovered
-                                ToolTip.text: i18n("Configure\u2026")
+                                ToolTip.text: i18n("Configure icon\u2026")
                                 onClicked: {
-                                    itemCfgDialog._itemId = model.itemId;
-                                    itemCfgDialog.open();
+                                    iconConfigDialog.context = "details";
+                                    iconConfigDialog.itemId = model.itemId;
+                                    iconConfigDialog.itemLabel = model.itemLabel;
+                                    iconConfigDialog.itemFallback = model.itemFallback;
+                                    iconConfigDialog.isSuntimes = (model.itemId === "suntimes");
+                                    iconConfigDialog.isMoonphase = (model.itemId === "moonphase");
+                                    iconConfigDialog.open();
                                 }
                             }
                             // ── Icon picker button (KDE themes, non-suntimes/moonphase) ──
                             ToolButton {
-                                visible: (configRoot.cfg_widgetIconTheme === "kde" || configRoot.cfg_widgetIconTheme === "kde-symbolic") && model.itemId !== "suntimes" && model.itemId !== "moonphase"
+                                visible: configRoot.cfg_widgetIconTheme === "kde" && model.itemId !== "suntimes" && model.itemId !== "moonphase"
                                 enabled: model.itemEnabled
                                 opacity: model.itemEnabled ? 1.0 : 0.3
                                 implicitWidth: Kirigami.Units.iconSizes.medium
@@ -429,7 +379,7 @@ ColumnLayout {
                     }
                     // ── Inline suntimes options (non-KDE themes) ──────────
                     RowLayout {
-                        visible: model.itemId === "suntimes" && detailsDelegateRoot.settingsExpanded && configRoot.cfg_widgetIconTheme !== "kde" && configRoot.cfg_widgetIconTheme !== "kde-symbolic"
+                        visible: model.itemId === "suntimes" && detailsDelegateRoot.settingsExpanded
                         Layout.fillWidth: true
                         Layout.leftMargin: Kirigami.Units.iconSizes.smallMedium * 2 + Kirigami.Units.largeSpacing * 2
                         Layout.rightMargin: Kirigami.Units.largeSpacing
@@ -474,7 +424,7 @@ ColumnLayout {
                     }
                     // ── Inline moonphase options (non-KDE themes) ─────────
                     RowLayout {
-                        visible: model.itemId === "moonphase" && detailsDelegateRoot.settingsExpanded && configRoot.cfg_widgetIconTheme !== "kde" && configRoot.cfg_widgetIconTheme !== "kde-symbolic"
+                        visible: model.itemId === "moonphase" && detailsDelegateRoot.settingsExpanded
                         Layout.fillWidth: true
                         Layout.leftMargin: Kirigami.Units.iconSizes.smallMedium * 2 + Kirigami.Units.largeSpacing * 2
                         Layout.rightMargin: Kirigami.Units.largeSpacing
@@ -529,116 +479,6 @@ ColumnLayout {
                             onActivated: configRoot.cfg_widgetMoonMode = model[currentIndex].value
                         }
                     }
-                    // ── KDE theme sub-icons for suntimes ──────────────────
-                    RowLayout {
-                        visible: model.itemId === "suntimes" && (configRoot.cfg_widgetIconTheme === "kde" || configRoot.cfg_widgetIconTheme === "kde-symbolic")
-                        Layout.fillWidth: true
-                        Layout.leftMargin: Kirigami.Units.iconSizes.smallMedium * 2 + Kirigami.Units.largeSpacing * 2
-                        Layout.rightMargin: Kirigami.Units.largeSpacing
-                        Layout.bottomMargin: Kirigami.Units.smallSpacing
-                        spacing: Kirigami.Units.largeSpacing
-                        // Sunrise icon
-                        Kirigami.Icon {
-                            source: {
-                                var _w = configRoot.cfg_widgetDetailsCustomIcons;
-                                var saved = configRoot.getDetailsCustomIcon("suntimes-sunrise");
-                                return saved.length > 0 ? saved : "weather-clear";
-                            }
-                            implicitWidth: Kirigami.Units.iconSizes.smallMedium
-                            implicitHeight: Kirigami.Units.iconSizes.smallMedium
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Label {
-                            text: i18n("Sunrise icon")
-                            font: Kirigami.Theme.smallFont
-                            opacity: 0.75
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Button {
-                            text: i18n("Browse…")
-                            icon.name: "document-open"
-                            font: Kirigami.Theme.smallFont
-                            onClicked: iconDialogDetailsRise.open()
-                        }
-                        // Sunset icon
-                        Kirigami.Icon {
-                            source: {
-                                var _w = configRoot.cfg_widgetDetailsCustomIcons;
-                                var saved = configRoot.getDetailsCustomIcon("suntimes-sunset");
-                                return saved.length > 0 ? saved : "weather-clear";
-                            }
-                            implicitWidth: Kirigami.Units.iconSizes.smallMedium
-                            implicitHeight: Kirigami.Units.iconSizes.smallMedium
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Label {
-                            text: i18n("Sunset icon")
-                            font: Kirigami.Theme.smallFont
-                            opacity: 0.75
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Button {
-                            text: i18n("Browse…")
-                            icon.name: "document-open"
-                            font: Kirigami.Theme.smallFont
-                            onClicked: iconDialogDetailsSet.open()
-                        }
-                    }
-                    // ── KDE theme sub-icons for moonphase ─────────────────
-                    RowLayout {
-                        visible: model.itemId === "moonphase" && (configRoot.cfg_widgetIconTheme === "kde" || configRoot.cfg_widgetIconTheme === "kde-symbolic")
-                        Layout.fillWidth: true
-                        Layout.leftMargin: Kirigami.Units.iconSizes.smallMedium * 2 + Kirigami.Units.largeSpacing * 2
-                        Layout.rightMargin: Kirigami.Units.largeSpacing
-                        Layout.bottomMargin: Kirigami.Units.smallSpacing
-                        spacing: Kirigami.Units.largeSpacing
-                        // Moonrise icon
-                        Kirigami.Icon {
-                            source: {
-                                var _w = configRoot.cfg_widgetDetailsCustomIcons;
-                                var saved = configRoot.getDetailsCustomIcon("moonrise");
-                                return saved.length > 0 ? saved : "weather-clear-night";
-                            }
-                            implicitWidth: Kirigami.Units.iconSizes.smallMedium
-                            implicitHeight: Kirigami.Units.iconSizes.smallMedium
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Label {
-                            text: i18n("Moonrise icon")
-                            font: Kirigami.Theme.smallFont
-                            opacity: 0.75
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Button {
-                            text: i18n("Browse…")
-                            icon.name: "document-open"
-                            font: Kirigami.Theme.smallFont
-                            onClicked: iconDialogDetailsMoonrise.open()
-                        }
-                        // Moonset icon
-                        Kirigami.Icon {
-                            source: {
-                                var _w = configRoot.cfg_widgetDetailsCustomIcons;
-                                var saved = configRoot.getDetailsCustomIcon("moonset");
-                                return saved.length > 0 ? saved : "weather-clear-night";
-                            }
-                            implicitWidth: Kirigami.Units.iconSizes.smallMedium
-                            implicitHeight: Kirigami.Units.iconSizes.smallMedium
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Label {
-                            text: i18n("Moonset icon")
-                            font: Kirigami.Theme.smallFont
-                            opacity: 0.75
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Button {
-                            text: i18n("Browse…")
-                            icon.name: "document-open"
-                            font: Kirigami.Theme.smallFont
-                            onClicked: iconDialogDetailsMoonset.open()
-                        }
-                    }
                     Kirigami.Separator {
                         Layout.fillWidth: true
                         opacity: 0.4
@@ -690,7 +530,7 @@ ColumnLayout {
                 }
             }
             RowLayout {
-                visible: configRoot.cfg_widgetIconTheme === "kde" || configRoot.cfg_widgetIconTheme === "kde-symbolic"
+                visible: configRoot.cfg_widgetIconTheme === "kde"
                 spacing: 4
                 Kirigami.Icon {
                     source: "color-picker"
@@ -699,6 +539,19 @@ ColumnLayout {
                 }
                 Label {
                     text: i18n("Choose a custom icon for this item")
+                    font: Kirigami.Theme.smallFont
+                    opacity: 0.75
+                }
+            }
+            RowLayout {
+                spacing: 4
+                Kirigami.Icon {
+                    source: "configure"
+                    implicitWidth: Kirigami.Units.iconSizes.small
+                    implicitHeight: Kirigami.Units.iconSizes.small
+                }
+                Label {
+                    text: i18n("Configure display mode options")
                     font: Kirigami.Theme.smallFont
                     opacity: 0.75
                 }

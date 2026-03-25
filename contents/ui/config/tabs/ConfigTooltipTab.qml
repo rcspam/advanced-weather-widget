@@ -184,15 +184,15 @@ Kirigami.FormLayout {
                     value: "wi-font"
                 },
                 {
-                    text: i18n("Symbolic (SVG)"),
+                    text: i18n("Symbolic (Bundled)"),
                     value: "symbolic"
                 },
                 {
-                    text: i18n("Flat Color (SVG)"),
+                    text: i18n("Flat Color (Bundled)"),
                     value: "flat-color"
                 },
                 {
-                    text: i18n("3D Oxygen (SVG)"),
+                    text: i18n("3D Oxygen (Bundled)"),
                     value: "3d-oxygen"
                 },
                 {

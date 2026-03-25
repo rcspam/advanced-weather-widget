@@ -20,16 +20,32 @@ ColumnLayout {
     /** Icon theme choices shared by all combos */
     readonly property var iconThemeModel: [
         { text: i18n("KDE Icon Theme"),        value: "kde"          },
+        { text: i18n("Symbolic (Bundled)"),        value: "symbolic"     },
+        { text: i18n("Flat Color (Bundled)"),      value: "flat-color"   },
+        { text: i18n("3D Oxygen (Bundled)"),       value: "3d-oxygen"    }
+    ]
+
+    /** Condition icon theme choices — adds KDE Symbolic and Custom options */
+    readonly property var conditionIconThemeModel: [
+        { text: i18n("KDE Icon Theme"),        value: "kde"          },
         { text: i18n("KDE Symbolic"),          value: "kde-symbolic" },
-        { text: i18n("Symbolic (SVG)"),        value: "symbolic"     },
-        { text: i18n("Flat Color (SVG)"),      value: "flat-color"   },
-        { text: i18n("3D Oxygen (SVG)"),       value: "3d-oxygen"    }
+        { text: i18n("Symbolic (Bundled)"),        value: "symbolic"     },
+        { text: i18n("Flat Color (Bundled)"),      value: "flat-color"   },
+        { text: i18n("3D Oxygen (Bundled)"),       value: "3d-oxygen"    },
+        { text: i18n("Custom\u2026"),          value: "custom"       }
     ]
 
     function findThemeIndex(theme) {
         if (theme === "wi-font") theme = "symbolic";
         for (var i = 0; i < iconThemeModel.length; ++i)
             if (iconThemeModel[i].value === theme) return i;
+        return 0;
+    }
+
+    function findConditionThemeIndex(theme) {
+        if (theme === "wi-font") theme = "symbolic";
+        for (var i = 0; i < conditionIconThemeModel.length; ++i)
+            if (conditionIconThemeModel[i].value === theme) return i;
         return 0;
     }
 
@@ -60,17 +76,23 @@ ColumnLayout {
         // ── SUB-TAB 0: General ────────────────────────────────────────
         Kirigami.FormLayout {
             RowLayout {
-                Kirigami.FormData.label: i18n("Weather condition icon:")
+                Kirigami.FormData.label: i18n("Weather icon theme:")
                 spacing: Kirigami.Units.largeSpacing
                 ComboBox {
                     id: conditionIconThemeCombo
                     Layout.preferredWidth: 200
                     textRole: "text"
-                    model: widgetTab.iconThemeModel
-                    Component.onCompleted: currentIndex = widgetTab.findThemeIndex(
+                    model: widgetTab.conditionIconThemeModel
+                    Component.onCompleted: currentIndex = widgetTab.findConditionThemeIndex(
                         widgetTab.configRoot.cfg_conditionIconTheme)
                     onActivated: widgetTab.configRoot.cfg_conditionIconTheme = model[currentIndex].value
                 }
+            }
+            Button {
+                visible: widgetTab.configRoot.cfg_conditionIconTheme === "custom"
+                text: i18n("Configure weather icons\u2026")
+                icon.name: "configure"
+                onClicked: widgetTab.configRoot.conditionIconDialog.openWithContext("widget")
             }
             CheckBox {
                 Kirigami.FormData.label: i18n("Footer:")
@@ -123,7 +145,7 @@ ColumnLayout {
             // ── Warning — KDE themes lack some item icons ──
             Kirigami.InlineMessage {
                 Layout.fillWidth: true
-                visible: widgetTab.configRoot.cfg_widgetIconTheme === "kde" || widgetTab.configRoot.cfg_widgetIconTheme === "kde-symbolic"
+                visible: widgetTab.configRoot.cfg_widgetIconTheme === "kde"
                 type: Kirigami.MessageType.Warning
                 text: i18n("KDE icon themes don't fully support many item icons. You can set your own icons by clicking \"Set your own icons\".")
                 showCloseButton: true
@@ -246,19 +268,7 @@ ColumnLayout {
                 value: widgetTab.configRoot.cfg_forecastDays
                 onValueModified: widgetTab.configRoot.cfg_forecastDays = value
             }
-            RowLayout {
-                Kirigami.FormData.label: i18n("Icon theme:")
-                spacing: Kirigami.Units.largeSpacing
-                ComboBox {
-                    id: forecastIconThemeCombo
-                    Layout.preferredWidth: 200
-                    textRole: "text"
-                    model: widgetTab.iconThemeModel
-                    Component.onCompleted: currentIndex = widgetTab.findThemeIndex(
-                        widgetTab.configRoot.cfg_forecastIconTheme)
-                    onActivated: widgetTab.configRoot.cfg_forecastIconTheme = model[currentIndex].value
-                }
-            }
+
         }
     }
 }

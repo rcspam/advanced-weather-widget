@@ -55,7 +55,7 @@ Item {
     readonly property color accentViolet: isDark ? "#c4b4ff" : "#5030a0"
 
     // ── icon theme ────────────────────────────────────────────────────────
-    // Normalise legacy "wi-font" to "symbolic"; "kde" and "kde-symbolic" are valid.
+    // Normalise legacy "wi-font" to "symbolic"; "kde" is valid.
     readonly property string iconTheme: {
         var t = Plasmoid.configuration.widgetIconTheme || "symbolic";
         return (t === "wi-font") ? "symbolic" : t;
@@ -170,14 +170,14 @@ Item {
     }
     /** Resolves an icon for the given detail card ID */
     function resolveIcon(itemId) {
-        if (root.iconTheme === "kde" || root.iconTheme === "kde-symbolic") {
+        if (root.iconTheme === "kde") {
             var custom = getDetailsCustomIcon(itemId);
             if (custom.length > 0)
                 return {
                     type: "kde",
                     source: custom,
                     svgFallback: "",
-                    isMask: (root.iconTheme === "kde-symbolic")
+                    isMask: false
                 };
         }
         return IconResolver.resolve(itemId, root.iconSize, root.iconsBaseDir, root.iconTheme);
@@ -185,7 +185,9 @@ Item {
     /** Resolves the current moon phase icon */
     function resolveMoonPhaseIcon() {
         var stem = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
-        return IconResolver.resolveMoonPhase(stem, root.iconSize, root.iconsBaseDir, root.iconTheme);
+        // Always use bundled SVG for moon phase (flat-color for KDE theme)
+        var theme = (root.iconTheme === "kde") ? "flat-color" : root.iconTheme;
+        return IconResolver.resolveMoonPhase(stem, root.iconSize, root.iconsBaseDir, theme);
     }
     function accentFor(id) {
         return ({
@@ -201,10 +203,10 @@ Item {
             })[id] || root.accentBlue;
     }
 
-    // When the icon theme is symbolic or kde-symbolic, icons should render monochrome (textColor).
+    // When the icon theme is symbolic, icons should render monochrome (textColor).
     // Accent colours are only applied for non-mask themes (flat-color, 3d-oxygen, kde).
     function iconColorFor(c) {
-        return (root.iconTheme === "symbolic" || root.iconTheme === "kde-symbolic") ? Kirigami.Theme.textColor : c;
+        return (root.iconTheme === "symbolic") ? Kirigami.Theme.textColor : c;
     }
     function labelFor(id) {
         return ({
@@ -333,12 +335,11 @@ Item {
 
                             // Card height
                             readonly property bool isExpandedCard: card.modelData === "suntimes" || card.modelData === "moonphase"
-                            // suntimes and moonphase both get the tall arc height
+                            // suntimes and moonphase: height scales with card width
+                            // so the arc grows when the widget is stretched.
                             readonly property int autoHeight: {
-                                if (card.modelData === "suntimes")
-                                    return 165;
-                                if (card.modelData === "moonphase")
-                                    return 165;
+                                if (card.modelData === "suntimes" || card.modelData === "moonphase")
+                                    return Math.max(165, Math.round(card.width * 0.55));
                                 if (isExpandedCard)
                                     return 80;
                                 return 30;  // ← adjust this value to change regular card height
@@ -544,6 +545,10 @@ Item {
                                                 return root.resolveIcon("suntimes-sunset");
                                             if (m === "upcoming")
                                                 return root.resolveIcon(root.upcomingSunEvent() === "sunrise" ? "suntimes-sunrise" : "suntimes-sunset");
+                                            // "both" — prefer custom sunrise icon if set
+                                            var custom = root.getDetailsCustomIcon("suntimes-sunrise");
+                                            if (custom.length > 0 && root.iconTheme === "kde")
+                                                return { type: "kde", source: custom, svgFallback: "", isMask: false };
                                             return root.resolveIcon("suntimes");
                                         }
                                         iconSize: root.iconSize
@@ -751,9 +756,15 @@ Item {
                                 readonly property color _nightRight: root.isDark ? "#c090f0" : "#8030b0"
                                 readonly property color _nightCentre: root.isDark ? "#d8a0e0" : "#9040c0"
 
+                                // ── Arc geometry helpers for positioning time labels ──
+                                readonly property real _arcR: {
+                                    var cx = sunCanvas.width / 2;
+                                    var hY = sunCanvas.height - 14;
+                                    return Math.min(cx - 28, hY - 12);
+                                }
+
                                 // ── Bottom info row ───────────────────────────────────
-                                // DAY:   [↑ sunrise gold]  [day length / remaining]     [↓ sunset orange]
-                                // NIGHT: [↓ sunset pink]   [night length / until dawn]  [↑ sunrise violet]
+                                // Centre only: day/night length + remaining time
                                 RowLayout {
                                     visible: card._isArcExpanded
                                     anchors.bottom: parent.bottom
@@ -761,34 +772,9 @@ Item {
                                     anchors.right: parent.right
                                     anchors.leftMargin: 10
                                     anchors.rightMargin: 10
-                                    anchors.bottomMargin: 6
-                                    height: 44
+                                    anchors.bottomMargin: 4
+                                    height: 38
                                     spacing: 4
-
-                                    // ── Left column ───────────────────────────────────
-                                    Column {
-                                        spacing: 1
-                                        Layout.alignment: Qt.AlignVCenter
-                                        Rectangle {
-                                            width: 6
-                                            height: 6
-                                            radius: 3
-                                            color: suntimesCard._isNight ? suntimesCard._nightLeft : root.accentGold
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                        }
-                                        Label {
-                                            text: {
-                                                if (!root.weatherRoot)
-                                                    return "--";
-                                                var t = suntimesCard._isNight ? root.weatherRoot.sunsetTimeText : root.weatherRoot.sunriseTimeText;
-                                                return root.weatherRoot.formatTimeForDisplay(t);
-                                            }
-                                            color: suntimesCard._isNight ? suntimesCard._nightLeft : root.accentGold
-                                            font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
-                                                bold: true
-                                            })
-                                        }
-                                    }
 
                                     // ── Centre column ─────────────────────────────────
                                     Column {
@@ -845,32 +831,35 @@ Item {
                                             elide: Text.ElideRight
                                         }
                                     }
-
-                                    // ── Right column ──────────────────────────────────
-                                    Column {
-                                        spacing: 1
-                                        Layout.alignment: Qt.AlignVCenter
-                                        Rectangle {
-                                            width: 6
-                                            height: 6
-                                            radius: 3
-                                            color: suntimesCard._isNight ? suntimesCard._nightRight : root.accentOrange
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                        }
-                                        Label {
-                                            text: {
-                                                if (!root.weatherRoot)
-                                                    return "--";
-                                                var t = suntimesCard._isNight ? root.weatherRoot.sunriseTimeText : root.weatherRoot.sunsetTimeText;
-                                                return root.weatherRoot.formatTimeForDisplay(t);
-                                            }
-                                            color: suntimesCard._isNight ? suntimesCard._nightRight : root.accentOrange
-                                            font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
-                                                bold: true
-                                            })
-                                        }
-                                    }
                                 } // RowLayout (info row)
+
+                                // ── Time labels positioned under arc horizon dots ──
+                                Label {
+                                    visible: card._isArcExpanded
+                                    x: sunCanvas.width / 2 - suntimesCard._arcR - implicitWidth / 2
+                                    y: sunCanvas.y + sunCanvas.height - 14 + 8
+                                    text: {
+                                        if (!root.weatherRoot)
+                                            return "--";
+                                        var t = suntimesCard._isNight ? root.weatherRoot.sunsetTimeText : root.weatherRoot.sunriseTimeText;
+                                        return root.weatherRoot.formatTimeForDisplay(t);
+                                    }
+                                    color: suntimesCard._isNight ? suntimesCard._nightLeft : root.accentGold
+                                    font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({ bold: true })
+                                }
+                                Label {
+                                    visible: card._isArcExpanded
+                                    x: sunCanvas.width / 2 + suntimesCard._arcR - implicitWidth / 2
+                                    y: sunCanvas.y + sunCanvas.height - 14 + 8
+                                    text: {
+                                        if (!root.weatherRoot)
+                                            return "--";
+                                        var t = suntimesCard._isNight ? root.weatherRoot.sunriseTimeText : root.weatherRoot.sunsetTimeText;
+                                        return root.weatherRoot.formatTimeForDisplay(t);
+                                    }
+                                    color: suntimesCard._isNight ? suntimesCard._nightRight : root.accentOrange
+                                    font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({ bold: true })
+                                }
 
                             } // Item (suntimes)
 
@@ -896,6 +885,10 @@ Item {
                                             return root.resolveIcon("suntimes-sunset");
                                         if (m === "upcoming")
                                             return root.resolveIcon(root.upcomingSunEvent() === "sunrise" ? "suntimes-sunrise" : "suntimes-sunset");
+                                        // "both" — prefer custom sunrise icon if set
+                                        var custom = root.getDetailsCustomIcon("suntimes-sunrise");
+                                        if (custom.length > 0 && root.iconTheme === "kde")
+                                            return { type: "kde", source: custom, svgFallback: "", isMask: false };
                                         return root.resolveIcon("suntimes");
                                     }
                                     iconSize: root.iconSize
@@ -1212,8 +1205,15 @@ Item {
                                     }
                                 } // Canvas
 
+                                // ── Arc geometry helpers for positioning time labels ──
+                                readonly property real _arcR: {
+                                    var cx = moonCanvas.width / 2;
+                                    var hY = moonCanvas.height - 14;
+                                    return Math.min(cx - 28, hY - 12);
+                                }
+
                                 // ── Bottom info row ───────────────────────────────────
-                                // [↑ moonrise]  [phase glyph + name]  [↓ moonset]
+                                // Centre only: [phase glyph + name]
                                 RowLayout {
                                     visible: card._isArcExpanded
                                     anchors.bottom: parent.bottom
@@ -1221,29 +1221,9 @@ Item {
                                     anchors.right: parent.right
                                     anchors.leftMargin: 10
                                     anchors.rightMargin: 10
-                                    anchors.bottomMargin: 6
-                                    height: 44
+                                    anchors.bottomMargin: 4
+                                    height: 38
                                     spacing: 4
-
-                                    // ── Moonrise (left) ───────────────────────────────
-                                    Column {
-                                        spacing: 1
-                                        Layout.alignment: Qt.AlignVCenter
-                                        Rectangle {
-                                            width: 6
-                                            height: 6
-                                            radius: 3
-                                            color: root.accentViolet
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                        }
-                                        Label {
-                                            text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(moonCard._moonriseText) : "--"
-                                            color: root.accentViolet
-                                            font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({
-                                                bold: false
-                                            })
-                                        }
-                                    }
 
                                     // ── Phase glyph + name (centre) ───────────────────
                                     RowLayout {
@@ -1272,29 +1252,26 @@ Item {
                                             Layout.fillWidth: true
                                         }
                                     }
-
-                                    // ── Moonset (right) ───────────────────────────────
-                                    Column {
-                                        spacing: 1
-                                        Layout.alignment: Qt.AlignVCenter
-                                        Rectangle {
-                                            width: 6
-                                            height: 6
-                                            radius: 3
-                                            color: root.accentViolet
-                                            opacity: 0.70
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                        }
-                                        Label {
-                                            text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(moonCard._moonsetText) : "--"
-                                            color: root.accentViolet
-                                            opacity: 0.75
-                                            font: root.weatherRoot ? root.weatherRoot.wf(12, true) : Qt.font({
-                                                bold: true
-                                            })
-                                        }
-                                    }
                                 } // RowLayout (info row)
+
+                                // ── Time labels positioned under arc horizon dots ──
+                                Label {
+                                    visible: card._isArcExpanded
+                                    x: moonCanvas.width / 2 - moonCard._arcR - implicitWidth / 2
+                                    y: moonCanvas.y + moonCanvas.height - 14 + 8
+                                    text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(moonCard._moonriseText) : "--"
+                                    color: root.accentViolet
+                                    font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({ bold: true })
+                                }
+                                Label {
+                                    visible: card._isArcExpanded
+                                    x: moonCanvas.width / 2 + moonCard._arcR - implicitWidth / 2
+                                    y: moonCanvas.y + moonCanvas.height - 14 + 8
+                                    text: root.weatherRoot ? root.weatherRoot.formatTimeForDisplay(moonCard._moonsetText) : "--"
+                                    color: root.accentViolet
+                                    opacity: 0.75
+                                    font: root.weatherRoot ? root.weatherRoot.wf(11, true) : Qt.font({ bold: true })
+                                }
 
                             } // Item (moonphase)
 
