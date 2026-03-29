@@ -73,6 +73,7 @@ var _isoToSlug = {
  * Tries MeteoAlarm first, falls back to met.no MetAlerts.
  */
 function fetchAlerts(service) {
+    var r = service.weatherRoot;  // FIX: r was undefined here, causing silent failure
     var isoCode = (service.countryCode || "").toUpperCase();
     var slug = _isoToSlug[isoCode];
 
@@ -98,6 +99,7 @@ function fetchAlerts(service) {
 // ── Reverse-geocode fallback for missing countryCode ──────────────────
 
 function _resolveCountryThenFetch(service) {
+    var r = service.weatherRoot;  // FIX: r was undefined here, causing silent failure
     var lat = service.latitude;
     var lon = service.longitude;
     if (!lat || !lon) return;
@@ -407,23 +409,15 @@ function _parseMeteoAlarmAlerts(data, locationName, localTerms, lat, lon) {
         });
     });
 
-    // Deduplicate by displayName — keep the one with the latest expiry
+    // Deduplicate by displayName + onset — same alert type at different time windows
+    // must be kept as separate entries (e.g. two "Moderate for Wind" on different days)
     var seen = {};
     var unique = [];
     alerts.forEach(function (a) {
-        var key = a.displayName || a.headline;
+        var key = (a.displayName || a.headline) + "|" + (a.onset || a.effective || "");
         if (!seen[key]) {
             seen[key] = true;
             unique.push(a);
-        } else {
-            // Replace if this one expires later
-            for (var i = 0; i < unique.length; i++) {
-                if ((unique[i].displayName || unique[i].headline) === key) {
-                    if (a.expires && unique[i].expires && a.expires > unique[i].expires)
-                        unique[i] = a;
-                    break;
-                }
-            }
         }
     });
     return unique;

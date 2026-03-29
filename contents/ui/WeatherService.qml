@@ -77,6 +77,12 @@ QtObject {
             r.uvIndex = NaN;
             r.airQualityIndex = NaN;
             r.airQualityLabel = "";
+            r.aqiPm10  = NaN;
+            r.aqiPm2_5 = NaN;
+            r.aqiCo    = NaN;
+            r.aqiNo2   = NaN;
+            r.aqiSo2   = NaN;
+            r.aqiO3    = NaN;
             r.weatherAlerts = [];
             r.snowDepthCm = NaN;
             r.sunriseTimeText = "--";

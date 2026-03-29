@@ -107,7 +107,7 @@ function _fetchAirQuality(service) {
     var url = "https://air-quality-api.open-meteo.com/v1/air-quality"
         + "?latitude=" + service.latitude
         + "&longitude=" + service.longitude
-        + "&current=european_aqi"
+        + "&current=european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone"
         + "&timezone=" + encodeURIComponent(tz.length > 0 ? tz : "auto");
     var req = new XMLHttpRequest();
     req.open("GET", url);
@@ -117,16 +117,31 @@ function _fetchAirQuality(service) {
         if (req.status !== 200) {
             r.airQualityIndex = NaN;
             r.airQualityLabel = "";
+            r.aqiPm10 = NaN;
+            r.aqiPm2_5 = NaN;
+            r.aqiCo = NaN;
+            r.aqiNo2 = NaN;
+            r.aqiSo2 = NaN;
+            r.aqiO3 = NaN;
             return;
         }
         var d = JSON.parse(req.responseText);
-        if (d.current && d.current.european_aqi !== undefined) {
-            r.airQualityIndex = d.current.european_aqi;
-            r.airQualityLabel = _aqiLabel(d.current.european_aqi);
+        var c = d.current || {};
+        if (c.european_aqi !== undefined) {
+            r.airQualityIndex = c.european_aqi;
+            r.airQualityLabel = _aqiLabel(c.european_aqi);
         } else {
             r.airQualityIndex = NaN;
             r.airQualityLabel = "";
         }
+        // Pollutant concentrations (µg/m³ except CO which is µg/m³ → store as mg/m³)
+        r.aqiPm10  = (c.pm10               !== undefined) ? c.pm10               : NaN;
+        r.aqiPm2_5 = (c.pm2_5              !== undefined) ? c.pm2_5              : NaN;
+        r.aqiNo2   = (c.nitrogen_dioxide    !== undefined) ? c.nitrogen_dioxide    : NaN;
+        r.aqiSo2   = (c.sulphur_dioxide     !== undefined) ? c.sulphur_dioxide     : NaN;
+        r.aqiO3    = (c.ozone               !== undefined) ? c.ozone               : NaN;
+        // Open-Meteo returns CO in µg/m³; our breakpoints use mg/m³
+        r.aqiCo    = (c.carbon_monoxide     !== undefined) ? c.carbon_monoxide / 1000.0 : NaN;
     };
     req.send();
 }

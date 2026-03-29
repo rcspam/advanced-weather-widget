@@ -63,12 +63,12 @@ Item {
     // are NOT overridden by the layout engine, so manual tooltip sizing works.
     implicitWidth: (Plasmoid.configuration.tooltipEnabled !== false)
         ? (ttWidthAuto
-            ? Math.min(ttMaxWidth, Math.max(280, ttContentCol.implicitWidth + 24))
+            ? Math.min(ttMaxWidth, Math.max(280, ttContentCol.implicitWidth + 48))
             : ttWidthManual)
         : 0
     implicitHeight: (Plasmoid.configuration.tooltipEnabled !== false)
         ? (ttHeightAuto
-            ? Math.max(40, ttDataCol.implicitHeight + _headerHeight + 16)
+            ? Math.max(40, ttDataCol.implicitHeight + _headerHeight + 32)
             : ttHeightManual)
         : 0
 
@@ -127,7 +127,7 @@ Item {
             var glyphs = {
                 temperature: "\uF055",
                 feelslike: "\uF053",
-                condition: "\uF013",
+                condition: weatherRoot ? weatherRoot.panelItemGlyph("condition") : "\uF013",
                 wind: "\uF050",
                 humidity: "\uF07A",
                 pressure: "\uF079",
@@ -139,7 +139,7 @@ Item {
                 "suntimes-sunrise": "\uF051",
                 "suntimes-sunset": "\uF052",
                 preciprate: "\uF04E",
-                precipsum: "\uF04E",
+                precipsum: "\uF07C",
                 uvindex: "\uF072",
                 airquality: "\uF074",
                 alerts: "\uF0CE",
@@ -163,7 +163,7 @@ Item {
                 "suntimes-sunrise": "weather-sunrise",
                 "suntimes-sunset": "weather-sunset",
                 preciprate: "weather-showers",
-                precipsum: "weather-showers",
+                precipsum: "flood",
                 uvindex: "weather-clear",
                 airquality: "weather-many-clouds",
                 alerts: "weather-storm",
@@ -203,6 +203,10 @@ Item {
     ColumnLayout {
         id: ttLayout
         anchors.fill: parent
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        anchors.topMargin: 8
+        anchors.bottomMargin: 8
         spacing: 5
 
     // ── Header: location name ─────────────────────────────────────────────

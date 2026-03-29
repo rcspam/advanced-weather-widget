@@ -1183,8 +1183,8 @@ KCM.AbstractKCM {
             itemId: "precipsum",
             label: i18n("Precipitation Sum"),
             description: i18n("Today's total precipitation (mm/in)"),
-            wiChar: "\uF04E",
-            iconFallback: "weather-showers"
+            wiChar: "\uF07C",
+            iconFallback: "flood"
         },
         {
             itemId: "uvindex",
@@ -1286,8 +1286,8 @@ KCM.AbstractKCM {
             itemId: "precipsum",
             label: i18n("Precipitation Sum"),
             description: i18n("Today's total precipitation (mm/in)"),
-            wiChar: "\uF04E",
-            iconFallback: "weather-showers"
+            wiChar: "\uF07C",
+            iconFallback: "flood"
         },
         {
             itemId: "uvindex",
@@ -1388,8 +1388,8 @@ KCM.AbstractKCM {
             itemId: "precipsum",
             label: i18n("Precipitation Sum"),
             description: i18n("Today's total precipitation (mm/in)"),
-            wiChar: "\uF04E",
-            iconFallback: "weather-showers"
+            wiChar: "\uF07C",
+            iconFallback: "flood"
         },
         {
             itemId: "uvindex",

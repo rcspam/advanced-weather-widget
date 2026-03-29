@@ -206,8 +206,10 @@ ColumnLayout {
                                             return b + "day-cloudy.svg";
                                         if (id === "location")
                                             return b + "wind-deg.svg";
-                                        if (id === "preciprate" || id === "precipsum")
+                                        if (id === "preciprate")
                                             return b + "raindrop.svg";
+                                        if (id === "precipsum")
+                                            return b + "flood.svg";
                                         if (id === "uvindex")
                                             return b + "hot.svg";
                                         if (id === "airquality")

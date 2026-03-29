@@ -1149,6 +1149,32 @@ PlasmaCore.ToolTipArea {
                 return;
             }
 
+            // ── Alerts: no alerts → single flag + "None"; with alerts → flag + type glyph + text ──
+            if (tok === "alerts") {
+                var alertTxt = r.panelItemTextOnly(tok);
+                if (!alertTxt || alertTxt.length === 0)
+                    return;
+                if (result.length > 0)
+                    pushSep();
+                var pa = (r.weatherAlerts && r.weatherAlerts.length > 0)
+                    ? r.primaryAlert() : null;
+                if (pa) {
+                    // Have alerts: flag icon (no text) + type glyph icon + alert name text
+                    pushInfoItem(iconInfo, show, "");
+                    var glyphInfo = {
+                        type: "wi",
+                        source: r.alertTypeGlyph(pa.awarenessType || 0),
+                        svgFallback: "",
+                        isMask: false
+                    };
+                    pushInfoItem(glyphInfo, show, alertTxt);
+                } else {
+                    // No alerts: single flag icon + "None" text (no double icon)
+                    pushInfoItem(iconInfo, show, alertTxt);
+                }
+                return;
+            }
+
             var txt = r.panelItemTextOnly(tok);
             if (!txt || txt.length === 0)
                 return;

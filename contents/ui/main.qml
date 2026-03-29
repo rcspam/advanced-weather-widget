@@ -69,6 +69,12 @@ PlasmoidItem {
     property real uvIndex: NaN             // UV index (0–11+)
     property real airQualityIndex: NaN     // AQI numeric value (provider scale)
     property string airQualityLabel: ""    // "Good", "Moderate", etc.
+    property real aqiPm10:  NaN
+    property real aqiPm2_5: NaN
+    property real aqiCo:    NaN
+    property real aqiNo2:   NaN
+    property real aqiSo2:   NaN
+    property real aqiO3:    NaN
     property var weatherAlerts: []         // [{headline, severity, description}]
     property real snowDepthCm: NaN         // Current snow depth (cm)
     property string sunriseTimeText: "--"
@@ -286,9 +292,16 @@ PlasmoidItem {
 
     function airQualityText() {
         if (isNaN(airQualityIndex)) return "--";
-        if (airQualityLabel.length > 0)
-            return airQualityIndex + " — " + airQualityLabel;
-        return "" + airQualityIndex;
+        // EU AQI band
+        var label = "";
+        var square = "";
+        if (airQualityIndex < 25)       { label = i18n("Good");           square = "\u{1F7E2}"; }  // 🟢
+        else if (airQualityIndex < 50)  { label = i18n("Fair");           square = "\u{1F7E1}"; }  // 🟡
+        else if (airQualityIndex < 75)  { label = i18n("Moderate");       square = "\u{1F7E0}"; }  // 🟠
+        else if (airQualityIndex < 100) { label = i18n("Poor");           square = "\u{1F534}"; }  // 🔴
+        else if (airQualityIndex < 150) { label = i18n("Very Poor");      square = "\u{1F7E3}"; }  // 🟣
+        else                            { label = i18n("Extremely Poor"); square = "\u{1F7E4}"; }  // 🟤
+        return square + " " + label + ": " + Math.round(airQualityIndex);
     }
 
     function snowDepthText(cm) {
@@ -298,10 +311,39 @@ PlasmoidItem {
         return cm.toFixed(1) + " cm";
     }
 
+    /** Returns a numeric priority for an alert color — higher = more severe. */
+    function alertColorPriority(color) {
+        var c = (color || "").toLowerCase();
+        if (c === "red")    return 3;
+        if (c === "orange") return 2;
+        if (c === "yellow") return 1;
+        return 0;
+    }
+
+    /**
+     * Returns the single highest-priority currently-active alert,
+     * or the first alert if none are active yet.
+     */
+    function primaryAlert() {
+        if (!weatherAlerts || weatherAlerts.length === 0) return null;
+        var now = new Date();
+        var best = null;
+        for (var i = 0; i < weatherAlerts.length; i++) {
+            var a = weatherAlerts[i];
+            var onset   = a.onset   ? new Date(a.onset)   : null;
+            var expires = a.expires ? new Date(a.expires) : null;
+            var active  = (!onset || onset <= now) && (!expires || expires >= now);
+            if (!active) continue;
+            if (!best || alertColorPriority(a.color) > alertColorPriority(best.color))
+                best = a;
+        }
+        return best || weatherAlerts[0];
+    }
+
     function alertsText() {
         if (!weatherAlerts || weatherAlerts.length === 0) return i18n("None");
-        if (weatherAlerts.length === 1) return weatherAlerts[0].displayName || weatherAlerts[0].headline || i18n("1 Alert");
-        return weatherAlerts.length + " " + i18n("Alerts");
+        var p = primaryAlert();
+        return p ? (p.displayName || p.headline || i18n("1 Alert")) : i18n("None");
     }
 
     function alertTypeGlyph(typeNum) {
@@ -655,17 +697,15 @@ PlasmoidItem {
         if (tok === "preciprate")
             return "\uF04E";        // wi-sprinkle (rain drop)
         if (tok === "precipsum")
-            return "\uF04E";        // wi-sprinkle (rain drop)
+            return "\uF07C";        
         if (tok === "uvindex")
             return "\uF072";        // wi-hot
         if (tok === "airquality")
             return "\uF074";        // wi-smog
         if (tok === "alerts") {
-            if (weatherAlerts && weatherAlerts.length > 0) {
-                var t = weatherAlerts[0].awarenessType || 0;
-                return alertTypeGlyph(t);
-            }
-            return "\uF0CE";        // wi-gale-warning
+            var pa = primaryAlert();
+            if (pa) return alertTypeGlyph(pa.awarenessType || 0);
+            return "\uF0CE";        // wi-gale-warning (flag)
         }
         if (tok === "snowcover")
             return "\uF076";        // wi-snowflake-cold
@@ -716,7 +756,7 @@ PlasmoidItem {
                 moonphase: "weather-clear-night",
                 location: "mark-location",
                 preciprate: "weather-showers",
-                precipsum: "weather-showers",
+                precipsum: "flood",
                 uvindex: "weather-clear",
                 airquality: "weather-many-clouds",
                 alerts: "weather-storm",
