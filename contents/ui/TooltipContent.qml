@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * TooltipContent.qml — Tooltip popup content
  *
@@ -6,7 +23,6 @@
  * Supports the same icon themes as the Panel: wi-font, symbolic, flat-color,
  * 3d-oxygen, kde, and custom (user-picked KDE icons per item).
  */
-pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
@@ -15,9 +31,12 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 
 import "js/moonphase.js" as Moon
+import "js/suncalc.js" as SC
 import "js/weather.js" as W
+import "js/iconResolver.js" as IconResolver
+import "components"
 
-ColumnLayout {
+Item {
     id: ttRoot
 
     // ── Interface ─────────────────────────────────────────────────────────
@@ -28,7 +47,6 @@ ColumnLayout {
     // (CompactView also sets active:false on the ToolTipArea, so the popup
     //  never opens at all.  This guard is a belt-and-suspenders fallback.)
     visible: Plasmoid.configuration.tooltipEnabled !== false
-    spacing: 5
 
     // When truncating, cap tooltip width so the Label elide actually fires.
     // When wrapping, still cap at a reasonable max so very long names wrap
@@ -40,7 +58,37 @@ ColumnLayout {
     readonly property int ttHeightManual: Plasmoid.configuration.tooltipHeightManual || 300
     // Auto width: fit content, min 280, max 480
     readonly property int ttMaxWidth: ttWidthAuto ? 480 : Math.max(200, ttWidthManual)
-    implicitWidth: (Plasmoid.configuration.tooltipEnabled !== false) ? (ttWidthAuto ? Math.min(ttMaxWidth, Math.max(280, ttContentCol.implicitWidth + 24)) : ttWidthManual) : 0
+
+    // Track tooltip item count for auto-width sizing
+    readonly property int _ttItemCount: ttIconRepeater.count
+    // Estimate width from actual column count and icon size
+    readonly property int _ttAutoWidth: {
+        if (!ttUseIcons || _ttItemCount === 0)
+            return 280;
+        var effectiveCols = Math.min(3, _ttItemCount);
+        // Each column: icon + 5px spacing + ~100px text + 10px col spacing
+        var colW = ttIconSize + 5 + 100 + 10;
+        return Math.max(280, effectiveCols * colW + 48);
+    }
+
+    // Using an Item root (not ColumnLayout) ensures implicitWidth/Height
+    // are NOT overridden by the layout engine, so manual tooltip sizing works.
+    implicitWidth: (Plasmoid.configuration.tooltipEnabled !== false)
+        ? (ttWidthAuto
+            ? Math.min(ttMaxWidth, _ttAutoWidth)
+            : ttWidthManual)
+        : 0
+    implicitHeight: (Plasmoid.configuration.tooltipEnabled !== false)
+        ? (ttHeightAuto
+            ? Math.max(40, ttDataCol.implicitHeight + _headerHeight + 32)
+            : ttHeightManual)
+        : 0
+
+    // Sum of header labels + separator — used in manual-height calculation
+    readonly property int _headerHeight: _ttHeaderLabel.implicitHeight
+        + ((_ttTimestamp.visible ? _ttTimestamp.implicitHeight : 0))
+        + ((_ttNoLocHint.visible ? _ttNoLocHint.implicitHeight : 0))
+        + 6 /* separator + margins */
 
     // ── Wi-font loaded inside tooltip popup ───────────────────────────────
     FontLoader {
@@ -53,8 +101,9 @@ ColumnLayout {
     readonly property int ttIconSize: Plasmoid.configuration.tooltipIconSize || 22
     readonly property bool ttUseIcons: Plasmoid.configuration.tooltipUseIcons !== false
     readonly property string ttSunTimesMode: Plasmoid.configuration.tooltipSunTimesMode || "both"
+    readonly property string ttMoonPhaseMode: Plasmoid.configuration.tooltipMoonPhaseMode || "full"
 
-    readonly property url iconsBaseDir: Qt.resolvedUrl("../icons/")
+    readonly property string iconsBaseDir: Qt.resolvedUrl("../icons/")
 
     // Resolved icon font to use in tooltip rows
     readonly property font ttFont: {
@@ -82,30 +131,35 @@ ColumnLayout {
         return (itemId in m) ? m[itemId] : "";
     }
 
-    // Returns { type, source, kdeFallback } for a given token + ttIconTheme
+    // Returns { type, source, svgFallback, isMask } for a given token + ttIconTheme
     function ttItemIconInfo(tok) {
         var theme = ttIconTheme;
 
         if (theme === "wi-font") {
-            // Return the same wi-font codepoints used historically
             var glyphs = {
                 temperature: "\uF055",
                 feelslike: "\uF053",
-                condition: "\uF013",
+                condition: weatherRoot ? weatherRoot.panelItemGlyph("condition") : "\uF013",
                 wind: "\uF050",
                 humidity: "\uF07A",
                 pressure: "\uF079",
                 dewpoint: "\uF078",
                 visibility: "\uF0B6",
-                moonphase: Moon.moonPhaseFontIcon(),
+                moonphase: Moon.moonPhaseFontIcon(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase)),
+                "moonphase-moonrise": "\uF0C9",
+                "moonphase-moonset": "\uF0CA",
                 "suntimes-sunrise": "\uF051",
-                "suntimes-sunset": "\uF052"
+                "suntimes-sunset": "\uF052",
+                preciprate: "\uF04E",
+                precipsum: "\uF07C",
+                uvindex: "\uF072",
+                airquality: "\uF074",
+                pollen:     "\uF082",
+                spaceweather: "\uF06E",
+                alerts: "\uF0CE",
+                snowcover: "\uF076"
             };
-            return {
-                type: "wi",
-                source: glyphs[tok] || "",
-                kdeFallback: ""
-            };
+            return { type: "wi", source: glyphs[tok] || "", svgFallback: "", isMask: false };
         }
 
         if (theme === "custom") {
@@ -118,100 +172,62 @@ ColumnLayout {
                 pressure: "weather-overcast",
                 dewpoint: "raindrop",
                 visibility: "weather-fog",
-                moonphase: "weather-clear-night",
+                "moonphase-moonrise": "weather-clear-night",
+                "moonphase-moonset": "weather-clear-night",
                 "suntimes-sunrise": "weather-sunrise",
-                "suntimes-sunset": "weather-sunset"
+                "suntimes-sunset": "weather-sunset",
+                preciprate: "weather-showers",
+                precipsum: "flood",
+                uvindex: "weather-clear",
+                airquality: "weather-many-clouds",
+                pollen: "sandstorm",
+                spaceweather: "solar-eclipse",
+                alerts: "weather-storm",
+                snowcover: "weather-snow-scattered"
             };
+            // Moon phase token: use bundled SVG (shows actual phase) rather than custom icon
+            if (tok === "moonphase") {
+                var moonStemC = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
+                return IconResolver.resolveMoonPhase(moonStemC, ttIconSize, ttRoot.iconsBaseDir, "flat-color");
+            }
             var saved = getTooltipCustomIcon(tok);
-            return {
-                type: "kde",
-                source: saved.length > 0 ? saved : (defaults[tok] || ""),
-                kdeFallback: ""
-            };
+            return { type: "kde", source: saved.length > 0 ? saved : (defaults[tok] || ""), svgFallback: "", isMask: false };
         }
 
-        if (theme === "kde") {
-            var kdeMap = {
-                temperature: "thermometer",
-                feelslike: "thermometer",
-                wind: "weather-wind-beaufort-0",
-                humidity: "weather-humidity",
-                pressure: "weather-pressure",
-                dewpoint: "raindrop",
-                visibility: "weather-fog",
-                moonphase: "weather-clear-night",
-                "suntimes-sunrise": "weather-sunrise",
-                "suntimes-sunset": "weather-sunset"
-            };
-            if (tok === "condition")
-                return {
-                    type: "kde",
-                    source: weatherRoot ? W.weatherCodeToIcon(weatherRoot.weatherCode, weatherRoot.isNightTime()) : "weather-none-available",
-                    kdeFallback: ""
-                };
-            return {
-                type: "kde",
-                source: kdeMap[tok] || "",
-                kdeFallback: ""
-            };
-        }
+        // KDE / SVG themes — unified via IconResolver
+        // Pass theme directly; "kde" is handled by IconResolver internally.
+        var svgTheme = theme;
 
-        // ── SVG themes ────────────────────────────────────────────────────
-        // Use iconsBaseDir (resolved at load time) — do NOT call Qt.resolvedUrl() here;
-        // inside a JS function in a detached tooltip context the base path is wrong.
-        var base = ttRoot.iconsBaseDir + theme + "/" + ttIconSize + "/wi-";
-
-        var svgMap = {
-            temperature: "thermometer",
-            feelslike: "thermometer",
-            humidity: "humidity",
-            pressure: "barometer",
-            wind: "strong-wind",
-            dewpoint: "raindrop",
-            visibility: "thermometer",
-            moonphase: Moon.moonPhaseSvgStem(),
-            "suntimes-sunrise": "sunrise",
-            "suntimes-sunset": "sunset"
-        };
         if (tok === "condition") {
             if (!weatherRoot)
-                return {
-                    type: "svg",
-                    source: "",
-                    kdeFallback: ""
-                };
-            var code = weatherRoot.weatherCode, night = weatherRoot.isNightTime(), stem;
-            if (code === 0)
-                stem = night ? "night-clear" : "day-sunny";
-            else if (code <= 2)
-                stem = night ? "night-alt-partly-cloudy" : "day-cloudy";
-            else if (code === 3)
-                stem = "cloudy";
-            else if (code <= 48)
-                stem = night ? "night-fog" : "day-fog";
-            else if (code <= 65)
-                stem = night ? "night-alt-rain" : "day-rain";
-            else if (code <= 75)
-                stem = night ? "night-alt-snow" : "day-snow";
-            else
-                stem = night ? "night-alt-thunderstorm" : "day-thunderstorm";
-            return {
-                type: "svg",
-                source: base + stem + ".svg",
-                kdeFallback: ""
-            };
+                return { type: "kde", source: "weather-none-available", svgFallback: "", isMask: false };
+            return IconResolver.resolveCondition(weatherRoot.weatherCode, weatherRoot.isNightTime(), ttIconSize, ttRoot.iconsBaseDir, svgTheme);
         }
-        var s = svgMap[tok];
-        // wi-sunrise.svg and wi-sunset.svg exist in all SVG theme packs — no kdeFallback needed
-        return {
-            type: "svg",
-            source: s ? base + s + ".svg" : "",
-            kdeFallback: ""
-        };
+        if (tok === "moonphase") {
+            var moonStem = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
+            return IconResolver.resolveMoonPhase(moonStem, ttIconSize, ttRoot.iconsBaseDir, svgTheme);
+        }
+        if (tok === "moonphase-moonrise")
+            return IconResolver.resolve("moonrise", ttIconSize, ttRoot.iconsBaseDir, svgTheme);
+        if (tok === "moonphase-moonset")
+            return IconResolver.resolve("moonset", ttIconSize, ttRoot.iconsBaseDir, svgTheme);
+
+        return IconResolver.resolve(tok, ttIconSize, ttRoot.iconsBaseDir, svgTheme);
     }
+
+    // ── Inner layout — anchored to root Item for proper sizing ───────────
+    ColumnLayout {
+        id: ttLayout
+        anchors.fill: parent
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        anchors.topMargin: 8
+        anchors.bottomMargin: 8
+        spacing: 5
 
     // ── Header: location name ─────────────────────────────────────────────
     Label {
+        id: _ttHeaderLabel
         Layout.fillWidth: true
         Layout.maximumWidth: ttRoot.ttMaxWidth - 24
         text: ttRoot.weatherRoot && ttRoot.weatherRoot.hasSelectedTown ? Plasmoid.configuration.locationName : i18n("Weather Widget")
@@ -225,15 +241,22 @@ ColumnLayout {
 
     // ── Update timestamp ─────────────────────────────────────────────────
     Label {
+        id: _ttTimestamp
         Layout.fillWidth: true
         visible: ttRoot.weatherRoot && ttRoot.weatherRoot.hasSelectedTown && ttRoot.weatherRoot.updateText.length > 0
         text: ttRoot.weatherRoot ? ttRoot.weatherRoot.updateText : ""
+        textFormat: Text.RichText
+        onLinkActivated: function(link) { Qt.openUrlExternally(link) }
         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
         color: Kirigami.Theme.disabledTextColor
+        HoverHandler {
+            cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+        }
     }
 
     // ── No-location hint ─────────────────────────────────────────────────
     Label {
+        id: _ttNoLocHint
         Layout.fillWidth: true
         visible: !ttRoot.weatherRoot || !ttRoot.weatherRoot.hasSelectedTown
         text: i18n("Click to configure a location")
@@ -253,11 +276,16 @@ ColumnLayout {
     // ── Scrollable data area — height capped when Manual ──────────────
     ScrollView {
         Layout.fillWidth: true
-        // Auto: natural height. Manual: fixed height with scrollbar when needed.
-        implicitHeight: ttRoot.ttHeightAuto ? ttDataCol.implicitHeight : Math.min(ttRoot.ttHeightManual, ttDataCol.implicitHeight)
+        Layout.fillHeight: !ttRoot.ttHeightAuto
+        // Auto: natural height. Manual: fill remaining space within the capped tooltip.
+        implicitHeight: ttRoot.ttHeightAuto
+            ? ttDataCol.implicitHeight
+            : Math.min(Math.max(40, ttRoot.ttHeightManual - ttRoot._headerHeight - 16), ttDataCol.implicitHeight)
         clip: true
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-        ScrollBar.vertical.policy: ttRoot.ttHeightAuto ? ScrollBar.AlwaysOff : (ttDataCol.implicitHeight > ttRoot.ttHeightManual ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff)
+        ScrollBar.vertical.policy: ttRoot.ttHeightAuto
+            ? ScrollBar.AlwaysOff
+            : (ttDataCol.implicitHeight > (ttRoot.ttHeightManual - ttRoot._headerHeight - 16) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff)
 
         ColumnLayout {
             id: ttDataCol
@@ -278,7 +306,7 @@ ColumnLayout {
                     model: {
                         if (!ttRoot.weatherRoot || !ttRoot.ttUseIcons)
                             return [];
-                        var _ = ttRoot.weatherRoot.temperatureC + ttRoot.weatherRoot.windKmh + ttRoot.weatherRoot.windDirection + ttRoot.weatherRoot.humidityPercent + ttRoot.weatherRoot.pressureHpa + ttRoot.weatherRoot.weatherCode + ttRoot.weatherRoot.sunriseTimeText.length + ttRoot.weatherRoot.sunsetTimeText.length + ttRoot.ttIconTheme + ttRoot.ttIconSize + ttRoot.ttSunTimesMode;
+                        var _ = ttRoot.weatherRoot.temperatureC + ttRoot.weatherRoot.windKmh + ttRoot.weatherRoot.windDirection + ttRoot.weatherRoot.humidityPercent + ttRoot.weatherRoot.pressureHpa + ttRoot.weatherRoot.weatherCode + ttRoot.weatherRoot.sunriseTimeText.length + ttRoot.weatherRoot.sunsetTimeText.length + ttRoot.weatherRoot.moonriseTimeText.length + ttRoot.weatherRoot.moonsetTimeText.length + ttRoot.ttIconTheme + ttRoot.ttIconSize + ttRoot.ttSunTimesMode + ttRoot.ttMoonPhaseMode;
                         return ttRoot._buildTooltipItems();
                     }
 
@@ -289,50 +317,19 @@ ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 5
 
-                        // ── wi-font glyph ─────────────────────────────────────────
-                        Text {
-                            visible: ttIconDelegate.modelData.showIcon && ttIconDelegate.modelData.glyphType === "wi" && (ttIconDelegate.modelData.glyph || "").length > 0
-                            text: ttIconDelegate.modelData.glyph || ""
-                            font.family: wiFontTT.status === FontLoader.Ready ? wiFontTT.font.family : ""
-                            font.pixelSize: ttRoot.ttFont.pixelSize + 2
-                            color: Kirigami.Theme.textColor
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        // ── KDE icon ──────────────────────────────────────────────
-                        Kirigami.Icon {
-                            visible: ttIconDelegate.modelData.showIcon && ttIconDelegate.modelData.glyphType === "kde" && (ttIconDelegate.modelData.glyph || "").length > 0
-                            source: ttIconDelegate.modelData.glyph || ""
-                            implicitWidth: ttRoot.ttIconSize
-                            implicitHeight: ttRoot.ttIconSize
+                        WeatherIcon {
+                            visible: modelData.showIcon
+                            iconInfo: modelData.iconInfo
+                            iconSize: ttRoot.ttIconSize
+                            wiFontFamily: wiFontTT.status === FontLoader.Ready ? wiFontTT.font.family : ""
+                            wiFontReady: wiFontTT.status === FontLoader.Ready
                             Layout.alignment: Qt.AlignVCenter
-                        }
-
-                        // ── SVG icon ──────────────────────────────────────────────
-                        Item {
-                            id: svgIconItem
-                            visible: svgIconItem_modelData.showIcon && svgIconItem_modelData.glyphType === "svg" && (svgIconItem_modelData.glyph || "").length > 0
-                            implicitWidth: ttRoot.ttIconSize
-                            implicitHeight: ttRoot.ttIconSize
-                            Layout.alignment: Qt.AlignVCenter
-                            property var svgIconItem_modelData: ttIconDelegate.modelData
-                            Kirigami.Icon {
-                                anchors.fill: parent
-                                source: svgIconItem.svgIconItem_modelData.glyphKdeFallback || ""
-                                visible: (svgIconItem.svgIconItem_modelData.glyphKdeFallback || "").length > 0
-                            }
-                            Kirigami.Icon {
-                                anchors.fill: parent
-                                source: svgIconItem.svgIconItem_modelData.glyph || ""
-                                isMask: ttRoot.ttIconTheme === "symbolic"
-                                color: Kirigami.Theme.textColor
-                            }
                         }
 
                         // ── Value text ────────────────────────────────────────────
                         Label {
                             Layout.fillWidth: true
-                            text: ttIconDelegate.modelData.text || ""
+                            text: modelData.text || ""
                             color: Kirigami.Theme.textColor
                             font: ttRoot.ttFont
                             verticalAlignment: Text.AlignVCenter
@@ -352,7 +349,7 @@ ColumnLayout {
                     model: {
                         if (!ttRoot.weatherRoot || ttRoot.ttUseIcons)
                             return [];
-                        var _ = ttRoot.weatherRoot.temperatureC + ttRoot.weatherRoot.windKmh + ttRoot.weatherRoot.windDirection + ttRoot.weatherRoot.humidityPercent + ttRoot.weatherRoot.pressureHpa + ttRoot.weatherRoot.weatherCode + ttRoot.weatherRoot.sunriseTimeText.length + ttRoot.weatherRoot.sunsetTimeText.length + ttRoot.ttSunTimesMode;
+                        var _ = ttRoot.weatherRoot.temperatureC + ttRoot.weatherRoot.windKmh + ttRoot.weatherRoot.windDirection + ttRoot.weatherRoot.humidityPercent + ttRoot.weatherRoot.pressureHpa + ttRoot.weatherRoot.weatherCode + ttRoot.weatherRoot.sunriseTimeText.length + ttRoot.weatherRoot.sunsetTimeText.length + ttRoot.weatherRoot.moonriseTimeText.length + ttRoot.weatherRoot.moonsetTimeText.length + ttRoot.ttSunTimesMode + ttRoot.ttMoonPhaseMode;
                         return ttRoot._buildTooltipItems();
                     }
 
@@ -368,6 +365,8 @@ ColumnLayout {
             }
         } // ttDataCol
     } // ScrollView
+
+    } // ColumnLayout (ttLayout)
 
     // ── Private: build tooltip rows ───────────────────────────────────────
     function _buildTooltipItems() {
@@ -396,32 +395,20 @@ ColumnLayout {
 
     /**
      * Returns 1–2 row objects for a given token.
-     * Icons mode: { glyph, glyphType, glyphKdeFallback, showIcon, text }
-     * Text mode:  { glyph: "", glyphType: "", glyphKdeFallback: "", showIcon: false, text: "Label: value" }
+     * Icons mode: { iconInfo, showIcon, text }
+     * Text mode:  { iconInfo: null, showIcon: false, text: "Label: value" }
      */
     function _tooltipItemsFor(tok, iconMap) {
         var r = weatherRoot;
         var showIcon = ttUseIcons && ((tok in iconMap) ? iconMap[tok] : true);
         var textMode = !ttUseIcons;
+        var emptyInfo = { type: "", source: "", svgFallback: "", isMask: false };
 
         function iconRow(iconTok, txt) {
-            var info = ttItemIconInfo(iconTok);
-            return {
-                glyph: info.source,
-                glyphType: info.type,
-                glyphKdeFallback: info.kdeFallback,
-                showIcon: showIcon,
-                text: txt
-            };
+            return { iconInfo: ttItemIconInfo(iconTok), showIcon: showIcon, text: txt };
         }
         function textRow(txt) {
-            return {
-                glyph: "",
-                glyphType: "",
-                glyphKdeFallback: "",
-                showIcon: false,
-                text: txt
-            };
+            return { iconInfo: emptyInfo, showIcon: false, text: txt };
         }
         function row(iconTok, iconText, labelText) {
             return textMode ? textRow(labelText) : iconRow(iconTok, iconText);
@@ -441,26 +428,14 @@ ColumnLayout {
             if (textMode)
                 return [textRow(i18n("Wind:") + " " + windTxt)];
             // Icons mode: use wind-direction glyph for wi-font
-            var glyph, type, kdf;
+            var windInfo;
             if (ttIconTheme === "wi-font") {
-                glyph = isNaN(r.windDirection) ? "\uF050" : W.windDirectionGlyph(r.windDirection);
-                type = "wi";
-                kdf = "";
+                var g = isNaN(r.windDirection) ? "\uF050" : W.windDirectionGlyph(r.windDirection);
+                windInfo = { type: "wi", source: g, svgFallback: "", isMask: false };
             } else {
-                var info = ttItemIconInfo("wind");
-                glyph = info.source;
-                type = info.type;
-                kdf = info.kdeFallback;
+                windInfo = ttItemIconInfo("wind");
             }
-            return [
-                {
-                    glyph: glyph,
-                    glyphType: type,
-                    glyphKdeFallback: kdf,
-                    showIcon: showIcon,
-                    text: windTxt
-                }
-            ];
+            return [{ iconInfo: windInfo, showIcon: showIcon, text: windTxt }];
         }
 
         if (tok === "humidity")
@@ -477,8 +452,129 @@ ColumnLayout {
             return [row("visibility", visTxt, i18n("Visibility:") + " " + visTxt)];
         }
 
-        if (tok === "moonphase")
-            return [row("moonphase", i18n(Moon.moonPhaseNameKey()), i18n("Moon:") + " " + i18n(Moon.moonPhaseNameKey()))];
+        if (tok === "preciprate") {
+            var pTxt = r.precipValue(r.precipMmh);
+            return [row("preciprate", pTxt, i18n("Precipitation:") + " " + pTxt)];
+        }
+
+        if (tok === "precipsum") {
+            var psTxt = r.precipSumText(r.precipSumMm);
+            return [row("precipsum", psTxt, i18n("Precip. Sum:") + " " + psTxt)];
+        }
+
+        if (tok === "uvindex") {
+            var uvTxt = r.uvIndexText(r.uvIndex);
+            return [row("uvindex", uvTxt, i18n("UV Index:") + " " + uvTxt)];
+        }
+
+        if (tok === "airquality") {
+            var aqTxt = r.airQualityText();
+            return [row("airquality", aqTxt, i18n("Air Quality:") + " " + aqTxt)];
+        }
+
+        if (tok === "pollen") {
+            var polTxt = r.pollenText();
+            return [row("pollen", polTxt, i18n("Pollen:") + " " + polTxt)];
+        }
+
+        if (tok === "spaceweather") {
+            var swTxt = r.spaceWeatherText();
+            return [row("spaceweather", swTxt, i18n("Space Weather:") + " " + swTxt)];
+        }
+
+        if (tok === "alerts") {
+            var alTxt = r.alertsText();
+            return [row("alerts", alTxt, i18n("Alerts:") + " " + alTxt)];
+        }
+
+        if (tok === "snowcover") {
+            var snTxt = r.snowDepthText(r.snowDepthCm);
+            return [row("snowcover", snTxt, i18n("Snow Cover:") + " " + snTxt)];
+        }
+
+        if (tok === "moonphase") {
+            var _age = Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase);
+            var phaseName = i18n(Moon.moonPhaseNameKey(_age));
+            var moonMode = ttMoonPhaseMode;
+            var riseTime = r.formatTimeForDisplay(r.moonriseTimeText);
+            var setTime = r.formatTimeForDisplay(r.moonsetTimeText);
+
+            if (moonMode === "phase")
+                return [row("moonphase", phaseName, i18n("Moon:") + " " + phaseName)];
+
+            if (moonMode === "moonrise")
+                return textMode ? [textRow(i18n("Moonrise:") + " " + riseTime)]
+                    : [iconRow("moonphase-moonrise", riseTime)];
+
+            if (moonMode === "moonset")
+                return textMode ? [textRow(i18n("Moonset:") + " " + setTime)]
+                    : [iconRow("moonphase-moonset", setTime)];
+
+            if (moonMode === "upcoming-times") {
+                // Show next moonrise or moonset
+                function parseMoonMins(s) {
+                    if (!s || s.indexOf(":") < 0) return -1;
+                    var pts = s.split(":");
+                    return parseInt(pts[0]) * 60 + parseInt(pts[1]);
+                }
+                var nowMM = (new Date()).getHours() * 60 + (new Date()).getMinutes();
+                var riseMM = parseMoonMins(r.moonriseTimeText);
+                var setMM = parseMoonMins(r.moonsetTimeText);
+                var useSetM = riseMM >= 0 && nowMM >= riseMM && (setMM < 0 || nowMM < setMM);
+                if (useSetM)
+                    return textMode ? [textRow(i18n("Moonset:") + " " + setTime)]
+                        : [iconRow("moonphase-moonset", setTime)];
+                else
+                    return textMode ? [textRow(i18n("Moonrise:") + " " + riseTime)]
+                        : [iconRow("moonphase-moonrise", riseTime)];
+            }
+
+            if (moonMode === "times") {
+                // Moonrise + moonset only
+                if (textMode) {
+                    return [textRow(i18n("Moonrise:") + " " + riseTime), textRow(i18n("Moonset:") + " " + setTime)];
+                }
+                return [
+                    { iconInfo: ttItemIconInfo("moonphase-moonrise"), showIcon: showIcon, text: riseTime },
+                    { iconInfo: ttItemIconInfo("moonphase-moonset"), showIcon: showIcon, text: setTime }
+                ];
+            }
+
+            if (moonMode === "upcoming") {
+                // Phase + upcoming rise/set
+                var rows2 = [row("moonphase", phaseName, i18n("Moon:") + " " + phaseName)];
+                function parseMoonMins2(s) {
+                    if (!s || s.indexOf(":") < 0) return -1;
+                    var pts = s.split(":");
+                    return parseInt(pts[0]) * 60 + parseInt(pts[1]);
+                }
+                var nowMM2 = (new Date()).getHours() * 60 + (new Date()).getMinutes();
+                var riseMM2 = parseMoonMins2(r.moonriseTimeText);
+                var setMM2 = parseMoonMins2(r.moonsetTimeText);
+                var useSetM2 = riseMM2 >= 0 && nowMM2 >= riseMM2 && (setMM2 < 0 || nowMM2 < setMM2);
+                if (useSetM2)
+                    rows2.push(textMode ? textRow(i18n("Moonset:") + " " + setTime)
+                        : { iconInfo: ttItemIconInfo("moonphase-moonset"), showIcon: showIcon, text: setTime });
+                else
+                    rows2.push(textMode ? textRow(i18n("Moonrise:") + " " + riseTime)
+                        : { iconInfo: ttItemIconInfo("moonphase-moonrise"), showIcon: showIcon, text: riseTime });
+                return rows2;
+            }
+
+            // "full" (default): phase + moonrise + moonset
+            if (textMode) {
+                return [
+                    textRow(i18n("Moon:") + " " + phaseName),
+                    textRow(i18n("Moonrise:") + " " + riseTime),
+                    textRow(i18n("Moonset:") + " " + setTime)
+                ];
+            }
+            return [
+                { iconInfo: ttItemIconInfo("moonphase"), showIcon: showIcon, text: phaseName },
+                { iconInfo: ttItemIconInfo("moonphase-moonrise"), showIcon: showIcon, text: riseTime },
+                { iconInfo: ttItemIconInfo("moonphase-moonset"), showIcon: showIcon, text: setTime }
+            ];
+        }
 
         if (tok === "suntimes") {
             var mode = ttSunTimesMode;
@@ -496,26 +592,12 @@ ColumnLayout {
             }
 
             if (mode === "sunrise") {
-                return textMode ? [textRow(i18n("Sunrise:") + " " + riseTime)] : [
-                    {
-                        glyph: infoRise.source,
-                        glyphType: infoRise.type,
-                        glyphKdeFallback: infoRise.kdeFallback,
-                        showIcon: showIcon,
-                        text: riseTime
-                    }
-                ];
+                return textMode ? [textRow(i18n("Sunrise:") + " " + riseTime)]
+                    : [{ iconInfo: infoRise, showIcon: showIcon, text: riseTime }];
             }
             if (mode === "sunset") {
-                return textMode ? [textRow(i18n("Sunset:") + " " + setTime)] : [
-                    {
-                        glyph: infoSet.source,
-                        glyphType: infoSet.type,
-                        glyphKdeFallback: infoSet.kdeFallback,
-                        showIcon: showIcon,
-                        text: setTime
-                    }
-                ];
+                return textMode ? [textRow(i18n("Sunset:") + " " + setTime)]
+                    : [{ iconInfo: infoSet, showIcon: showIcon, text: setTime }];
             }
             if (mode === "upcoming") {
                 var nowM = (new Date()).getHours() * 60 + (new Date()).getMinutes();
@@ -523,45 +605,19 @@ ColumnLayout {
                 var setM = parseMins(r.sunsetTimeText);
                 var useSet = riseM >= 0 && nowM >= riseM && (setM < 0 || nowM < setM);
                 if (useSet)
-                    return textMode ? [textRow(i18n("Sunset:") + " " + setTime)] : [
-                        {
-                            glyph: infoSet.source,
-                            glyphType: infoSet.type,
-                            glyphKdeFallback: infoSet.kdeFallback,
-                            showIcon: showIcon,
-                            text: setTime
-                        }
-                    ];
+                    return textMode ? [textRow(i18n("Sunset:") + " " + setTime)]
+                        : [{ iconInfo: infoSet, showIcon: showIcon, text: setTime }];
                 else
-                    return textMode ? [textRow(i18n("Sunrise:") + " " + riseTime)] : [
-                        {
-                            glyph: infoRise.source,
-                            glyphType: infoRise.type,
-                            glyphKdeFallback: infoRise.kdeFallback,
-                            showIcon: showIcon,
-                            text: riseTime
-                        }
-                    ];
+                    return textMode ? [textRow(i18n("Sunrise:") + " " + riseTime)]
+                        : [{ iconInfo: infoRise, showIcon: showIcon, text: riseTime }];
             }
             // "both" (default)
             if (textMode) {
                 return [textRow(i18n("Sunrise:") + " " + riseTime), textRow(i18n("Sunset:") + " " + setTime)];
             }
             return [
-                {
-                    glyph: infoRise.source,
-                    glyphType: infoRise.type,
-                    glyphKdeFallback: infoRise.kdeFallback,
-                    showIcon: showIcon,
-                    text: riseTime
-                },
-                {
-                    glyph: infoSet.source,
-                    glyphType: infoSet.type,
-                    glyphKdeFallback: infoSet.kdeFallback,
-                    showIcon: showIcon,
-                    text: setTime
-                }
+                { iconInfo: infoRise, showIcon: showIcon, text: riseTime },
+                { iconInfo: infoSet, showIcon: showIcon, text: setTime }
             ];
         }
         return [];

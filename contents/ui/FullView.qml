@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * FullView.qml — Main widget popup
  */
@@ -9,6 +26,8 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 
 import "js/weather.js" as W
+import "js/iconResolver.js" as IconResolver
+import "components"
 
 Rectangle {
     id: fullView
@@ -25,6 +44,67 @@ Rectangle {
 
     // Maximum height: 90% of screen height, but no more than 40 grid units
     readonly property int maxHeight: Math.min(Screen.desktopAvailableHeight * 0.9, Kirigami.Units.gridUnit * 40)
+
+    // Condition icon theme for the hero icon — "kde" uses system icons, others use SVGs
+    readonly property string conditionIconTheme: {
+        var t = Plasmoid.configuration.conditionIconTheme || "kde";
+        return (t === "wi-font") ? "symbolic" : t;
+    }
+    readonly property url iconsBaseDir: Qt.resolvedUrl("../icons/")
+
+    /** Resolve a condition icon, handling the "custom" theme with per-condition overrides */
+    function resolveConditionIcon(code, isNight, iconSize) {
+        if (fullView.conditionIconTheme === "custom") {
+            var raw = Plasmoid.configuration.widgetConditionCustomIcons || "";
+            var m = {};
+            if (raw.length > 0) {
+                raw.split(";").forEach(function (pair) {
+                    var kv = pair.split("=");
+                    if (kv.length === 2 && kv[0].trim().length > 0)
+                        m[kv[0].trim()] = kv[1].trim();
+                });
+            }
+            if (m["condition-custom"] === "1") {
+                var condKey;
+                if (code === 0)
+                    condKey = isNight ? "condition-clear-night" : "condition-clear";
+                else if (code === 1)
+                    condKey = isNight ? "condition-few-clouds-night" : "condition-few-clouds";
+                else if (code === 2)
+                    condKey = isNight ? "condition-cloudy-night" : "condition-cloudy-day";
+                else if (code === 3)
+                    condKey = "condition-overcast";
+                else if (code === 45 || code === 48)
+                    condKey = "condition-fog";
+                else if (code === 51 || code === 53 || code === 55 || code === 61 || code === 80)
+                    condKey = isNight ? "condition-showers-scattered-night" : "condition-showers-scattered-day";
+                else if (code === 63 || code === 65 || code === 81 || code === 82)
+                    condKey = isNight ? "condition-showers-night" : "condition-showers-day";
+                else if (code === 56 || code === 66)
+                    condKey = isNight ? "condition-freezing-scattered-rain-night" : "condition-freezing-scattered-rain-day";
+                else if (code === 57 || code === 67)
+                    condKey = isNight ? "condition-freezing-rain-night" : "condition-freezing-rain-day";
+                else if (code === 71 || code === 77 || code === 85)
+                    condKey = isNight ? "condition-snow-scattered-night" : "condition-snow-scattered-day";
+                else if (code === 73 || code === 75 || code === 86)
+                    condKey = isNight ? "condition-snow-night" : "condition-snow-day";
+                else if (code === 95)
+                    condKey = isNight ? "condition-storm-night" : "condition-storm-day";
+                else if (code === 96)
+                    condKey = isNight ? "condition-hail-storm-rain-night" : "condition-hail-storm-rain-day";
+                else if (code === 99)
+                    condKey = isNight ? "condition-hail-storm-snow-night" : "condition-hail-storm-snow-day";
+                else
+                    condKey = isNight ? "condition-clear-night" : "condition-clear";
+                var fallback = W.weatherCodeToIcon(code, isNight);
+                var saved = (condKey in m && m[condKey].length > 0) ? m[condKey] : fallback;
+                return { type: "kde", source: saved, svgFallback: "", isMask: false };
+            }
+            // condition-custom not set — fall back to KDE icons
+            return IconResolver.resolveCondition(code, isNight, iconSize, fullView.iconsBaseDir, "kde");
+        }
+        return IconResolver.resolveCondition(code, isNight, iconSize, fullView.iconsBaseDir, fullView.conditionIconTheme);
+    }
 
     // Always transparent — Plasma draws the background via backgroundHints
     // (DefaultBackground | ConfigurableBackground set in main.qml).
@@ -62,7 +142,6 @@ Rectangle {
             text: i18n("No location set")
             // #2: textColor instead of hardcoded white
             color: Qt.tint(Kirigami.Theme.textColor, Qt.rgba(0, 0, 0, 0))
-            opacity: 0.6
             font: weatherRoot ? weatherRoot.wf(14, true) : Qt.font({
                 bold: true
             })
@@ -98,7 +177,6 @@ Rectangle {
                 source: "mark-location"
                 width: 13
                 height: 13
-                opacity: 0.4
                 Layout.alignment: Qt.AlignVCenter
             }
 
@@ -107,7 +185,6 @@ Rectangle {
                 text: Plasmoid.configuration.locationName || ""
                 // #2
                 color: Kirigami.Theme.textColor
-                opacity: 0.65
                 font: weatherRoot ? weatherRoot.wf(11, false) : Qt.font({})
                 elide: Text.ElideRight
                 verticalAlignment: Text.AlignVCenter
@@ -119,7 +196,6 @@ Rectangle {
                 display: AbstractButton.IconOnly
                 width: 22
                 height: 22
-                opacity: 0.55
                 ToolTip.visible: hovered
                 ToolTip.text: i18n("Detect / change location…")
                 onClicked: if (weatherRoot)
@@ -131,7 +207,6 @@ Rectangle {
                 text: i18n("Updating…")
                 // #2
                 color: Kirigami.Theme.textColor
-                opacity: 0.35
                 font: weatherRoot ? weatherRoot.wf(10, false) : Qt.font({})
             }
 
@@ -186,26 +261,23 @@ Rectangle {
                 Label {
                     text: weatherRoot ? weatherRoot.weatherCodeToText(weatherRoot.weatherCode, weatherRoot.isNightTime()) : ""
                     color: Kirigami.Theme.textColor
-                    opacity: 0.6
-                    font: weatherRoot ? weatherRoot.wf(13, false) : Qt.font({})
+                    font: weatherRoot ? weatherRoot.wf(15, true) : Qt.font({})
                     wrapMode: Text.WordWrap
                     Layout.maximumWidth: 130
                 }
                 Label {
                     text: weatherRoot ? i18n("Feels like: %1", weatherRoot.tempValue(weatherRoot.apparentC)) : ""
                     color: Kirigami.Theme.textColor
-                    opacity: 0.38
                     font: weatherRoot ? weatherRoot.wf(10, false) : Qt.font({})
                 }
             }
 
             // CENTRE — condition icon enlarged to 120 px (#6)
-            Kirigami.Icon {
+            WeatherIcon {
                 anchors.centerIn: parent
-                source: weatherRoot ? W.weatherCodeToIcon(weatherRoot.weatherCode, weatherRoot.isNightTime()) : "weather-none-available"
-                width: 120
-                height: 120
-                smooth: true
+                iconInfo: weatherRoot ? fullView.resolveConditionIcon(
+                    weatherRoot.weatherCode, weatherRoot.isNightTime(), 32) : null
+                iconSize: 120
             }
 
             // RIGHT — today's High / Low (#7)
@@ -224,7 +296,6 @@ Rectangle {
                         Layout.alignment: Qt.AlignHCenter
                         text: i18n("High")
                         color: Kirigami.Theme.textColor
-                        opacity: 0.45
                         font: weatherRoot ? weatherRoot.wf(9, false) : Qt.font({})
                     }
                     Label {
@@ -245,7 +316,6 @@ Rectangle {
                         Layout.alignment: Qt.AlignHCenter
                         text: i18n("Low")
                         color: Kirigami.Theme.textColor
-                        opacity: 0.45
                         font: weatherRoot ? weatherRoot.wf(9, false) : Qt.font({})
                     }
                     Label {
@@ -341,7 +411,7 @@ Rectangle {
             }
         }
 
-        // ── Footer: "Updated HH:mm (Provider)" ───────────────────────
+        // ── Footer: "Updated HH:mm · Weather provider: <link>" ─────────
         Item {
             Layout.preferredHeight: 6
         }
@@ -349,12 +419,16 @@ Rectangle {
             Layout.fillWidth: true
             visible: Plasmoid.configuration.showUpdateText !== false && weatherRoot && !weatherRoot.loading && (weatherRoot.updateText || "").length > 0
             text: weatherRoot ? weatherRoot.updateText : ""
+            textFormat: Text.RichText
+            onLinkActivated: function(link) { Qt.openUrlExternally(link) }
             // #2
             color: Kirigami.Theme.textColor
-            opacity: 0.32
             font: weatherRoot ? weatherRoot.wf(9, false) : Qt.font({})
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
+            HoverHandler {
+                cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+            }
         }
     }
 }

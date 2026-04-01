@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * main.qml — Advanced Weather Widget root
  *
@@ -21,6 +38,8 @@ import org.kde.kirigami as Kirigami
 
 import "js/weather.js" as W
 import "js/moonphase.js" as Moon
+import "js/suncalc.js" as SC
+import "js/iconResolver.js" as IconResolver
 
 PlasmoidItem {
     id: root
@@ -45,10 +64,31 @@ PlasmoidItem {
     property real humidityPercent: NaN
     property real visibilityKm: NaN
     property real dewPointC: NaN
+    property real precipMmh: NaN           // Current precipitation rate (mm/h)
+    readonly property real precipSumMm: dailyData.length > 0 && !isNaN(dailyData[0].precipMm) ? dailyData[0].precipMm : NaN
+    property real uvIndex: NaN             // UV index (0–11+)
+    property real airQualityIndex: NaN     // AQI numeric value (provider scale)
+    property string airQualityLabel: ""    // "Good", "Moderate", etc.
+    property real aqiPm10:  NaN
+    property real aqiPm2_5: NaN
+    property real aqiCo:    NaN
+    property real aqiNo2:   NaN
+    property real aqiSo2:   NaN
+    property real aqiO3:    NaN
+    property var weatherAlerts: []         // [{headline, severity, description}]
+    property var pollenData: []             // [{key, value}] UPI 0–12 per pollen type
+    property var spaceWeather: null         // NOAA SWPC data object
+    property real snowDepthCm: NaN         // Current snow depth (cm)
     property string sunriseTimeText: "--"
     property string sunsetTimeText: "--"
+    property string moonriseTimeText: "--"
+    property string moonsetTimeText: "--"
     property int weatherCode: -1
     property int isDay: -1   // -1=unknown, 0=night, 1=day (populated by API when available)
+    // UTC offset of the weather location in minutes (e.g. -420 for California UTC-7).
+    // Set by WeatherService from the API response. Used by sunpath.js to convert
+    // UTC clock time to location-local time without relying on Intl (unsupported in Qt V4).
+    property int locationUtcOffsetMins: 0
     property var dailyData: []
     property var hourlyData: []
     property int panelScrollIndex: 0
@@ -76,14 +116,18 @@ PlasmoidItem {
         // Plasma reads Layout.minimumWidth/Height from the fullRepresentation
         // item — NOT from PlasmoidItem — to enforce resize limits.
 
-        Layout.minimumWidth: 540
-        Layout.minimumHeight: 550
+        Layout.minimumWidth: {
+            if ((Plasmoid.configuration.widgetMinWidthMode || "auto") === "manual")
+                return Math.max(200, Plasmoid.configuration.widgetMinWidth || 800);
+            return 800;
+        }
+        Layout.minimumHeight: {
+            if ((Plasmoid.configuration.widgetMinHeightMode || "auto") === "manual")
+                return Math.max(200, Plasmoid.configuration.widgetMinHeight || 750);
+            return 750;
+        }
     }
 
-    // And update it when the full representation is created:
-    onFullRepresentationItemChanged: {
-        fullViewItem = fullRepresentationItem;
-    }
 
     // ══════════════════════════════════════════════════════════════════════
     // Service — all API calls delegated to WeatherService
@@ -205,7 +249,7 @@ PlasmoidItem {
         return Plasmoid.configuration.temperatureUnit || "C";
     }
     function tempValue(celsius) {
-        return W.formatTemp(celsius, _tempUnit(), Plasmoid.configuration.roundValues);
+        return W.formatTemp(celsius, _tempUnit(), Plasmoid.configuration.roundValues, Plasmoid.configuration.showTempUnit);
     }
 
     function _windUnit() {
@@ -224,6 +268,160 @@ PlasmoidItem {
     }
     function pressureValue(hpa) {
         return W.formatPressure(hpa, _pressureUnit());
+    }
+
+    function _isImperial() {
+        if (Plasmoid.configuration.unitsMode === "kde")
+            return Qt.locale().measurementSystem === 1;
+        return (_tempUnit() === "F");
+    }
+
+    function precipValue(mmh) {
+        if (isNaN(mmh)) return "--";
+        if (_isImperial())
+            return (mmh / 25.4).toFixed(2) + " in/h";
+        return mmh.toFixed(1) + " mm/h";
+    }
+
+    function precipSumText(mm) {
+        if (isNaN(mm)) return "--";
+        if (_isImperial())
+            return (mm / 25.4).toFixed(2) + " in";
+        return mm.toFixed(1) + " mm";
+    }
+
+    function uvIndexText(uv) {
+        if (isNaN(uv)) return "--";
+        var v = Math.round(uv * 10) / 10;
+        if (v <= 2) return v + " (" + i18n("Low") + ")";
+        if (v <= 5) return v + " (" + i18n("Moderate") + ")";
+        if (v <= 7) return v + " (" + i18n("High") + ")";
+        if (v <= 10) return v + " (" + i18n("Very High") + ")";
+        return v + " (" + i18n("Extreme") + ")";
+    }
+
+    function airQualityText() {
+        if (isNaN(airQualityIndex)) return "--";
+        // EU AQI band
+        var label = "";
+        var square = "";
+        if (airQualityIndex < 25)       { label = i18n("Good");           square = "\u{1F7E2}"; }  // 🟢
+        else if (airQualityIndex < 50)  { label = i18n("Fair");           square = "\u{1F7E1}"; }  // 🟡
+        else if (airQualityIndex < 75)  { label = i18n("Moderate");       square = "\u{1F7E0}"; }  // 🟠
+        else if (airQualityIndex < 100) { label = i18n("Poor");           square = "\u{1F534}"; }  // 🔴
+        else if (airQualityIndex < 150) { label = i18n("Very Poor");      square = "\u{1F7E3}"; }  // 🟣
+        else                            { label = i18n("Extremely Poor"); square = "\u{1F7E4}"; }  // 🟤
+        // Compute AQHI from EU AQI
+        var aqhi;
+        var aqi = airQualityIndex;
+        if (aqi <= 0)        aqhi = 1;
+        else if (aqi <= 25)  aqhi = 1 + (aqi / 25) * 2;
+        else if (aqi <= 50)  aqhi = 4 + ((aqi - 25) / 25) * 2;
+        else if (aqi <= 75)  aqhi = 7;
+        else if (aqi <= 100) aqhi = 8 + ((aqi - 75) / 25);
+        else                 aqhi = 10;
+        return square + " " + label + " · " + i18n("AQI") + ": " + Math.round(aqi) + " | " + i18n("AQHI") + ": " + Math.round(aqhi);
+    }
+
+    /**
+     * Returns the dominant pollen display text for the panel / tooltip chip.
+     * Format: "<PollenName>: <Label> (<value>)"
+     */
+    function pollenText() {
+        if (!pollenData || pollenData.length === 0) return "--";
+        var best = null;
+        for (var i = 0; i < pollenData.length; i++) {
+            var p = pollenData[i];
+            if (isNaN(p.value) || p.value === null) continue;
+            if (!best || p.value > best.value) best = p;
+        }
+        if (!best) return "--";
+        var label = "";
+        if (best.value < 2.5)      label = i18n("Low");
+        else if (best.value < 4.9) label = i18n("Moderate");
+        else if (best.value < 7.3) label = i18n("High");
+        else                       label = i18n("Very High");
+        var name = "";
+        switch (best.key) {
+            case "alder":   name = i18n("Alder");   break;
+            case "birch":   name = i18n("Birch");   break;
+            case "grass":   name = i18n("Grass");   break;
+            case "mugwort": name = i18n("Mugwort"); break;
+            case "olive":   name = i18n("Olive");   break;
+            case "ragweed": name = i18n("Ragweed"); break;
+            default:        name = best.key;
+        }
+        return name + ": " + label + " (" + best.value.toFixed(1) + ")";
+    }
+
+    /**
+     * Returns the space weather display text for the panel / tooltip chip.
+     * Collapsed: "Kp 3.3" — or "Kp 5.0 · G1" when storm active.
+     */
+    function spaceWeatherText() {
+        var sw = spaceWeather;
+        if (!sw || isNaN(sw.kp)) return "--";
+        return "Kp " + sw.kp.toFixed(1) + " · " + (sw.gScale || "G0");
+    }
+
+    function snowDepthText(cm) {
+        if (isNaN(cm)) return "--";
+        if (_isImperial())
+            return (cm / 2.54).toFixed(1) + " in";
+        return cm.toFixed(1) + " cm";
+    }
+
+    /** Returns a numeric priority for an alert color — higher = more severe. */
+    function alertColorPriority(color) {
+        var c = (color || "").toLowerCase();
+        if (c === "red")    return 3;
+        if (c === "orange") return 2;
+        if (c === "yellow") return 1;
+        return 0;
+    }
+
+    /**
+     * Returns the single highest-priority currently-active alert,
+     * or the first alert if none are active yet.
+     */
+    function primaryAlert() {
+        if (!weatherAlerts || weatherAlerts.length === 0) return null;
+        var now = new Date();
+        var best = null;
+        for (var i = 0; i < weatherAlerts.length; i++) {
+            var a = weatherAlerts[i];
+            var onset   = a.onset   ? new Date(a.onset)   : null;
+            var expires = a.expires ? new Date(a.expires) : null;
+            var active  = (!onset || onset <= now) && (!expires || expires >= now);
+            if (!active) continue;
+            if (!best || alertColorPriority(a.color) > alertColorPriority(best.color))
+                best = a;
+        }
+        return best || weatherAlerts[0];
+    }
+
+    function alertsText() {
+        if (!weatherAlerts || weatherAlerts.length === 0) return i18n("None");
+        var p = primaryAlert();
+        return p ? (p.displayName || p.headline || i18n("1 Alert")) : i18n("None");
+    }
+
+    function alertTypeGlyph(typeNum) {
+        switch (typeNum) {
+            case 1:  return "\uF050"; // wind
+            case 2:  return "\uF076"; // snow/ice
+            case 3:  return "\uF01E"; // thunderstorm
+            case 4:  return "\uF014"; // fog
+            case 5:  return "\uF072"; // high temperature
+            case 6:  return "\uF076"; // low temperature
+            case 7:  return "\uF0CD"; // coastal event
+            case 8:  return "\uF0C7"; // forest fire
+            case 9:  return "\uF076"; // avalanche
+            case 10: return "\uF019"; // rain
+            case 11: return "\uF04E"; // flooding
+            case 12: return "\uF019"; // rain-flood
+            default: return "\uF0CE"; // generic warning
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -300,41 +498,67 @@ PlasmoidItem {
         }
     }
 
+    /** Returns the condition icon SVG stem for a weather code + night flag. */
+    function _conditionSvgStem(code, night) {
+        return IconResolver._conditionSvgStem(code, night);
+    }
+
+    // Icons base directory — resolved once so it works in all contexts
+    readonly property string _iconsBaseDir: Qt.resolvedUrl("../icons/") + ""
+
     function getSimpleModeIconSource() {
         var theme = Plasmoid.configuration.panelIconTheme || "wi-font";
-        var code = weatherCode;
+        var code  = weatherCode;
         var night = isNightTime();
         var style = Plasmoid.configuration.panelSimpleIconStyle || "symbolic";
-
-        // For colorful style, always use KDE system icons (they are naturally colorful)
-        if (style === "colorful" || theme === "kde" || theme === "custom") {
+        // Custom style: use per-condition custom icons from panelCustomIcons
+        if (style === "custom") {
+            var customMap = {};
+            var raw = Plasmoid.configuration.panelCustomIcons || "";
+            if (raw.length > 0) {
+                raw.split(";").forEach(function (pair) {
+                    var kv = pair.split("=");
+                    if (kv.length === 2 && kv[0].trim().length > 0)
+                        customMap[kv[0].trim()] = kv[1].trim();
+                });
+            }
+            if (customMap["condition-custom"] === "1") {
+                var condKey = _resolveConditionKey(code, night);
+                if (condKey in customMap && customMap[condKey].length > 0)
+                    return customMap[condKey];
+            }
             return W.weatherCodeToIcon(code, night);
-        } else {
-            // For SVG themes, return the appropriate SVG path
-            var iconSz = Plasmoid.configuration.panelIconSize || 22;
-            var resolvedTheme = theme;
-            if (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light")
-                resolvedTheme = "symbolic-light";
-            var base = Qt.resolvedUrl("../icons/" + resolvedTheme + "/" + iconSz + "/wi-");
-
-            var stem;
-            if (code === 0)
-                stem = night ? "night-clear" : "day-sunny";
-            else if (code <= 2)
-                stem = night ? "night-alt-partly-cloudy" : "day-cloudy";
-            else if (code === 3)
-                stem = "cloudy";
-            else if (code <= 48)
-                stem = night ? "night-fog" : "day-fog";
-            else if (code <= 65)
-                stem = night ? "night-alt-rain" : "day-rain";
-            else if (code <= 75)
-                stem = night ? "night-alt-snow" : "day-snow";
-            else
-                stem = night ? "night-alt-thunderstorm" : "day-thunderstorm";
-
-            return base + stem + ".svg";
         }
+        if (style === "colorful" || theme === "kde" || theme === "custom")
+            return W.weatherCodeToIcon(code, night);
+        var iconSz = Plasmoid.configuration.panelIconSize || 22;
+        var resolvedTheme = (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light")
+            ? "symbolic-light" : theme;
+        return IconResolver.svgUrl(IconResolver._conditionSvgStem(code, night), iconSz, _iconsBaseDir, resolvedTheme);
+    }
+
+    function getMultilineModeIconSource() {
+        var code  = weatherCode;
+        var night = isNightTime();
+        var style = Plasmoid.configuration.panelMultilineIconStyle || "colorful";
+        if (style === "custom") {
+            var customMap = {};
+            var raw = Plasmoid.configuration.panelCustomIcons || "";
+            if (raw.length > 0) {
+                raw.split(";").forEach(function (pair) {
+                    var kv = pair.split("=");
+                    if (kv.length === 2 && kv[0].trim().length > 0)
+                        customMap[kv[0].trim()] = kv[1].trim();
+                });
+            }
+            if (customMap["condition-custom"] === "1") {
+                var condKey = _resolveConditionKey(code, night);
+                if (condKey in customMap && customMap[condKey].length > 0)
+                    return customMap[condKey];
+            }
+            return W.weatherCodeToIcon(code, night);
+        }
+        return W.weatherCodeToIcon(code, night);
     }
 
     function getSimpleModeIconChar() {
@@ -385,7 +609,7 @@ PlasmoidItem {
     function moonPhaseLabel() {
         // Each string is a literal so xgettext can extract all 8 translations.
         // moonPhaseNameKey() returns the English key; we map it here.
-        var key = Moon.moonPhaseNameKey();
+        var key = Moon.moonPhaseNameKey(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
         if (key === "New Moon")
             return i18n("New Moon");
         if (key === "Waxing Crescent")
@@ -406,10 +630,26 @@ PlasmoidItem {
     }
 
     function moonPhaseGlyph() {
-        return Moon.moonPhaseFontIcon();
+        return Moon.moonPhaseFontIcon(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
     }
-    function moonPhaseSvgUrl() {
-        return Qt.resolvedUrl("../icons/wi-" + Moon.moonPhaseSvgStem() + ".svg");
+
+    /** Compute moonrise / moonset using suncalc.js and update root properties */
+    function _computeMoonTimes() {
+        var lat = Plasmoid.configuration.latitude;
+        var lon = Plasmoid.configuration.longitude;
+        if (isNaN(lat) || isNaN(lon) || (lat === 0 && lon === 0)) {
+            moonriseTimeText = "--";
+            moonsetTimeText = "--";
+            return;
+        }
+        var t = SC.getMoonTimes(new Date(), lat, lon, locationUtcOffsetMins);
+        moonriseTimeText = t.rise || "--";
+        moonsetTimeText  = t.set  || "--";
+    }
+
+    onLoadingChanged: {
+        if (!loading && !isNaN(temperatureC))
+            _computeMoonTimes();
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -468,8 +708,17 @@ PlasmoidItem {
             return "\uF079";        // wi-barometer
         if (tok === "location")
             return "\uF0B1";       // wi-direction (F0B1)
-        if (tok === "moonphase")
+        if (tok === "moonphase") {
+            var mm = Plasmoid.configuration.panelMoonPhaseMode || "full";
+            if (mm === "moonrise") return "\uF0C9";
+            if (mm === "moonset") return "\uF0CA";
+            if (mm === "upcoming-times") return _moonUpcoming() === "rise" ? "\uF0C9" : "\uF0CA";
             return moonPhaseGlyph();
+        }
+        if (tok === "moonphase-moonrise")
+            return "\uF0C9";
+        if (tok === "moonphase-moonset")
+            return "\uF0CA";
         if (tok === "wind")
             return W.windDirectionGlyph(windDirection);
         if (tok === "condition") {
@@ -505,6 +754,25 @@ PlasmoidItem {
             }
             return "\uF051";
         }
+        if (tok === "preciprate")
+            return "\uF04E";        // wi-sprinkle (rain drop)
+        if (tok === "precipsum")
+            return "\uF07C";        
+        if (tok === "uvindex")
+            return "\uF072";        // wi-hot
+        if (tok === "airquality")
+            return "\uF074";        // wi-smog
+        if (tok === "pollen")
+            return "\uF082";        // wi-sandstorm
+        if (tok === "spaceweather")
+            return "\uF06E";        // wi-solar-eclipse
+        if (tok === "alerts") {
+            var pa = primaryAlert();
+            if (pa) return alertTypeGlyph(pa.awarenessType || 0);
+            return "\uF0CE";        // wi-gale-warning (flag)
+        }
+        if (tok === "snowcover")
+            return "\uF076";        // wi-snowflake-cold
         return "";
     }
 
@@ -528,16 +796,11 @@ PlasmoidItem {
         // ── Font icons (default) ──────────────────────────────────────────────
         if (theme === "wi-font") {
             var g = panelItemGlyph(tok);
-            // location: F0B1 renders via wi-font Text element
-            return {
-                type: "wi",
-                source: g
-            };
+            return { type: "wi", source: g, svgFallback: "", isMask: false };
         }
 
         // ── Custom icon theme — user picks each icon individually ────────────
         if (theme === "custom") {
-            // Parse saved mapping: "location=mark-location;temperature=thermometer;..."
             var customMap = {};
             var raw = Plasmoid.configuration.panelCustomIcons || "";
             if (raw.length > 0) {
@@ -547,7 +810,6 @@ PlasmoidItem {
                         customMap[kv[0].trim()] = kv[1].trim();
                 });
             }
-            // Default KDE fallbacks when no custom icon saved for this item
             var defaults = {
                 condition: W.weatherCodeToIcon(weatherCode, isNightTime()),
                 temperature: "thermometer",
@@ -556,44 +818,29 @@ PlasmoidItem {
                 pressure: "weather-overcast",
                 wind: "weather-windy",
                 moonphase: "weather-clear-night",
-                location: "mark-location"
+                location: "mark-location",
+                preciprate: "weather-showers",
+                precipsum: "flood",
+                uvindex: "weather-clear",
+                airquality: "weather-many-clouds",
+                pollen: "sandstorm",
+                spaceweather: "stars",
+                alerts: "weather-storm",
+                snowcover: "weather-snow-scattered"
             };
 
-            // Condition: per-weather-code custom icons when condition-custom=1
             if (tok === "condition") {
                 if (customMap["condition-custom"] === "1") {
                     var code2 = weatherCode;
                     var night2 = isNightTime();
-                    var condKey;
-                    if (code2 === 0)
-                        condKey = night2 ? "condition-clear-night" : "condition-clear";
-                    else if (code2 <= 2)
-                        condKey = night2 ? "condition-cloudy-night" : "condition-cloudy-day";
-                    else if (code2 === 3)
-                        condKey = "condition-overcast";
-                    else if (code2 <= 48)
-                        condKey = "condition-fog";
-                    else if (code2 <= 65)
-                        condKey = "condition-rain";
-                    else if (code2 <= 75)
-                        condKey = "condition-snow";
-                    else
-                        condKey = "condition-storm";
+                    var condKey = _resolveConditionKey(code2, night2);
                     var fallback2 = W.weatherCodeToIcon(code2, night2);
                     var condSaved2 = (condKey in customMap && customMap[condKey].length > 0) ? customMap[condKey] : fallback2;
-                    return {
-                        type: "kde",
-                        source: condSaved2
-                    };
+                    return { type: "kde", source: condSaved2, svgFallback: "", isMask: false };
                 }
-                // KDE mode (condition-custom not set) → system icon based on weather code
-                return {
-                    type: "kde",
-                    source: W.weatherCodeToIcon(weatherCode, isNightTime())
-                };
+                return { type: "kde", source: W.weatherCodeToIcon(weatherCode, isNightTime()), svgFallback: "", isMask: false };
             }
 
-            // Suntimes: pick sunrise or sunset icon independently
             if (tok === "suntimes") {
                 var mode2 = Plasmoid.configuration.panelSunTimesMode || "upcoming";
                 var nowM2 = (new Date()).getHours() * 60 + (new Date()).getMinutes();
@@ -603,176 +850,125 @@ PlasmoidItem {
                 var sunKey2 = useSet2 ? "suntimes-sunset" : "suntimes-sunrise";
                 var sunDef2 = useSet2 ? "weather-sunset" : "weather-sunrise";
                 var sunSaved2 = (sunKey2 in customMap && customMap[sunKey2].length > 0) ? customMap[sunKey2] : sunDef2;
-                return {
-                    type: "kde",
-                    source: sunSaved2
-                };
+                return { type: "kde", source: sunSaved2, svgFallback: "", isMask: false };
+            }
+
+            if (tok === "moonphase" || tok === "moonphase-moonrise" || tok === "moonphase-moonset") {
+                if (tok === "moonphase-moonrise") {
+                    var mrSaved = (("moonrise" in customMap) && customMap["moonrise"].length > 0) ? customMap["moonrise"] : "weather-clear-night";
+                    return { type: "kde", source: mrSaved, svgFallback: "", isMask: false };
+                }
+                if (tok === "moonphase-moonset") {
+                    var msSaved = (("moonset" in customMap) && customMap["moonset"].length > 0) ? customMap["moonset"] : "weather-clear-night";
+                    return { type: "kde", source: msSaved, svgFallback: "", isMask: false };
+                }
+                var mm2 = Plasmoid.configuration.panelMoonPhaseMode || "full";
+                if (mm2 === "moonrise") {
+                    var mrS2 = (("moonrise" in customMap) && customMap["moonrise"].length > 0) ? customMap["moonrise"] : "weather-clear-night";
+                    return { type: "kde", source: mrS2, svgFallback: "", isMask: false };
+                }
+                if (mm2 === "moonset") {
+                    var msS2 = (("moonset" in customMap) && customMap["moonset"].length > 0) ? customMap["moonset"] : "weather-clear-night";
+                    return { type: "kde", source: msS2, svgFallback: "", isMask: false };
+                }
+                if (mm2 === "upcoming-times") {
+                    var utKey = _moonUpcoming() === "rise" ? "moonrise" : "moonset";
+                    var utSaved = ((utKey in customMap) && customMap[utKey].length > 0) ? customMap[utKey] : "weather-clear-night";
+                    return { type: "kde", source: utSaved, svgFallback: "", isMask: false };
+                }
+                // Phase-showing modes: use bundled SVG moon phase icon
+                var iconSzC = Plasmoid.configuration.panelIconSize || 22;
+                var moonStemC = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
+                return IconResolver.resolveMoonPhase(moonStemC, iconSzC, _iconsBaseDir, "flat-color");
             }
 
             var iconName = (tok in customMap && customMap[tok].length > 0) ? customMap[tok] : (tok in defaults ? defaults[tok] : "");
-            return {
-                type: "kde",
-                source: iconName
-            };
+            return { type: "kde", source: iconName, svgFallback: "", isMask: false };
         }
 
-        // ── KDE system theme ──────────────────────────────────────────────────
-        if (theme === "kde") {
-            if (tok === "temperature" || tok === "feelslike")
-                return {
-                    type: "kde",
-                    source: "temperature"
-                };
-            if (tok === "humidity")
-                return {
-                    type: "kde",
-                    source: "weather-humidity"
-                };
-            if (tok === "pressure")
-                return {
-                    type: "kde",
-                    source: "weather-pressure"
-                };
-            if (tok === "wind")
-                return {
-                    type: "kde",
-                    source: "weather-wind-beaufort-0"
-                };
-            if (tok === "condition")
-                return {
-                    type: "kde",
-                    source: W.weatherCodeToIcon(weatherCode, isNightTime())
-                };
-            if (tok === "suntimes") {
-                var mode3 = Plasmoid.configuration.panelSunTimesMode || "upcoming";
-                var nowM3 = (new Date()).getHours() * 60 + (new Date()).getMinutes();
-                var riseM3 = parseSunTimeMins(sunriseTimeText);
-                var setM3 = parseSunTimeMins(sunsetTimeText);
-                var useSet3 = (mode3 === "sunset") || (mode3 === "upcoming" && riseM3 >= 0 && nowM3 >= riseM3 && (setM3 < 0 || nowM3 < setM3));
-                return {
-                    type: "kde",
-                    source: useSet3 ? "weather-sunset" : "weather-sunrise"
-                };
-            }
-            if (tok === "moonphase")
-                return {
-                    type: "kde",
-                    source: "weather-clear-night"
-                };
-            if (tok === "location")
-                return {
-                    type: "kde",
-                    source: "mark-location"
-                };
-            return {
-                type: "kde",
-                source: ""
-            };
-        }
-
-        // ── SVG themes: symbolic | flat-color | 3d-oxygen | 3d-adwaita ───────
-        // Files live under icons/<theme>/32/wi-<name>.svg
-        // Using size 32 as a safe universal size that all themes provide.
+        // ── KDE / SVG themes — unified via IconResolver ──────────────────────
+        // KDE theme: KDE icon primary, symbolic SVG fallback.
+        // SVG themes: SVG primary, KDE fallback.
+        // KDE theme: KDE primary, symbolic SVG fallback (handled by IconResolver).
         var iconSz = Plasmoid.configuration.panelIconSize || 22;
-        // For symbolic theme, the light variant uses a parallel folder "symbolic-light".
-        // All other themes are not affected.
-        var resolvedTheme = theme;
-        if (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light")
-            resolvedTheme = "symbolic-light";
-        var base = Qt.resolvedUrl("../icons/" + resolvedTheme + "/" + iconSz + "/wi-");
+        var svgTheme = (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light")
+            ? "symbolic-light" : theme;
 
-        if (tok === "temperature" || tok === "feelslike")
-            return {
-                type: "svg",
-                source: base + "thermometer.svg"
-            };
-        if (tok === "humidity")
-            return {
-                type: "svg",
-                source: base + "humidity.svg"
-            };
-        if (tok === "pressure")
-            return {
-                type: "svg",
-                source: base + "barometer.svg"
-            };
-        if (tok === "wind")
-            return {
-                type: "svg",
-                source: base + "strong-wind.svg"
-            };
-        // Use wi-wind-deg.svg as location icon for all SVG themes
-        if (tok === "location")
-            return {
-                type: "svg",
-                source: base + "wind-deg.svg"
-            };
-        if (tok === "condition") {
-            var code = weatherCode;
-            var night = isNightTime();
-            var stem;
-            if (code === 0)
-                stem = night ? "night-clear" : "day-sunny";
-            else if (code <= 2)
-                stem = night ? "night-alt-partly-cloudy" : "day-cloudy";
-            else if (code === 3)
-                stem = "cloudy";
-            else if (code <= 48)
-                stem = night ? "night-fog" : "day-fog";
-            else if (code <= 65)
-                stem = night ? "night-alt-rain" : "day-rain";
-            else if (code <= 75)
-                stem = night ? "night-alt-snow" : "day-snow";
-            else
-                stem = night ? "night-alt-thunderstorm" : "day-thunderstorm";
-            return {
-                type: "svg",
-                source: base + stem + ".svg"
-            };
-        }
+        // Dynamic items: condition, suntimes, moonphase
+        if (tok === "condition")
+            return IconResolver.resolveCondition(weatherCode, isNightTime(), iconSz, _iconsBaseDir, svgTheme);
+
         if (tok === "suntimes") {
-            var mode2 = Plasmoid.configuration.panelSunTimesMode || "upcoming";
-            if (mode2 === "sunset")
-                return {
-                    type: "svg",
-                    source: base + "sunset.svg"
-                };
-            if (mode2 === "sunrise")
-                return {
-                    type: "svg",
-                    source: base + "sunrise.svg"
-                };
-            if (mode2 === "both")
-                return {
-                    type: "svg",
-                    source: base + "sunrise.svg"
-                }; // CompactView handles both-mode split
-            // "upcoming": pick based on current time
-            var nowM2 = (new Date()).getHours() * 60 + (new Date()).getMinutes();
-            var riseM2 = parseSunTimeMins(sunriseTimeText);
-            var setM2 = parseSunTimeMins(sunsetTimeText);
-            var useSet2 = (riseM2 >= 0 && nowM2 >= riseM2 && (setM2 < 0 || nowM2 < setM2));
-            return {
-                type: "svg",
-                source: base + (useSet2 ? "sunset" : "sunrise") + ".svg"
-            };
+            var sunTok = _resolveSuntimesTok();
+            return IconResolver.resolve(sunTok, iconSz, _iconsBaseDir, svgTheme);
         }
-        if (tok === "moonphase")
-            // moonPhaseSvgStem() returns e.g. "moon-new" → wi-moon-new.svg
-            return {
-                type: "svg",
-                source: base + Moon.moonPhaseSvgStem() + ".svg"
-            };
 
-        return {
-            type: "svg",
-            source: ""
-        };
+        if (tok === "moonphase" || tok === "moonphase-moonrise" || tok === "moonphase-moonset") {
+            if (tok === "moonphase-moonrise")
+                return IconResolver.resolve("moonrise", iconSz, _iconsBaseDir, svgTheme);
+            if (tok === "moonphase-moonset")
+                return IconResolver.resolve("moonset", iconSz, _iconsBaseDir, svgTheme);
+            var mm3 = Plasmoid.configuration.panelMoonPhaseMode || "full";
+            if (mm3 === "moonrise") return IconResolver.resolve("moonrise", iconSz, _iconsBaseDir, svgTheme);
+            if (mm3 === "moonset") return IconResolver.resolve("moonset", iconSz, _iconsBaseDir, svgTheme);
+            if (mm3 === "upcoming-times") return IconResolver.resolve(_moonUpcoming() === "rise" ? "moonrise" : "moonset", iconSz, _iconsBaseDir, svgTheme);
+            var moonStem = Moon.moonPhaseSvgStem(Moon.moonAgeFromPhase(SC.getMoonIllumination(new Date()).phase));
+            return IconResolver.resolveMoonPhase(moonStem, iconSz, _iconsBaseDir, svgTheme);
+        }
+
+        // Standard items: temperature, humidity, pressure, wind, location, etc.
+        return IconResolver.resolve(tok, iconSz, _iconsBaseDir, svgTheme);
     }
 
-    function getSimpleModeIconSourceSvg() {
-        return "image://icon/" + getSimpleModeIconSource();
+    /** Determines whether to show sunrise or sunset for suntimes panel item */
+    function _resolveSuntimesTok() {
+        var mode = Plasmoid.configuration.panelSunTimesMode || "upcoming";
+        if (mode === "sunset") return "suntimes-sunset";
+        if (mode === "sunrise") return "suntimes-sunrise";
+        if (mode === "both") return "suntimes-sunrise"; // CompactView handles both-mode split
+        // "upcoming": pick based on current time
+        var nowM = (new Date()).getHours() * 60 + (new Date()).getMinutes();
+        var riseM = parseSunTimeMins(sunriseTimeText);
+        var setM = parseSunTimeMins(sunsetTimeText);
+        var useSet = (riseM >= 0 && nowM >= riseM && (setM < 0 || nowM < setM));
+        return useSet ? "suntimes-sunset" : "suntimes-sunrise";
     }
+
+    /** Returns "rise" or "set" depending on which moon event is next */
+    function _moonUpcoming() {
+        var nowM = (new Date()).getHours() * 60 + (new Date()).getMinutes();
+        var riseM = parseSunTimeMins(moonriseTimeText);
+        var setM = parseSunTimeMins(moonsetTimeText);
+        if (riseM >= 0 && nowM < riseM) return "rise";
+        if (setM >= 0 && nowM < setM) return "set";
+        return "rise";
+    }
+
+    /** Maps a WMO code + night flag to a condition custom icon key */
+    function _resolveConditionKey(code, night) {
+        if (code === 0) return night ? "condition-clear-night" : "condition-clear";
+        if (code === 1) return night ? "condition-few-clouds-night" : "condition-few-clouds";
+        if (code === 2) return night ? "condition-cloudy-night" : "condition-cloudy-day";
+        if (code === 3) return "condition-overcast";
+        if (code === 45 || code === 48) return "condition-fog";
+        if (code === 51 || code === 53 || code === 55 || code === 61 || code === 80)
+            return night ? "condition-showers-scattered-night" : "condition-showers-scattered-day";
+        if (code === 63 || code === 65 || code === 81 || code === 82)
+            return night ? "condition-showers-night" : "condition-showers-day";
+        if (code === 56 || code === 66)
+            return night ? "condition-freezing-scattered-rain-night" : "condition-freezing-scattered-rain-day";
+        if (code === 57 || code === 67)
+            return night ? "condition-freezing-rain-night" : "condition-freezing-rain-day";
+        if (code === 71 || code === 77 || code === 85)
+            return night ? "condition-snow-scattered-night" : "condition-snow-scattered-day";
+        if (code === 73 || code === 75 || code === 86)
+            return night ? "condition-snow-night" : "condition-snow-day";
+        if (code === 95) return night ? "condition-storm-night" : "condition-storm-day";
+        if (code === 96) return night ? "condition-hail-storm-rain-night" : "condition-hail-storm-rain-day";
+        if (code === 99) return night ? "condition-hail-storm-snow-night" : "condition-hail-storm-snow-day";
+        return night ? "condition-clear-night" : "condition-clear";
+    }
+
 
     /** Returns the display text for a panel chip */
     function panelItemTextOnly(tok) {
@@ -791,8 +987,20 @@ PlasmoidItem {
             return isNaN(humidityPercent) ? "--" : Math.round(humidityPercent) + "%";
         if (tok === "pressure")
             return pressureValue(pressureHpa);
-        if (tok === "moonphase")
+        if (tok === "moonphase" || tok === "moonphase-moonrise" || tok === "moonphase-moonset") {
+            if (tok === "moonphase-moonrise")
+                return formatTimeForDisplay(moonriseTimeText);
+            if (tok === "moonphase-moonset")
+                return formatTimeForDisplay(moonsetTimeText);
+            var mm = Plasmoid.configuration.panelMoonPhaseMode || "full";
+            if (mm === "phase") return moonPhaseLabel();
+            if (mm === "moonrise") return formatTimeForDisplay(moonriseTimeText);
+            if (mm === "moonset") return formatTimeForDisplay(moonsetTimeText);
+            if (mm === "upcoming-times")
+                return _moonUpcoming() === "rise" ? formatTimeForDisplay(moonriseTimeText) : formatTimeForDisplay(moonsetTimeText);
+            // "full", "upcoming", "times" — main chip shows phase label; CompactView handles multi-chip
             return moonPhaseLabel();
+        }
         if (tok === "suntimes") {
             var nowMins = (new Date()).getHours() * 60 + (new Date()).getMinutes();
             var riseMins = parseSunTimeMins(sunriseTimeText);
@@ -810,6 +1018,22 @@ PlasmoidItem {
                 return formatTimeForDisplay(sunsetTimeText);
             return formatTimeForDisplay(sunriseTimeText) + " / " + formatTimeForDisplay(sunsetTimeText);
         }
+        if (tok === "preciprate")
+            return precipValue(precipMmh);
+        if (tok === "precipsum")
+            return precipSumText(precipSumMm);
+        if (tok === "uvindex")
+            return uvIndexText(uvIndex);
+        if (tok === "airquality")
+            return airQualityText();
+        if (tok === "pollen")
+            return pollenText();
+        if (tok === "spaceweather")
+            return spaceWeatherText();
+        if (tok === "alerts")
+            return alertsText();
+        if (tok === "snowcover")
+            return snowDepthText(snowDepthCm);
         return "";
     }
 
@@ -889,15 +1113,6 @@ PlasmoidItem {
     // Panel scroll ticker removed — "scroll/cycle" mode was removed.
     // The multiline Timer in CompactView.qml handles scrolling independently.
 
-    // Moon phase refresh — re-evaluate glyphs/labels once per hour
-    Timer {
-        interval: 3600000
-        running: true
-        repeat: true
-        onTriggered: {
-            var dummy = Moon.getMoonAge();
-        }
-    }
 
     // ══════════════════════════════════════════════════════════════════════
     // Startup + config change reactions

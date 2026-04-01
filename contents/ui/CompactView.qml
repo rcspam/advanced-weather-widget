@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * CompactView.qml — Panel / compact representation
  *
@@ -34,6 +51,8 @@ import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
 
 import "js/weather.js" as W
+import "js/iconResolver.js" as IconResolver
+import "components"
 
 PlasmaCore.ToolTipArea {
     id: compactRoot
@@ -291,7 +310,7 @@ PlasmaCore.ToolTipArea {
         if (!weatherRoot)
             return [];
         // Touch every reactive property so this re-evaluates when data changes
-        var _deps = weatherRoot.temperatureC + weatherRoot.windKmh + weatherRoot.windDirection + weatherRoot.humidityPercent + weatherRoot.pressureHpa + weatherRoot.weatherCode + weatherRoot.panelScrollIndex + weatherRoot.sunriseTimeText.length + weatherRoot.sunsetTimeText.length + Plasmoid.configuration.panelItemOrder + Plasmoid.configuration.panelItemIcons + Plasmoid.configuration.panelInfoMode + Plasmoid.configuration.panelSeparator + Plasmoid.configuration.panelSunTimesMode + compactRoot.iconTheme + Plasmoid.configuration.panelIconSize;
+        var _deps = weatherRoot.temperatureC + weatherRoot.windKmh + weatherRoot.windDirection + weatherRoot.humidityPercent + weatherRoot.pressureHpa + weatherRoot.weatherCode + weatherRoot.panelScrollIndex + weatherRoot.sunriseTimeText.length + weatherRoot.sunsetTimeText.length + weatherRoot.moonriseTimeText.length + weatherRoot.moonsetTimeText.length + Plasmoid.configuration.panelItemOrder + Plasmoid.configuration.panelItemIcons + Plasmoid.configuration.panelInfoMode + Plasmoid.configuration.panelSeparator + Plasmoid.configuration.panelSunTimesMode + Plasmoid.configuration.panelMoonPhaseMode + compactRoot.iconTheme + Plasmoid.configuration.panelIconSize;
         return _buildItems();
     }
 
@@ -354,41 +373,13 @@ PlasmaCore.ToolTipArea {
                     required property var modelData
                     spacing: 5
 
-                    Text {
-                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "wi"
-                        text: slRowItem.modelData.glyph
-                        font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                        font.pixelSize: compactRoot.glyphSize
-                        color: Kirigami.Theme.textColor
+                    WeatherIcon {
+                        visible: slRowItem.modelData.iconVis
+                        iconInfo: slRowItem.modelData.iconInfo
+                        iconSize: (slRowItem.modelData.iconInfo.type || "") === "wi" ? compactRoot.glyphSize : compactRoot.svgIconPx
+                        wiFontFamily: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                        wiFontReady: wiFontPanel.status === FontLoader.Ready
                         Layout.alignment: Qt.AlignVCenter
-                    }
-                    Kirigami.Icon {
-                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "kde" && slRowItem.modelData.glyph.length > 0
-                        source: slRowItem.modelData.glyph
-                        implicitWidth: compactRoot.svgIconPx
-                        implicitHeight: compactRoot.svgIconPx
-                    }
-                    Kirigami.Icon {
-                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "kirigami" && slRowItem.modelData.glyph.length > 0
-                        source: slRowItem.modelData.glyph
-                        implicitWidth: compactRoot.glyphSize
-                        implicitHeight: compactRoot.glyphSize
-                    }
-                    Item {
-                        visible: slRowItem.modelData.glyphVis && slRowItem.modelData.glyphType === "svg" && slRowItem.modelData.glyph.length > 0
-                        implicitWidth: compactRoot.svgIconPx
-                        implicitHeight: compactRoot.svgIconPx
-                        Kirigami.Icon {
-                            anchors.fill: parent
-                            source: slRowItem.modelData.glyphKdeFallback || ""
-                            visible: (slRowItem.modelData.glyphKdeFallback || "").length > 0
-                        }
-                        Kirigami.Icon {
-                            anchors.fill: parent
-                            source: slRowItem.modelData.glyph
-                            isMask: compactRoot.iconTheme === "symbolic"
-                            color: Kirigami.Theme.textColor
-                        }
                     }
                     Label {
                         text: slRowItem.modelData.text
@@ -447,44 +438,13 @@ PlasmaCore.ToolTipArea {
                         spacing: 4
                         clip: false
 
-                        Text {
-                            visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "wi"
-                            text: slVertItem.modelData.glyph
-                            font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                            font.pixelSize: compactRoot.glyphSize
-                            color: Kirigami.Theme.textColor
+                        WeatherIcon {
+                            visible: slVertItem.modelData.iconVis
+                            iconInfo: slVertItem.modelData.iconInfo
+                            iconSize: (slVertItem.modelData.iconInfo.type || "") === "wi" ? compactRoot.glyphSize : compactRoot.svgIconPx
+                            wiFontFamily: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                            wiFontReady: wiFontPanel.status === FontLoader.Ready
                             Layout.alignment: Qt.AlignVCenter
-                        }
-                        Kirigami.Icon {
-                            visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "kde" && slVertItem.modelData.glyph.length > 0
-                            source: slVertItem.modelData.glyph
-                            implicitWidth: compactRoot.svgIconPx
-                            implicitHeight: compactRoot.svgIconPx
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Kirigami.Icon {
-                            visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "kirigami" && slVertItem.modelData.glyph.length > 0
-                            source: slVertItem.modelData.glyph
-                            implicitWidth: compactRoot.mlVertRowH
-                            implicitHeight: compactRoot.mlVertRowH
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                        Item {
-                            visible: slVertItem.modelData.glyphVis && slVertItem.modelData.glyphType === "svg" && slVertItem.modelData.glyph.length > 0
-                            implicitWidth: compactRoot.svgIconPx
-                            implicitHeight: compactRoot.svgIconPx
-                            Layout.alignment: Qt.AlignVCenter
-                            Kirigami.Icon {
-                                anchors.fill: parent
-                                source: slVertItem.modelData.glyphKdeFallback || ""
-                                visible: (slVertItem.modelData.glyphKdeFallback || "").length > 0
-                            }
-                            Kirigami.Icon {
-                                anchors.fill: parent
-                                source: slVertItem.modelData.glyph
-                                isMask: compactRoot.iconTheme === "symbolic"
-                                color: Kirigami.Theme.textColor
-                            }
                         }
                         Label {
                             text: slVertItem.modelData.text
@@ -554,15 +514,14 @@ PlasmaCore.ToolTipArea {
                         : "weather-none-available-symbolic"
                     smooth: true
                 }
-                // Colorful
+                // Colorful / custom
                 Kirigami.Icon {
                     width: parent.iconSz
                     height: parent.iconSz
                     anchors.centerIn: parent
                     visible: compactRoot.mlIconStyle !== "symbolic"
                     source: compactRoot.weatherRoot
-                        ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode,
-                            compactRoot.weatherRoot.isNightTime())
+                        ? compactRoot.weatherRoot.getMultilineModeIconSource()
                         : "weather-none-available"
                     smooth: true
                 }
@@ -604,44 +563,13 @@ PlasmaCore.ToolTipArea {
                             height: scrollCol.rowH
                             spacing: 6
                             clip: true
-                            Text {
-                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "wi"
-                                text: mlRowItem.modelData.glyph
-                                font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                                font.pixelSize: Math.round(scrollCol.rowFontPx * 1.3)
-                                color: Kirigami.Theme.textColor
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            Kirigami.Icon {
-                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "kde" && mlRowItem.modelData.glyph.length > 0
-                                source: mlRowItem.modelData.glyph
-                                implicitWidth: compactRoot.svgIconPx
-                                implicitHeight: compactRoot.svgIconPx
+                            WeatherIcon {
+                                visible: mlRowItem.modelData.iconVis
+                                iconInfo: mlRowItem.modelData.iconInfo
+                                iconSize: (mlRowItem.modelData.iconInfo.type || "") === "wi" ? Math.round(scrollCol.rowFontPx * 1.3) : compactRoot.svgIconPx
+                                wiFontFamily: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                                wiFontReady: wiFontPanel.status === FontLoader.Ready
                                 Layout.alignment: Qt.AlignVCenter
-                            }
-                            Kirigami.Icon {
-                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "kirigami" && mlRowItem.modelData.glyph.length > 0
-                                source: mlRowItem.modelData.glyph
-                                implicitWidth: scrollCol.rowFontPx
-                                implicitHeight: scrollCol.rowFontPx
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-                            Item {
-                                visible: mlRowItem.modelData.glyphVis && mlRowItem.modelData.glyphType === "svg" && mlRowItem.modelData.glyph.length > 0
-                                implicitWidth: compactRoot.svgIconPx
-                                implicitHeight: compactRoot.svgIconPx
-                                Layout.alignment: Qt.AlignVCenter
-                                Kirigami.Icon {
-                                    anchors.fill: parent
-                                    source: mlRowItem.modelData.glyphKdeFallback || ""
-                                    visible: (mlRowItem.modelData.glyphKdeFallback || "").length > 0
-                                }
-                                Kirigami.Icon {
-                                    anchors.fill: parent
-                                    source: mlRowItem.modelData.glyph
-                                    isMask: compactRoot.iconTheme === "symbolic"
-                                    color: Kirigami.Theme.textColor
-                                }
                             }
                             Label {
                                 text: mlRowItem.modelData.text
@@ -687,8 +615,7 @@ PlasmaCore.ToolTipArea {
                     anchors.centerIn: parent
                     visible: compactRoot.mlIconStyle !== "symbolic"
                     source: compactRoot.weatherRoot
-                        ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode,
-                            compactRoot.weatherRoot.isNightTime())
+                        ? compactRoot.weatherRoot.getMultilineModeIconSource()
                         : "weather-none-available"
                     smooth: true
                 }
@@ -729,44 +656,13 @@ PlasmaCore.ToolTipArea {
                             height: scrollColV.rowH
                             spacing: 4
                             clip: true
-                            Text {
-                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "wi"
-                                text: mlRowItemV.modelData.glyph
-                                font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
-                                font.pixelSize: Math.round(scrollColV.rowFontPx * 1.3)
-                                color: Kirigami.Theme.textColor
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            Kirigami.Icon {
-                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "kde" && mlRowItemV.modelData.glyph.length > 0
-                                source: mlRowItemV.modelData.glyph
-                                implicitWidth: compactRoot.svgIconPx
-                                implicitHeight: compactRoot.svgIconPx
+                            WeatherIcon {
+                                visible: mlRowItemV.modelData.iconVis
+                                iconInfo: mlRowItemV.modelData.iconInfo
+                                iconSize: (mlRowItemV.modelData.iconInfo.type || "") === "wi" ? Math.round(scrollColV.rowFontPx * 1.3) : compactRoot.svgIconPx
+                                wiFontFamily: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                                wiFontReady: wiFontPanel.status === FontLoader.Ready
                                 Layout.alignment: Qt.AlignVCenter
-                            }
-                            Kirigami.Icon {
-                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "kirigami" && mlRowItemV.modelData.glyph.length > 0
-                                source: mlRowItemV.modelData.glyph
-                                implicitWidth: scrollColV.rowFontPx
-                                implicitHeight: scrollColV.rowFontPx
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-                            Item {
-                                visible: mlRowItemV.modelData.glyphVis && mlRowItemV.modelData.glyphType === "svg" && mlRowItemV.modelData.glyph.length > 0
-                                implicitWidth: compactRoot.svgIconPx
-                                implicitHeight: compactRoot.svgIconPx
-                                Layout.alignment: Qt.AlignVCenter
-                                Kirigami.Icon {
-                                    anchors.fill: parent
-                                    source: mlRowItemV.modelData.glyphKdeFallback || ""
-                                    visible: (mlRowItemV.modelData.glyphKdeFallback || "").length > 0
-                                }
-                                Kirigami.Icon {
-                                    anchors.fill: parent
-                                    source: mlRowItemV.modelData.glyph
-                                    isMask: compactRoot.iconTheme === "symbolic"
-                                    color: Kirigami.Theme.textColor
-                                }
                             }
                             Label {
                                 text: mlRowItemV.modelData.text
@@ -816,6 +712,27 @@ PlasmaCore.ToolTipArea {
         // fontSizeMode driven purely by panel orientation — not layout type
         readonly property int autoFontSizeMode: compactRoot.vertical ? Text.HorizontalFit : Text.VerticalFit
 
+        // ── No location prompt ────────────────────────────────────────────
+        RowLayout {
+            anchors.centerIn: parent
+            spacing: 5
+            visible: !compactRoot.weatherRoot || !compactRoot.weatherRoot.hasSelectedTown
+
+            Text {
+                text: "\uF041"
+                font.family: wiFontPanel.status === FontLoader.Ready ? wiFontPanel.font.family : ""
+                font.pixelSize: compactRoot.simpleFontSz
+                color: Kirigami.Theme.textColor
+                Layout.alignment: Qt.AlignVCenter
+            }
+            Label {
+                text: i18n("Add a location")
+                font.pixelSize: compactRoot.panelFontPx
+                color: Kirigami.Theme.textColor
+                Layout.alignment: Qt.AlignVCenter
+            }
+        }
+
         // ── Layout types 0 (side-by-side) and 1 (stacked) ────────────────
         // The GridLayout is anchored to the CENTER of its parent and sized
         // to exactly its content.  This prevents any dead space from pooling
@@ -830,7 +747,7 @@ PlasmaCore.ToolTipArea {
         //     width  = auto (sum of column paintedWidths; GridLayout.implicitWidth)
         GridLayout {
             id: simpleGrid
-            visible: compactRoot.simpleLayoutType !== 2
+            visible: compactRoot.simpleLayoutType !== 2 && compactRoot.weatherRoot && compactRoot.weatherRoot.hasSelectedTown
 
             // Centre in parent; size determined by axis.
             anchors.centerIn: parent
@@ -953,18 +870,18 @@ PlasmaCore.ToolTipArea {
                     width: compactRoot.simpleSymbolicIconSz
                     height: compactRoot.simpleSymbolicIconSz
                     anchors.centerIn: parent
-                    visible: compactRoot.simpleIconStyle !== "colorful"
+                    visible: compactRoot.simpleIconStyle === "symbolic"
                     source: compactRoot.weatherRoot ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode, compactRoot.weatherRoot.isNightTime(), true) : "weather-none-available-symbolic"
                     smooth: true
                 }
-                // Colorful icon: explicit size + centerIn, same as symbolic.
+                // Colorful / custom icon: explicit size + centerIn, same as symbolic.
                 // anchors.fill was constrained to the post-margin cell (~32 px on a
                 // 48 px panel); explicit size uses _cellSz = Window.height correctly.
                 Kirigami.Icon {
                     width: parent._cellSz
                     height: parent._cellSz
                     anchors.centerIn: parent
-                    visible: compactRoot.simpleIconStyle === "colorful"
+                    visible: compactRoot.simpleIconStyle === "colorful" || compactRoot.simpleIconStyle === "custom"
                     source: compactRoot.weatherRoot ? compactRoot.weatherRoot.getSimpleModeIconSource() : ""
                     smooth: true
                 }
@@ -1018,7 +935,7 @@ PlasmaCore.ToolTipArea {
             width: parent.width
             height: (!compactRoot.vertical && compactRoot.isSimpleMode)
                 ? compactRoot._fullPanelH : parent.height
-            visible: compactRoot.simpleLayoutType === 2
+            visible: compactRoot.simpleLayoutType === 2 && compactRoot.weatherRoot && compactRoot.weatherRoot.hasSelectedTown
 
             // Orientation-aware square sizing using _fullPanelH (true panel height).
             // Auto: icon = full panel height (48 px on a 48 px panel).
@@ -1040,32 +957,60 @@ PlasmaCore.ToolTipArea {
                     width: parent.width
                     height: parent.height
                     anchors.centerIn: parent
-                    visible: compactRoot.simpleIconStyle !== "colorful"
+                    visible: compactRoot.simpleIconStyle === "symbolic"
                     source: compactRoot.weatherRoot
                         ? W.weatherCodeToIcon(compactRoot.weatherRoot.weatherCode,
                             compactRoot.weatherRoot.isNightTime(), true)
                         : "weather-none-available-symbolic"
                     smooth: true
                 }
-                // Colorful icon
+                // Colorful / custom icon
                 Kirigami.Icon {
                     width: parent.width
                     height: parent.height
                     anchors.centerIn: parent
-                    visible: compactRoot.simpleIconStyle === "colorful"
+                    visible: compactRoot.simpleIconStyle === "colorful" || compactRoot.simpleIconStyle === "custom"
                     source: compactRoot.weatherRoot ? compactRoot.weatherRoot.getSimpleModeIconSource() : ""
                     smooth: true
                 }
 
-                // Temperature badge — anchored inside the square's bottom-right
-                // so it always overlaps the icon corner regardless of panel size
+                // Temperature badge — position, spacing and color are configurable
                 Rectangle {
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    width: compressedBadge.implicitWidth + 8
-                    height: compressedBadge.implicitHeight + 4
+                    id: compressedBadgeRect
+                    readonly property string _pos: Plasmoid.configuration.compressedBadgePosition || "bottom-right"
+                    readonly property int _spacing: Plasmoid.configuration.compressedBadgeSpacing || 0
+
+                    // Use computed x/y instead of anchors to avoid QML sticky-anchor issues
+                    x: {
+                        if (_pos === "bottom-right" || _pos === "top-right")
+                            return parent.width - width - _spacing;
+                        if (_pos === "bottom-left" || _pos === "top-left")
+                            return _spacing;
+                        // center
+                        return (parent.width - width) / 2;
+                    }
+                    y: {
+                        if (_pos.indexOf("bottom") === 0)
+                            return parent.height - height - _spacing;
+                        // top
+                        return _spacing;
+                    }
+
+                    width: compressedBadge.implicitWidth + 6
+                    height: compressedBadge.implicitHeight + 2
                     radius: height / 2
-                    color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.85)
+                    color: {
+                        var cc = Plasmoid.configuration.compressedBadgeColor || "";
+                        var op = Plasmoid.configuration.compressedBadgeOpacity !== undefined
+                            ? Plasmoid.configuration.compressedBadgeOpacity : 0.85;
+                        if (cc.length > 0) {
+                            var parsed = Qt.color(cc);
+                            return Qt.rgba(parsed.r, parsed.g, parsed.b, op);
+                        }
+                        return Qt.rgba(Kirigami.Theme.backgroundColor.r,
+                                       Kirigami.Theme.backgroundColor.g,
+                                       Kirigami.Theme.backgroundColor.b, op);
+                    }
 
                     Label {
                         id: compressedBadge
@@ -1093,6 +1038,9 @@ PlasmaCore.ToolTipArea {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────
+    // Icons base directory — resolved once for IconResolver calls
+    readonly property string _iconsBaseDir: Qt.resolvedUrl("../icons/") + ""
+
     function _buildItems() {
         var r = weatherRoot;
         if (!r)
@@ -1100,10 +1048,8 @@ PlasmaCore.ToolTipArea {
         if (!r.hasSelectedTown)
             return [
                 {
-                    glyph: "\uF041",
-                    glyphVis: true,
-                    glyphType: "wi",
-                    glyphKdeFallback: "",
+                    iconInfo: { type: "wi", source: "\uF041", svgFallback: "", isMask: false },
+                    iconVis: true,
                     text: i18n("Add a location"),
                     isSep: false
                 }
@@ -1119,30 +1065,24 @@ PlasmaCore.ToolTipArea {
 
         function pushSep() {
             result.push({
-                glyph: "",
-                glyphVis: false,
-                glyphType: "wi",
-                glyphKdeFallback: "",
+                iconInfo: { type: "wi", source: "", svgFallback: "", isMask: false },
+                iconVis: false,
                 text: sep,
                 isSep: true
             });
         }
-        function pushItem(src, vis, type, fallback, txt) {
+        function pushInfoItem(info, vis, txt) {
             result.push({
-                glyph: src,
-                glyphVis: vis && src.length > 0,
-                glyphType: type,
-                glyphKdeFallback: fallback || "",
+                iconInfo: info,
+                iconVis: vis && (info.source || "").length > 0,
                 text: txt,
                 isSep: false
             });
         }
         function pushSpaceSep() {
             result.push({
-                glyph: "",
-                glyphVis: false,
-                glyphType: "wi",
-                glyphKdeFallback: "",
+                iconInfo: { type: "wi", source: "", svgFallback: "", isMask: false },
+                iconVis: false,
                 text: " ",
                 isSep: true
             });
@@ -1156,26 +1096,16 @@ PlasmaCore.ToolTipArea {
             if (tok === "suntimes") {
                 var sunMode = Plasmoid.configuration.panelSunTimesMode || "upcoming";
 
-                if (sunMode === "both" && theme === "wi-font") {
-                    if (result.length > 0)
-                        pushSep();
-                    pushItem("\uF051", show, "wi", "", r.sunriseTimeText);
-                    pushSpaceSep();
-                    pushItem("\uF052", show, "wi", "", r.sunsetTimeText);
-                    return;
-                }
-
                 if (sunMode === "both") {
+                    // Both sunrise and sunset on the same line
+                    var iconSz = Plasmoid.configuration.panelIconSize || 22;
+                    var svgTheme = (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light")
+                        ? "symbolic-light" : theme;
+
                     var rInfo, sInfo;
-                    if (theme === "kde") {
-                        rInfo = {
-                            type: "kde",
-                            source: "weather-sunrise"
-                        };
-                        sInfo = {
-                            type: "kde",
-                            source: "weather-sunset"
-                        };
+                    if (theme === "wi-font") {
+                        rInfo = { type: "wi", source: "\uF051", svgFallback: "", isMask: false };
+                        sInfo = { type: "wi", source: "\uF052", svgFallback: "", isMask: false };
                     } else if (theme === "custom") {
                         var cmap = {};
                         (Plasmoid.configuration.panelCustomIcons || "").split(";").forEach(function (p) {
@@ -1183,32 +1113,18 @@ PlasmaCore.ToolTipArea {
                             if (kv.length === 2)
                                 cmap[kv[0].trim()] = kv[1].trim();
                         });
-                        rInfo = {
-                            type: "kde",
-                            source: cmap["suntimes-sunrise"] || "weather-sunrise"
-                        };
-                        sInfo = {
-                            type: "kde",
-                            source: cmap["suntimes-sunset"] || "weather-sunset"
-                        };
+                        rInfo = { type: "kde", source: cmap["suntimes-sunrise"] || "weather-sunrise", svgFallback: "", isMask: false };
+                        sInfo = { type: "kde", source: cmap["suntimes-sunset"] || "weather-sunset", svgFallback: "", isMask: false };
                     } else {
-                        var sz = Plasmoid.configuration.panelIconSize || 22;
-                        var rt = (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light") ? "symbolic-light" : theme;
-                        var base = Qt.resolvedUrl("../icons/" + rt + "/" + sz + "/wi-");
-                        rInfo = {
-                            type: "svg",
-                            source: base + "sunrise.svg"
-                        };
-                        sInfo = {
-                            type: "svg",
-                            source: base + "sunset.svg"
-                        };
+                        rInfo = IconResolver.resolve("suntimes-sunrise", iconSz, compactRoot._iconsBaseDir, svgTheme);
+                        sInfo = IconResolver.resolve("suntimes-sunset", iconSz, compactRoot._iconsBaseDir, svgTheme);
                     }
+
                     if (result.length > 0)
                         pushSep();
-                    pushItem(rInfo.source, show, rInfo.type, "", r.sunriseTimeText);
+                    pushInfoItem(rInfo, show, r.formatTimeForDisplay(r.sunriseTimeText));
                     pushSpaceSep();
-                    pushItem(sInfo.source, show, sInfo.type, "", r.sunsetTimeText);
+                    pushInfoItem(sInfo, show, r.formatTimeForDisplay(r.sunsetTimeText));
                     return;
                 }
 
@@ -1218,7 +1134,93 @@ PlasmaCore.ToolTipArea {
                     return;
                 if (result.length > 0)
                     pushSep();
-                pushItem(iconInfo.source, show, iconInfo.type, iconInfo.kdeFallback, stx);
+                pushInfoItem(iconInfo, show, stx);
+                return;
+            }
+
+            if (tok === "moonphase") {
+                var moonMode = Plasmoid.configuration.panelMoonPhaseMode || "full";
+
+                // Multi-chip modes: "full" = phase + rise + set, "times" = rise + set, "upcoming" = phase + upcoming
+                if (moonMode === "full" || moonMode === "times" || moonMode === "upcoming") {
+                    var iconSzM = Plasmoid.configuration.panelIconSize || 22;
+                    var svgThemeM = (theme === "symbolic" && Plasmoid.configuration.panelSymbolicVariant === "light")
+                        ? "symbolic-light" : theme;
+
+                    if (result.length > 0)
+                        pushSep();
+
+                    // Phase chip (only for "full" and "upcoming")
+                    if (moonMode === "full" || moonMode === "upcoming") {
+                        pushInfoItem(iconInfo, show, r.moonPhaseLabel());
+                        pushSpaceSep();
+                    }
+
+                    if (moonMode === "upcoming") {
+                        // upcoming: show next rise or set
+                        var upTok = r._moonUpcoming() === "rise" ? "moonphase-moonrise" : "moonphase-moonset";
+                        var upTime = r._moonUpcoming() === "rise" ? r.formatTimeForDisplay(r.moonriseTimeText) : r.formatTimeForDisplay(r.moonsetTimeText);
+                        pushInfoItem(r.panelItemIconInfo(upTok), show, upTime);
+                    } else {
+                        // full / times: show both rise and set
+                        var mrInfo, msInfo;
+                        if (theme === "wi-font") {
+                            mrInfo = { type: "wi", source: "\uF0C9", svgFallback: "", isMask: false };
+                            msInfo = { type: "wi", source: "\uF0CA", svgFallback: "", isMask: false };
+                        } else if (theme === "custom") {
+                            var cmapM = {};
+                            (Plasmoid.configuration.panelCustomIcons || "").split(";").forEach(function (p) {
+                                var kv = p.split("=");
+                                if (kv.length === 2)
+                                    cmapM[kv[0].trim()] = kv[1].trim();
+                            });
+                            mrInfo = { type: "kde", source: cmapM["moonrise"] || "weather-clear-night", svgFallback: "", isMask: false };
+                            msInfo = { type: "kde", source: cmapM["moonset"] || "weather-clear-night", svgFallback: "", isMask: false };
+                        } else {
+                            mrInfo = IconResolver.resolve("moonrise", iconSzM, compactRoot._iconsBaseDir, svgThemeM);
+                            msInfo = IconResolver.resolve("moonset", iconSzM, compactRoot._iconsBaseDir, svgThemeM);
+                        }
+
+                        pushInfoItem(mrInfo, show, r.formatTimeForDisplay(r.moonriseTimeText));
+                        pushSpaceSep();
+                        pushInfoItem(msInfo, show, r.formatTimeForDisplay(r.moonsetTimeText));
+                    }
+                    return;
+                }
+
+                // Single-chip modes: "phase", "moonrise", "moonset", "upcoming-times"
+                var mtx = r.panelItemTextOnly(tok);
+                if (!mtx || mtx.length === 0)
+                    return;
+                if (result.length > 0)
+                    pushSep();
+                pushInfoItem(iconInfo, show, mtx);
+                return;
+            }
+
+            // ── Alerts: no alerts → single flag + "None"; with alerts → flag + type glyph + text ──
+            if (tok === "alerts") {
+                var alertTxt = r.panelItemTextOnly(tok);
+                if (!alertTxt || alertTxt.length === 0)
+                    return;
+                if (result.length > 0)
+                    pushSep();
+                var pa = (r.weatherAlerts && r.weatherAlerts.length > 0)
+                    ? r.primaryAlert() : null;
+                if (pa) {
+                    // Have alerts: flag icon (no text) + type glyph icon + alert name text
+                    pushInfoItem(iconInfo, show, "");
+                    var glyphInfo = {
+                        type: "wi",
+                        source: r.alertTypeGlyph(pa.awarenessType || 0),
+                        svgFallback: "",
+                        isMask: false
+                    };
+                    pushInfoItem(glyphInfo, show, alertTxt);
+                } else {
+                    // No alerts: single flag icon + "None" text (no double icon)
+                    pushInfoItem(iconInfo, show, alertTxt);
+                }
                 return;
             }
 
@@ -1227,7 +1229,7 @@ PlasmaCore.ToolTipArea {
                 return;
             if (result.length > 0)
                 pushSep();
-            pushItem(iconInfo.source, show, iconInfo.type, iconInfo.kdeFallback, txt);
+            pushInfoItem(iconInfo, show, txt);
         });
 
         return result;

@@ -1,3 +1,20 @@
+/*
+ * Copyright 2026  Petar Nedyalkov
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * weather.js — Pure weather utility functions
  *
@@ -202,10 +219,11 @@ function weatherApiCodeToWmo(code) {
  * @param {string} unit      "C" or "F"
  * @param {boolean} round    Round to integer if true
  */
-function formatTemp(celsius, unit, round) {
+function formatTemp(celsius, unit, round, showUnit) {
     if (isNaN(celsius) || celsius === null || celsius === undefined) return "--";
     var value = (unit === "F") ? (celsius * 9 / 5 + 32) : celsius;
     var numStr = round ? String(Math.round(value)) : Number(value).toFixed(1);
+    if (showUnit) return numStr + " \u00B0" + unit;
     return numStr + "\u00B0"; // Unicode degree symbol
 }
 
@@ -234,15 +252,5 @@ function formatPressure(hpa, unit) {
     return Math.round(hpa) + " hPa";
 }
 
-/**
- * Returns the wind SVG filename stem for the 16-point compass rose
- * in /contents/icons/wind/.  E.g.: windDirSvgFilename(45) => "ne"
- * Use as: Qt.resolvedUrl("../../icons/wind/wind-" + W.windDirSvgFilename(deg) + ".svg")
- */
-function windDirSvgFilename(degrees) {
-    if (degrees === undefined || degrees === null || isNaN(degrees))
-        return "n"; // fallback
-    var dirs = ["n","nne","ne","ene","e","ese","se","sse","s","ssw","sw","wsw","w","wnw","nw","nnw"];
-    var idx = Math.floor(((degrees + 11.25) % 360) / 22.5) % 16;
-    return dirs[idx];
-}
+// windDirSvgFilename() removed — was a duplicate of windDirectionSvgStem().
+// Callers should use windDirectionSvgStem() instead.
