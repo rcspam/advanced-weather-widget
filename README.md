@@ -1,5 +1,7 @@
 # Advanced Weather Widget for KDE Plasma 6
 
+![image](screenshots/image.png)
+
 A modern, highly customizable weather widget built specifically for KDE Plasma 6.
 
 It delivers accurate forecasts, multiple weather provider support, adaptive failover logic, and extensive appearance customization - all while integrating naturally into the Plasma desktop.
@@ -102,34 +104,6 @@ All panel modes support:
 - Full i18n support for all UI labels, weather conditions, air quality / pollen / space weather descriptions
 - Locale-aware date / time formatting (12h / 24h, date format)
 - Localized location search results
-
----
-
-## 🖼 Screenshots
-
-### Panel Mode (Single line)
-![Panel Mode Single Line](screenshots/panel_single_line.png)
-
-### Panel Mode (Multiple lines)
-![Panel Mode Multiple Lines](screenshots/panel_multi_lines.png)
-
-### Widget from panel
-![Widget From Panel](screenshots/widget_from_panel.png)
-
-### Full Widget Mode
-![Widget Mode Desktop](screenshots/widget.png)
-
-### Tooltip View
-![Tooltip](screenshots/tooltip.png)
-
-### Settings – Location
-![Settings Location](screenshots/location.png)
-
-### Settings – General (Providers)
-![Settings Providers](screenshots/providers.png)
-
-### Settings – Appearance
-![Settings Appearance](screenshots/appearance.png)
 
 ---
 
