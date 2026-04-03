@@ -740,9 +740,7 @@ msgstr "Aantal dagen op voorspelling:"
 
 #: contents/ui/config/configGeneral.qml:299
 msgid "Free Norwegian Meteorological Institute service. No API key needed."
-msgstr ""
-"De gratis dienst van het Noors Meteorologisch Instituut. Geen api-sleutel "
-"benodigd."
+msgstr "De gratis dienst van het Noors Meteorologisch Instituut. Geen api-sleutel benodigd."
 
 #: contents/ui/config/configGeneral.qml:300
 msgid "Free and open-source. No API key needed. Recommended."
@@ -921,13 +919,8 @@ msgid "Imperial (°F, mph, inHg, in)"
 msgstr "Imperiaal (°F, mpu, inHg, in)"
 
 #: contents/ui/config/tabs/ConfigPanelTab.qml:78
-msgid ""
-"In a vertical panel, long item labels may be truncated. Consider using "
-"\"Simple\" mode, increasing the panel width, or reducing the font size."
-msgstr ""
-"Op verticale panelen kunnen lange itemlabels ingekort worden. Overweeg in "
-"dat geval de eenvoudige modus of de paneelbreedte of tekstgrootte aan te "
-"passen."
+msgid "In a vertical panel, long item labels may be truncated. Consider using \"Simple\" mode, increasing the panel width, or reducing the font size."
+msgstr "Op verticale panelen kunnen lange itemlabels ingekort worden. Overweeg in dat geval de eenvoudige modus of de paneelbreedte of tekstgrootte aan te passen."
 
 #: contents/ui/DetailsView.qml:1354
 msgid "Increased Activity"
@@ -1397,12 +1390,8 @@ msgid "Note: size may be reduced if the panel is not thick enough."
 msgstr "Let op: de grootte kan afwijken indien het paneel niet hoog genoeg is."
 
 #: contents/ui/config/tabs/ConfigPanelTab.qml:487
-msgid ""
-"Number of item rows visible at once. Resize the panel height in KDE settings "
-"to match."
-msgstr ""
-"Het aantal gelijktijdig zichtbare pictogramrijen. Pas de paneelhoogte hierop "
-"aan."
+msgid "Number of item rows visible at once. Resize the panel height in KDE settings to match."
+msgstr "Het aantal gelijktijdig zichtbare pictogramrijen. Pas de paneelhoogte hierop aan."
 
 #: contents/ui/configAppearance.qml:445
 #: contents/ui/config/configAppearance.qml:551
@@ -1594,8 +1583,7 @@ msgid ""
 msgstr ""
 "Alle diensten worden een voor een afgegaan tot er resultaat is:\n"
 "Open-Meteo  →  met.no  →  OpenWeatherMap  →  WeatherAPI.com\n"
-"Open-Meteo wordt als eerste geprobeerd, omdat die dienst gratis is en geen "
-"api-sleutel vereist."
+"Open-Meteo wordt als eerste geprobeerd, omdat die dienst gratis is en geen api-sleutel vereist."
 
 #: contents/ui/DetailsView.qml:895 contents/ui/main.qml:511
 msgid "Ragweed"
@@ -2016,20 +2004,13 @@ msgid "Text labels (Temperature, Wind…)"
 msgstr "Tekstlabels (temperatuur, wind, etc.)"
 
 #: contents/ui/config/tabs/ConfigPanelTab.qml:710
-msgid ""
-"Text will follow the system font and expand to fill the available space."
-msgstr ""
-"Voor de tekst wordt gebruikgemaakt van het systeemlettertype en alle "
-"beschikbare ruimte."
+msgid "Text will follow the system font and expand to fill the available space."
+msgstr "Voor de tekst wordt gebruikgemaakt van het systeemlettertype en alle beschikbare ruimte."
 
 #: contents/ui/configAppearance.qml:341
 #: contents/ui/config/configAppearance.qml:447
-msgid ""
-"The condition icon will automatically reflect the current weather using your "
-"KDE system icon theme. No customisation is needed."
-msgstr ""
-"Het weersomstandigheidspictogram toont de huidige omstandigheid op basis van "
-"het ingestelde KDE-pictogramthema."
+msgid "The condition icon will automatically reflect the current weather using your KDE system icon theme. No customisation is needed."
+msgstr "Het weersomstandigheidspictogram toont de huidige omstandigheid op basis van het ingestelde KDE-pictogramthema."
 
 #: contents/ui/config/tabs/ConfigPanelTab.qml:424
 msgid "Theme default"
@@ -2212,12 +2193,8 @@ msgstr "Zelf bepalen"
 
 #: contents/ui/config/tabs/ConfigPanelTab.qml:833
 #: contents/ui/config/tabs/ConfigTooltipTab.qml:277
-msgid ""
-"Uses KDE system icons by default. Click the button to customise each item's "
-"icon."
-msgstr ""
-"Standaard worden de KDE-systeempictogrammen gebruikt. Klik op een itemknop "
-"om een ander pictogram te kiezen."
+msgid "Uses KDE system icons by default. Click the button to customise each item's icon."
+msgstr "Standaard worden de KDE-systeempictogrammen gebruikt. Klik op een itemknop om een ander pictogram te kiezen."
 
 #: contents/ui/js/airQuality.js:51
 msgid "V.Poor"
@@ -2440,12 +2417,8 @@ msgstr "tot zonsondergang"
 #~ msgid "Updated %1 (met.no)"
 #~ msgstr "Bijgewerkt om %1 (met.no)"
 
-#~ msgid ""
-#~ "Uses KDE system icons by default. Click the button to customise each "
-#~ "item’s icon."
-#~ msgstr ""
-#~ "Standaard worden de KDE-systeempictogrammen gebruikt. Klik op een "
-#~ "itemknop om een ander pictogram te kiezen."
+#~ msgid "Uses KDE system icons by default. Click the button to customise each item’s icon."
+#~ msgstr "Standaard worden de KDE-systeempictogrammen gebruikt. Klik op een itemknop om een ander pictogram te kiezen."
 
 #~ msgid "Widget items"
 #~ msgstr "Widgetitems"
