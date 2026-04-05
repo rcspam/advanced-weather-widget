@@ -36,6 +36,7 @@ function _calcDewPoint(T, rh) {
 }
 
 function fetchCurrent(service, W, chain, idx) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var alt = service.altitude;
     var url = "https://api.met.no/weatherapi/locationforecast/2.0/complete?lat="
@@ -51,6 +52,7 @@ function fetchCurrent(service, W, chain, idx) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             service._tryProvider(chain, idx + 1);
             return;
@@ -147,11 +149,15 @@ function fetchCurrent(service, W, chain, idx) {
         r.dailyData = nd;
         r.loading = false;
         r.updateText = service._formatUpdateText("metno");
+
+        // No native alerts — fall back to MeteoAlarm / NWS
+        service._fetchAlertsIfNeeded();
     };
     req.send();
 }
 
 function fetchHourly(service, W, dateStr) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var alt = service.altitude;
     var url = "https://api.met.no/weatherapi/locationforecast/2.0/complete?lat="
@@ -165,6 +171,7 @@ function fetchHourly(service, W, dateStr) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             r.hourlyData = [];
             return;

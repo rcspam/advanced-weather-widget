@@ -68,6 +68,7 @@ function _apiTimeTo24h(s) {
 }
 
 function fetchCurrent(service, W, chain, idx) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var key = service._waKey();
     if (!key) {
@@ -79,13 +80,14 @@ function fetchCurrent(service, W, chain, idx) {
         + encodeURIComponent(key)
         + "&q=" + encodeURIComponent(
             service.latitude + "," + service.longitude)
-        + "&days=" + days + "&aqi=yes&alerts=no";
+        + "&days=" + days + "&aqi=yes&alerts=yes";
 
     var req = new XMLHttpRequest();
     req.open("GET", url);
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             service._tryProvider(chain, idx + 1);
             return;
@@ -150,11 +152,64 @@ function fetchCurrent(service, W, chain, idx) {
         r.dailyData = nd;
         r.loading = false;
         r.updateText = service._formatUpdateText("weatherApi");
+
+        // Parse native alerts if available
+        if (d.alerts && d.alerts.alert && d.alerts.alert.length > 0) {
+            _parseAlerts(r, d.alerts.alert);
+        }
+
+        // Fall back to MeteoAlarm / NWS if no native alerts
+        service._fetchAlertsIfNeeded();
     };
     req.send();
 }
 
+function _parseAlerts(r, alerts) {
+    var parsed = [];
+    var now = new Date();
+    for (var i = 0; i < alerts.length; i++) {
+        var a = alerts[i];
+        // Skip expired
+        if (a.expires) {
+            var exp = new Date(a.expires);
+            if (exp < now) continue;
+        }
+
+        // Map severity to MeteoAlarm-compatible color
+        var color = "";
+        var severity = (a.severity || "").toLowerCase();
+        if (severity === "extreme") color = "red";
+        else if (severity === "severe") color = "red";
+        else if (severity === "moderate") color = "orange";
+        else if (severity === "minor") color = "yellow";
+
+        parsed.push({
+            headline: a.headline || a.event || "",
+            displayName: a.event || a.headline || "",
+            severity: a.severity || "",
+            description: a.desc || "",
+            event: a.event || "",
+            area: a.areas || "",
+            color: color,
+            awarenessType: 0,
+            onset: a.effective || "",
+            effective: a.effective || "",
+            expires: a.expires || "",
+            instruction: a.instruction || "",
+            web: "",
+            source: "WeatherAPI",
+            action: a.msgtype || "",
+            senderName: a.note || ""
+        });
+    }
+
+    if (parsed.length > 0) {
+        r.weatherAlerts = parsed;
+    }
+}
+
 function fetchHourly(service, W, dateStr) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var key = service._waKey();
     if (!key) {
@@ -171,6 +226,7 @@ function fetchHourly(service, W, dateStr) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             r.hourlyData = [];
             return;

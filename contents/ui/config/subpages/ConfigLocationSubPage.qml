@@ -144,11 +144,7 @@ ColumnLayout {
         }
 
         fetchNominatim()
-
-        var prov = configRoot.cfg_weatherProvider && configRoot.cfg_weatherProvider.length > 0
-                   ? configRoot.cfg_weatherProvider : "adaptive"
-        if (prov === "adaptive" || prov === "openMeteo" || prov === "metno")
-            fetchOpenMeteo()
+        fetchOpenMeteo()
     }
 
     Timer {

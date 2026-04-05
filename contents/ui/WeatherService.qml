@@ -31,6 +31,11 @@ import "providers/openMeteo.js" as OpenMeteoJS
 import "providers/openWeather.js" as OpenWeatherJS
 import "providers/weatherApi.js" as WeatherApiJS
 import "providers/metNo.js" as MetNoJS
+import "providers/pirateWeather.js" as PirateWeatherJS
+import "providers/visualCrossing.js" as VisualCrossingJS
+import "providers/tomorrowIo.js" as TomorrowIoJS
+import "providers/stormGlass.js" as StormGlassJS
+import "providers/weatherbit.js" as WeatherbitJS
 import "providers/alerts.js" as AlertsJS
 import "providers/spaceWeather_provider.js" as SpaceWeatherJS
 
@@ -57,11 +62,54 @@ QtObject {
     function _waKey() {
         return (Plasmoid.configuration.waApiKey || "").trim();
     }
+    function _pwKey() {
+        return (Plasmoid.configuration.pwApiKey || "").trim();
+    }
+    function _vcKey() {
+        return (Plasmoid.configuration.vcApiKey || "").trim();
+    }
+    function _tioKey() {
+        return (Plasmoid.configuration.tioApiKey || "").trim();
+    }
+    function _sgKey() {
+        return (Plasmoid.configuration.sgApiKey || "").trim();
+    }
+    function _wbKey() {
+        return (Plasmoid.configuration.wbApiKey || "").trim();
+    }
+
+    // ── Private: space weather cache timestamp ──────────────────────────
+    property real _lastSpaceWeatherFetch: 0
+
+    // ── Request lifecycle — generation guard ────────────────────────────
+    // _refreshGen increments on each refreshNow().  Callbacks captured at
+    // send time compare their gen to the live value; a mismatch means a
+    // newer refresh has started and the callback should silently bail out.
+    // We intentionally do NOT call abort() on old XHRs — Qt QML's
+    // XMLHttpRequest.abort() can block the JS thread on some platforms.
+    property int _refreshGen: 0
+
+    // Safety timer — if loading stays true for 20 s, force-reset state
+    // so the widget never gets stuck in "Loading…" forever.
+    property Timer _safetyTimer: Timer {
+        interval: 20000
+        repeat: false
+        onTriggered: {
+            if (weatherRoot && weatherRoot.loading) {
+                console.warn("[WeatherService] Safety timeout — forcing loading=false");
+                weatherRoot.loading = false;
+                weatherRoot.updateText = i18n("Update timed out. Tap to retry.");
+            }
+        }
+    }
 
     // ── Public methods ────────────────────────────────────────────────────
 
     /** Full weather refresh — current + daily forecast */
     function refreshNow() {
+        _refreshGen++;
+        _safetyTimer.stop();
+
         var r = weatherRoot;
         if (!r.hasSelectedTown) {
             r.loading = false;
@@ -97,17 +145,21 @@ QtObject {
             return;
         }
         r.loading = true;
+        _safetyTimer.restart();
         r.weatherAlerts = [];  // reset before parallel fetch
 
         var provider = Plasmoid.configuration.weatherProvider || "adaptive";
-        var chain = (provider === "adaptive") ? ["openMeteo", "openWeather", "weatherApi", "metno"] : [provider];
+        var chain = (provider === "adaptive") ? ["openMeteo", "metno", "pirateWeather", "visualCrossing", "tomorrowIo", "stormGlass", "weatherbit", "openWeather", "weatherApi"] : [provider];
+        chain._gen = _refreshGen;
 
         _tryProvider(chain, 0);
-
-        // Fetch alerts independently (MeteoAlarm → met.no fallback)
-        AlertsJS.fetchAlerts(service);
-        // Fetch NOAA space weather independently (no location needed)
-        SpaceWeatherJS.fetchSpaceWeather(service);
+        // Fetch NOAA space weather independently (location-independent)
+        // Skip if data was fetched recently (< 10 min) since it doesn't change with location
+        var now = Date.now();
+        if (!_lastSpaceWeatherFetch || (now - _lastSpaceWeatherFetch) > 600000) {
+            _lastSpaceWeatherFetch = now;
+            SpaceWeatherJS.fetchSpaceWeather(service);
+        }
     }
 
     /** Hourly data fetch for a specific date string (yyyy-MM-dd) */
@@ -117,6 +169,10 @@ QtObject {
 
         if (ap === "openMeteo") {
             OpenMeteoJS.fetchHourly(service, dateStr);
+            return;
+        }
+        if (ap === "pirateWeather") {
+            PirateWeatherJS.fetchHourly(service, W, dateStr);
             return;
         }
         if (ap === "openWeather") {
@@ -131,12 +187,43 @@ QtObject {
             MetNoJS.fetchHourly(service, W, dateStr);
             return;
         }
+        if (ap === "visualCrossing") {
+            VisualCrossingJS.fetchHourly(service, W, dateStr);
+            return;
+        }
+        if (ap === "tomorrowIo") {
+            TomorrowIoJS.fetchHourly(service, W, dateStr);
+            return;
+        }
+        if (ap === "stormGlass") {
+            StormGlassJS.fetchHourly(service, W, dateStr);
+            return;
+        }
+        if (ap === "weatherbit") {
+            WeatherbitJS.fetchHourly(service, W, dateStr);
+            return;
+        }
         weatherRoot.hourlyData = [];
     }
 
     // ── Private: provider chain ───────────────────────────────────────────
 
     property var _failed: []
+
+    /**
+     * Called by each provider after setting r.loading = false.
+     * If the provider already populated weatherAlerts (native alerts),
+     * this is a no-op.  Otherwise it falls back to MeteoAlarm / NWS.
+     */
+    function _fetchAlertsIfNeeded() {
+        var r = weatherRoot;
+        if (!r.weatherAlerts || r.weatherAlerts.length === 0) {
+            console.log("[WeatherService] No native alerts → fetching via AlertsJS (countryCode=" + countryCode + ")");
+            AlertsJS.fetchAlerts(service);
+        } else {
+            console.log("[WeatherService] Provider set", r.weatherAlerts.length, "native alert(s) → skipping AlertsJS");
+        }
+    }
 
     function _formatUpdateText(p) {
         var t = Qt.formatTime(new Date(), Qt.locale().timeFormat(Locale.ShortFormat));
@@ -150,6 +237,21 @@ QtObject {
         } else if (p === "metno") {
             name = "MET Norway";
             url = "https://www.met.no";
+        } else if (p === "pirateWeather") {
+            name = "Pirate Weather";
+            url = "https://pirateweather.net";
+        } else if (p === "visualCrossing") {
+            name = "Visual Crossing";
+            url = "https://www.visualcrossing.com";
+        } else if (p === "tomorrowIo") {
+            name = "Tomorrow.io";
+            url = "https://www.tomorrow.io";
+        } else if (p === "stormGlass") {
+            name = "StormGlass";
+            url = "https://stormglass.io";
+        } else if (p === "weatherbit") {
+            name = "Weatherbit";
+            url = "https://www.weatherbit.io";
         } else {
             name = "Open-Meteo";
             url = "https://open-meteo.com";
@@ -164,20 +266,56 @@ QtObject {
             return "WeatherAPI.com";
         if (p === "metno")
             return "met.no";
+        if (p === "pirateWeather")
+            return "Pirate Weather";
+        if (p === "visualCrossing")
+            return "Visual Crossing";
+        if (p === "tomorrowIo")
+            return "Tomorrow.io";
+        if (p === "stormGlass")
+            return "StormGlass";
+        if (p === "weatherbit")
+            return "Weatherbit";
         return "Open-Meteo";
     }
 
     function _tryProvider(chain, idx) {
+        // If a newer refresh has started, stop advancing this chain
+        if (idx > 0 && _refreshGen !== chain._gen) return;
+
         if (idx >= chain.length) {
             weatherRoot.loading = false;
+            _safetyTimer.stop();
             var names = chain.map(function (p) {
                 return _providerLabel(p);
             });
             weatherRoot.updateText = i18n("Failed: %1", names.join(", "));
             _failed = [];
+            // Still fetch alerts even if all weather providers failed
+            _fetchAlertsIfNeeded();
             return;
         }
         var p = chain[idx];
+        if (p === "pirateWeather") {
+            PirateWeatherJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
+        if (p === "visualCrossing") {
+            VisualCrossingJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
+        if (p === "tomorrowIo") {
+            TomorrowIoJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
+        if (p === "stormGlass") {
+            StormGlassJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
+        if (p === "weatherbit") {
+            WeatherbitJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
         if (p === "openWeather") {
             OpenWeatherJS.fetchCurrent(service, W, chain, idx);
             return;
@@ -201,6 +339,7 @@ QtObject {
      * and isNightTime() work correctly even without a primary API for these.
      */
     function _fetchSunTimesOpenMeteo() {
+        var gen = _refreshGen;
         var r = weatherRoot;
         var tz = (Plasmoid.configuration.timezone || "").trim();
         var today = Qt.formatDate(new Date(), "yyyy-MM-dd");
@@ -210,6 +349,7 @@ QtObject {
         req.onreadystatechange = function () {
             if (req.readyState !== XMLHttpRequest.DONE)
                 return;
+            if (_refreshGen !== gen) return;
             if (req.status !== 200)
                 return;  // leave "--" in place — better than crashing
             try {

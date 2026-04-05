@@ -23,6 +23,7 @@
  */
 
 function fetchCurrent(service, chain, idx) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var tz = service.timezone;
     var url = "https://api.open-meteo.com/v1/forecast"
@@ -40,6 +41,7 @@ function fetchCurrent(service, chain, idx) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             service._tryProvider(chain, idx + 1);
             return;
@@ -86,6 +88,10 @@ function fetchCurrent(service, chain, idx) {
         r.dailyData = nd;
         r.loading = false;
         r.updateText = service._formatUpdateText("openMeteo");
+
+        // No native alerts — fall back to MeteoAlarm / NWS
+        service._fetchAlertsIfNeeded();
+
         // Fetch air quality from separate endpoint
         _fetchAirQuality(service);
     };
@@ -102,6 +108,7 @@ function _aqiLabel(aqi) {
 }
 
 function _fetchAirQuality(service) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var tz = service.timezone;
     var url = "https://air-quality-api.open-meteo.com/v1/air-quality"
@@ -115,6 +122,7 @@ function _fetchAirQuality(service) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             r.airQualityIndex = NaN;
             r.airQualityLabel = "";
@@ -165,6 +173,7 @@ function _fetchAirQuality(service) {
 }
 
 function fetchHourly(service, dateStr) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var tz = service.timezone;
     var url = "https://api.open-meteo.com/v1/forecast?latitude="
@@ -178,6 +187,7 @@ function fetchHourly(service, dateStr) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             r.hourlyData = [];
             return;

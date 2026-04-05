@@ -1712,6 +1712,26 @@ Item {
                                     if (c === "red")    return root.isDark ? "#ff4444" : "#cc0000";
                                     return Kirigami.Theme.textColor;
                                 }
+                                // Map alert source string to a clickable provider link
+                                function alertProviderLink(src) {
+                                    src = (src || "").trim();
+                                    if (src === "NWS")
+                                        return "<a href='https://www.weather.gov/'>NOAA NWS</a>";
+                                    if (src === "MET Norway")
+                                        return "<a href='https://www.met.no/'>MET Norway</a>";
+                                    if (src === "MeteoAlarm")
+                                        return "<a href='https://www.meteoalarm.org/'>EUMETNET MeteoAlarm</a>";
+                                    if (src === "PirateWeather")
+                                        return "<a href='https://pirateweather.net/'>Pirate Weather</a>";
+                                    if (src === "VisualCrossing")
+                                        return "<a href='https://www.visualcrossing.com/'>Visual Crossing</a>";
+                                    if (src === "WeatherAPI")
+                                        return "<a href='https://www.weatherapi.com/'>WeatherAPI.com</a>";
+                                    // Unknown source — show as plain text
+                                    if (src.length > 0)
+                                        return src;
+                                    return "<a href='https://www.meteoalarm.org/'>EUMETNET MeteoAlarm</a>";
+                                }
                                 function formatAlertDate(iso) {
                                     if (!iso) return "";
                                     var d = new Date(iso);
@@ -1743,22 +1763,42 @@ Item {
                                     if (!str) return "";
                                     return str.length > max ? str.substring(0, max).trimRight() + "…" : str;
                                 }
+                                function _formatNwsDescription(desc) {
+                                    if (!desc) return "";
+                                    var text = desc.replace(/\r?\n/g, "<br>");
+                                    text = text.replace(/\*\s+WHAT\s*\.{3}/gi, "<br><b>WHAT:</b> ");
+                                    text = text.replace(/\*\s+WHERE\s*\.{3}/gi, "<br><b>WHERE:</b> ");
+                                    text = text.replace(/\*\s+WHEN\s*\.{3}/gi, "<br><b>WHEN:</b> ");
+                                    text = text.replace(/\*\s+IMPACTS?\s*\.{3}/gi, "<br><b>IMPACTS:</b> ");
+                                    text = text.replace(/\*\s+ADDITIONAL\s+DETAILS\s*\.{3}/gi, "<br><b>ADDITIONAL DETAILS:</b> ");
+                                    text = text.replace(/\*\s+HAZARD\s*\.{3}/gi, "<br><b>HAZARD:</b> ");
+                                    text = text.replace(/\*\s+SOURCE\s*\.{3}/gi, "<br><b>SOURCE:</b> ");
+                                    text = text.replace(/\*\s+IMPACT\s*\.{3}/gi, "<br><b>IMPACT:</b> ");
+                                    text = text.replace(/\*\s+PRECAUTIONARY\/PREPAREDNESS\s+ACTIONS\s*\.{3}/gi, "<br><b>PRECAUTIONARY ACTIONS:</b> ");
+                                    text = text.replace(/(<br>\s*){3,}/g, "<br><br>");
+                                    text = text.replace(/^(<br>)+/, "");
+                                    return text;
+                                }
                                 function alertTooltipSub(a) {
                                     var lines = [];
                                     if (a.headline)
                                         lines.push("<b>" + i18n("Headline") + ":</b> " + a.headline);
-                                    if (a.description)
-                                        lines.push("<b>" + i18n("Description") + ":</b><br>" + a.description);
+                                    if (a.description) {
+                                        if (a.source === "NWS")
+                                            lines.push("<b>" + i18n("Description") + ":</b><br>" + _formatNwsDescription(a.description));
+                                        else
+                                            lines.push("<b>" + i18n("Description") + ":</b><br>" + a.description);
+                                    }
                                     if (a.effective)
                                         lines.push("<b>" + i18n("Effective") + ":</b> " + formatAlertDateTime(a.effective));
                                     if (a.expires)
                                         lines.push("<b>" + i18n("Expires") + ":</b> " + formatAlertDateTime(a.expires));
                                     if (a.instruction)
                                         lines.push("<b>" + i18n("Instruction") + ":</b><br>" + a.instruction);
-                                    if (a.senderName)
-                                        lines.push("<b>" + i18n("Provider") + ":</b> " + a.senderName);
+                                    if (a.source || a.senderName)
+                                        lines.push("<b>" + i18n("Provider") + ":</b> " + alertProviderLink(a.source));
                                     if (a.web)
-                                        lines.push("<b>" + i18n("Website") + ":</b> " + a.web);
+                                        lines.push("<b>" + i18n("Website") + ":</b> <a href='" + a.web + "'>" + a.web + "</a>");
                                     return lines.join("<br>");
                                 }
 
@@ -2206,7 +2246,20 @@ Item {
                                         Layout.fillWidth: true
                                         horizontalAlignment: Text.AlignRight
                                         textFormat: Text.RichText
-                                        text: i18n("Provider:") + " <a href='https://www.meteoalarm.org/'>EUMETNET</a>"
+                                        text: {
+                                            var sources = [];
+                                            var seen = {};
+                                            for (var i = 0; i < alertsCard.alerts.length; i++) {
+                                                var s = (alertsCard.alerts[i].source || "").trim();
+                                                if (s.length > 0 && !seen[s]) {
+                                                    seen[s] = true;
+                                                    sources.push(alertsCard.alertProviderLink(s));
+                                                }
+                                            }
+                                            if (sources.length === 0)
+                                                sources.push(alertsCard.alertProviderLink(""));
+                                            return i18n("Provider:") + " " + sources.join(" · ");
+                                        }
                                         color: Kirigami.Theme.disabledTextColor
                                         font: weatherRoot ? weatherRoot.wf(9, false) : Qt.font({})
                                         onLinkActivated: function(link) { Qt.openUrlExternally(link); }

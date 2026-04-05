@@ -69,9 +69,16 @@
     <entry name="timezone"           type="String"><default></default></entry>
     <entry name="countryCode"        type="String"><default></default></entry>
     <entry name="weatherProvider"    type="String"><default>adaptive</default></entry>
+    <!-- Saved locations: JSON array of {name, lat, lon, altitude, timezone, countryCode} -->
+    <entry name="savedLocations"     type="String"><default>[]</default></entry>
     <!-- User API keys: empty = use widget's bundled key -->
     <entry name="owApiKey"           type="String"><default></default></entry>
     <entry name="waApiKey"           type="String"><default></default></entry>
+    <entry name="pwApiKey"           type="String"><default></default></entry>
+    <entry name="vcApiKey"           type="String"><default></default></entry>
+    <entry name="tioApiKey"          type="String"><default></default></entry>
+    <entry name="sgApiKey"           type="String"><default></default></entry>
+    <entry name="wbApiKey"           type="String"><default></default></entry>
 
     <!-- ── Behaviour ─────────────────────────────────────────────────── -->
     <entry name="keepOpen"           type="Bool"><default>false</default></entry>

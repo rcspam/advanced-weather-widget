@@ -211,6 +211,37 @@ function weatherApiCodeToWmo(code) {
     return 2;
 }
 
+/** Converts a Pirate Weather / Dark Sky icon string to WMO weather code */
+function pirateWeatherIconToWmo(icon) {
+    if (!icon) return 2;
+    switch (icon) {
+        case "clear-day":
+        case "clear-night":
+            return 0;
+        case "partly-cloudy-day":
+        case "partly-cloudy-night":
+            return 2;
+        case "cloudy":
+            return 3;
+        case "rain":
+            return 63;
+        case "snow":
+            return 73;
+        case "sleet":
+            return 66;
+        case "wind":
+            return 2;
+        case "fog":
+            return 45;
+        case "thunderstorm":
+            return 95;
+        case "hail":
+            return 99;
+        default:
+            return 2;
+    }
+}
+
 // ── Unit formatters ─────────────────────────────────────────────────────────
 
 /**

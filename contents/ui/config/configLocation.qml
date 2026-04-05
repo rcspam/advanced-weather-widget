@@ -40,6 +40,7 @@ KCM.SimpleKCM {
     property string cfg_countryCode: ""
     property string cfg_altitudeUnit: "m"
     property string cfg_weatherProvider: "adaptive"
+    property string cfg_savedLocations: "[]"
 
     property bool   autoDetectBusy: false
     property string autoDetectStatus: ""
@@ -56,9 +57,25 @@ KCM.SimpleKCM {
     // to be written directly to Plasmoid.configuration.
     property bool   _detectedLocationApplied: false
 
+    // Pending save entry — set by applySearchResult, consumed by saveLocationDialog
+    property var _pendingSaveEntry: null
+
     // Always show the confirmation dialog when auto-detecting via the
     // config UI so the user can review the detected place before it is saved.
     property bool _forceConfirmAutoDetect: false
+
+    function _moveLocation(fromIdx, toIdx) {
+        var locs;
+        try {
+            locs = JSON.parse(root.cfg_savedLocations || "[]");
+            if (!Array.isArray(locs)) locs = [];
+        } catch (e) { locs = []; }
+        if (fromIdx < 0 || fromIdx >= locs.length || toIdx < 0 || toIdx >= locs.length)
+            return;
+        var item = locs.splice(fromIdx, 1)[0];
+        locs.splice(toIdx, 0, item);
+        root.cfg_savedLocations = JSON.stringify(locs);
+    }
 
     function shouldConfirmAutoDetectedLocation() {
         return _forceConfirmAutoDetect
@@ -137,6 +154,13 @@ KCM.SimpleKCM {
             url = "https://api.weatherapi.com/v1/current.json?key="
                 + encodeURIComponent(waKey)
                 + "&q=" + encodeURIComponent(lat + "," + lon);
+        } else if (provider === "pirateWeather") {
+            var pwKey = (Plasmoid.configuration.pwApiKey || "").trim();
+            if (!pwKey) { locationCheckState = 0; return; }
+            url = "https://api.pirateweather.net/forecast/"
+                + encodeURIComponent(pwKey) + "/"
+                + lat + "," + lon
+                + "?units=ca&exclude=minutely,hourly,daily,alerts";
         } else if (provider === "metno") {
             url = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat="
                 + encodeURIComponent(lat) + "&lon=" + encodeURIComponent(lon);
@@ -167,6 +191,7 @@ KCM.SimpleKCM {
         if (p === "openWeather") return "OpenWeatherMap";
         if (p === "weatherApi") return "WeatherAPI.com";
         if (p === "metno") return "met.no";
+        if (p === "pirateWeather") return "Pirate Weather";
         return "Open-Meteo";
     }
 
@@ -220,10 +245,11 @@ KCM.SimpleKCM {
         return formatResultTitle(item)
     }
     function selectedProviderDisplayName() {
-        if (cfg_weatherProvider === "adaptive")    return "Adaptive"
-        if (cfg_weatherProvider === "openWeather") return "OpenWeather"
-        if (cfg_weatherProvider === "weatherApi")  return "WeatherAPI.com"
-        if (cfg_weatherProvider === "metno")       return "met.no"
+        if (cfg_weatherProvider === "adaptive")       return "Adaptive"
+        if (cfg_weatherProvider === "openWeather")    return "OpenWeather"
+        if (cfg_weatherProvider === "weatherApi")     return "WeatherAPI.com"
+        if (cfg_weatherProvider === "pirateWeather")  return "Pirate Weather"
+        if (cfg_weatherProvider === "metno")          return "met.no"
         return "Open-Meteo"
     }
     function currentLocationDisplayName() {
@@ -591,6 +617,31 @@ KCM.SimpleKCM {
 
         // Verify the new location is available on the current provider
         verifyProviderLocation(lat, lon)
+
+        // Prepare save prompt — dialog shown when user navigates back
+        var entry = {
+            name: cfg_locationName,
+            lat:  cfg_latitude,
+            lon:  cfg_longitude,
+            altitude:    cfg_altitude || 0,
+            timezone:    cfg_timezone || "",
+            countryCode: cfg_countryCode || ""
+        };
+        // Check if already in saved locations
+        var existing;
+        try {
+            existing = JSON.parse(cfg_savedLocations || "[]");
+            if (!Array.isArray(existing)) existing = [];
+        } catch (e) { existing = []; }
+        var isDup = false;
+        for (var k = 0; k < existing.length; k++) {
+            if (Math.abs(existing[k].lat - entry.lat) < 0.01
+                && Math.abs(existing[k].lon - entry.lon) < 0.01) {
+                isDup = true;
+                break;
+            }
+        }
+        _pendingSaveEntry = isDup ? null : entry;
     }
 
     onCfg_autoDetectLocationChanged: {
@@ -653,18 +704,85 @@ KCM.SimpleKCM {
         else detectedLocationDialog.close()
     }
 
+    Kirigami.Dialog {
+        id: saveLocationDialog
+        title: i18n("Save location")
+        standardButtons: Kirigami.Dialog.NoButton
+        leftPadding: Kirigami.Units.gridUnit * 2; rightPadding: Kirigami.Units.gridUnit * 2
+        topPadding: Kirigami.Units.gridUnit;      bottomPadding: Kirigami.Units.gridUnit
+        onClosed: root._pendingSaveEntry = null
+        contentItem: Item {
+            implicitWidth: 380; implicitHeight: saveDlgCol.implicitHeight
+            ColumnLayout {
+                id: saveDlgCol
+                anchors.left: parent.left; anchors.right: parent.right
+                spacing: Kirigami.Units.largeSpacing
+                Kirigami.Icon {
+                    Layout.alignment: Qt.AlignHCenter; source: "bookmark-new"
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.huge
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.huge
+                }
+                Label {
+                    Layout.fillWidth: true; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter
+                    textFormat: Text.RichText
+                    text: root._pendingSaveEntry
+                          ? i18n("Save <b>%1</b> to your saved locations?", root._pendingSaveEntry.name || i18n("this location"))
+                          : ""
+                }
+                Item { Layout.preferredHeight: Kirigami.Units.largeSpacing }
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: Kirigami.Units.mediumSpacing
+                    Button {
+                        text: i18n("No, thanks")
+                        icon.name: "dialog-cancel"
+                        onClicked: { root._pendingSaveEntry = null; saveLocationDialog.close() }
+                    }
+                    Button {
+                        text: i18n("Save")
+                        icon.name: "bookmark-new"
+                        onClicked: {
+                            if (root._pendingSaveEntry) {
+                                var locs;
+                                try {
+                                    locs = JSON.parse(root.cfg_savedLocations || "[]");
+                                    if (!Array.isArray(locs)) locs = [];
+                                } catch (e) { locs = []; }
+                                locs.push(root._pendingSaveEntry);
+                                root.cfg_savedLocations = JSON.stringify(locs);
+                            }
+                            root._pendingSaveEntry = null;
+                            saveLocationDialog.close();
+                        }
+                    }
+                }
+                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+            }
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     StackView {
         id: stack
         anchors.fill: parent
         initialItem: mainPage
+        onDepthChanged: {
+            if (depth === 1 && root._pendingSaveEntry)
+                saveLocationDialog.open()
+        }
     }
 
     Component {
         id: mainPage
         Item {
-            ColumnLayout {
-                anchors.fill: parent; spacing: 10
+            ScrollView {
+                id: mainScrollView
+                anchors.fill: parent
+                contentWidth: availableWidth
+
+                ColumnLayout {
+                    width: mainScrollView.availableWidth
+                    spacing: 10
 
                 ButtonGroup { id: locationModeGroup }
 
@@ -715,6 +833,133 @@ KCM.SimpleKCM {
                         }
                     }
                 }
+
+                // ── Saved Locations section header ──────────────────────
+                Item { Layout.preferredHeight: 4 }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 8
+                    Kirigami.Heading {
+                        text: i18n("Saved locations")
+                        level: 4
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true; height: 1
+                        color: Kirigami.Theme.separatorColor
+                        opacity: 0.6
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true; wrapMode: Text.WordWrap; opacity: 0.7
+                    visible: savedLocRepeater.count === 0
+                    text: i18n("No saved locations. Save the current location to quickly switch between places.")
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true; spacing: 2
+
+                    Repeater {
+                        id: savedLocRepeater
+                        model: {
+                            try {
+                                var locs = JSON.parse(root.cfg_savedLocations || "[]");
+                                return Array.isArray(locs) ? locs : [];
+                            } catch (e) { return []; }
+                        }
+                        delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            implicitHeight: savedLocRow.implicitHeight + 12
+                            radius: 4
+                            color: savedLocMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.15) : "transparent"
+
+                            MouseArea {
+                                id: savedLocMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.cfg_autoDetectLocation = false;
+                                    root.cfg_locationName = modelData.name || "";
+                                    root.cfg_latitude = modelData.lat || 0;
+                                    root.cfg_longitude = modelData.lon || 0;
+                                    if (modelData.altitude !== undefined)
+                                        root.cfg_altitude = modelData.altitude;
+                                    if (modelData.timezone)
+                                        root.cfg_timezone = modelData.timezone;
+                                    if (modelData.countryCode)
+                                        root.cfg_countryCode = modelData.countryCode;
+                                    root.verifyProviderLocation(modelData.lat || 0, modelData.lon || 0);
+                                }
+                            }
+
+                            RowLayout {
+                                id: savedLocRow
+                                anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 6 }
+                                spacing: 8
+
+                                Kirigami.Icon {
+                                    source: "mark-location"
+                                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true; spacing: 0
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: modelData.name || i18n("Unknown")
+                                        elide: Text.ElideRight
+                                        font.bold: Math.abs(root.cfg_latitude - (modelData.lat || 0)) < 0.01
+                                                   && Math.abs(root.cfg_longitude - (modelData.lon || 0)) < 0.01
+                                    }
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: (modelData.lat || 0).toFixed(4) + "°, " + (modelData.lon || 0).toFixed(4) + "°"
+                                        opacity: 0.6; font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                    }
+                                }
+
+                                ToolButton {
+                                    icon.name: "arrow-up"
+                                    display: AbstractButton.IconOnly
+                                    enabled: index > 0
+                                    opacity: enabled ? 1.0 : 0.3
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: i18n("Move up")
+                                    onClicked: root._moveLocation(index, index - 1)
+                                }
+                                ToolButton {
+                                    icon.name: "arrow-down"
+                                    display: AbstractButton.IconOnly
+                                    enabled: index < savedLocRepeater.count - 1
+                                    opacity: enabled ? 1.0 : 0.3
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: i18n("Move down")
+                                    onClicked: root._moveLocation(index, index + 1)
+                                }
+                                ToolButton {
+                                    icon.name: "edit-delete"
+                                    display: AbstractButton.IconOnly
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: i18n("Remove saved location")
+                                    onClicked: {
+                                        var locs;
+                                        try {
+                                            locs = JSON.parse(root.cfg_savedLocations || "[]");
+                                            if (!Array.isArray(locs)) locs = [];
+                                        } catch (e) { locs = []; }
+                                        locs.splice(index, 1);
+                                        root.cfg_savedLocations = JSON.stringify(locs);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+
 
                 // ── Location information section header ─────────────────
                 Item { Layout.preferredHeight: 4 }
@@ -829,8 +1074,9 @@ KCM.SimpleKCM {
                     text: root.locationCheckMessage
                 }
 
-                Item { Layout.fillHeight: true }
-            }
+                Item { Layout.preferredHeight: Kirigami.Units.largeSpacing }
+            } // ColumnLayout
+            } // ScrollView
         }
     }
 

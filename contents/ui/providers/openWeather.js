@@ -36,6 +36,7 @@ function _calcDewPoint(T, rh) {
 }
 
 function fetchCurrent(service, W, chain, idx) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var key = service._owKey();
     if (!key) {
@@ -52,6 +53,7 @@ function fetchCurrent(service, W, chain, idx) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             service._tryProvider(chain, idx + 1);
             return;
@@ -87,6 +89,7 @@ function fetchCurrent(service, W, chain, idx) {
         fcReq.onreadystatechange = function () {
             if (fcReq.readyState !== XMLHttpRequest.DONE)
                 return;
+            if (service._refreshGen !== gen) return;
             var nd = [];
             if (fcReq.status === 200) {
                 var fc = JSON.parse(fcReq.responseText);
@@ -132,6 +135,10 @@ function fetchCurrent(service, W, chain, idx) {
             r.dailyData = nd;
             r.loading = false;
             r.updateText = service._formatUpdateText("openWeather");
+
+            // No native alerts — fall back to MeteoAlarm / NWS
+            service._fetchAlertsIfNeeded();
+
             _fetchAirQuality(service, W);
         };
         fcReq.send();
@@ -149,6 +156,7 @@ function _owAqiLabel(aqi) {
 }
 
 function _fetchAirQuality(service, W) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var key = service._owKey();
     if (!key) {
@@ -164,6 +172,7 @@ function _fetchAirQuality(service, W) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             r.airQualityIndex = NaN;
             r.airQualityLabel = "";
@@ -185,6 +194,7 @@ function _fetchAirQuality(service, W) {
 }
 
 function fetchHourly(service, W, dateStr) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var key = service._owKey();
     if (!key) {
@@ -200,6 +210,7 @@ function fetchHourly(service, W, dateStr) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             r.hourlyData = [];
             return;

@@ -290,6 +290,7 @@ Item {
                         }
 
                         ScrollView {
+                            id: hourlyScrollView
                             anchors.fill: parent
                             anchors.margins: 8
                             visible: weatherRoot && weatherRoot.hourlyData.length > 0
@@ -507,6 +508,21 @@ Item {
                                 } // Repeater
                             } // ScrollView content Row
                         } // ScrollView
+
+                        // Overlay: translate vertical mouse-wheel → horizontal scroll
+                        MouseArea {
+                            anchors.fill: hourlyScrollView
+                            visible: hourlyScrollView.visible
+                            acceptedButtons: Qt.NoButton
+                            onWheel: function(wheel) {
+                                var bar = hourlyScrollView.ScrollBar.horizontal
+                                if (!bar) return
+                                var delta = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x
+                                var step = 0.15 * (delta > 0 ? -1 : 1)
+                                bar.position = Math.max(0, Math.min(1.0 - bar.size, bar.position + step))
+                                wheel.accepted = true
+                            }
+                        }
                     }
 
                     Rectangle {

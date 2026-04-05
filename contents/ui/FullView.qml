@@ -182,7 +182,7 @@ Rectangle {
         spacing: 0
         visible: weatherRoot && weatherRoot.hasSelectedTown
 
-        // ── Header: location pin + name + detect + refresh ────────────
+        // ── Header: location pin + name + switcher + detect + refresh ────────────
         RowLayout {
             Layout.fillWidth: true
             spacing: 4
@@ -202,6 +202,109 @@ Rectangle {
                 font: weatherRoot ? weatherRoot.wf(11, false) : Qt.font({})
                 elide: Text.ElideRight
                 verticalAlignment: Text.AlignVCenter
+            }
+
+            // ── Location switcher dropdown ────────────────────────────────
+            ToolButton {
+                id: locationSwitcherBtn
+                icon.name: "go-down"
+                flat: true
+                display: AbstractButton.IconOnly
+                width: 20
+                height: 20
+                visible: {
+                    try {
+                        var locs = JSON.parse(Plasmoid.configuration.savedLocations || "[]");
+                        return Array.isArray(locs) && locs.length > 0;
+                    } catch (e) { return false; }
+                }
+                ToolTip.visible: hovered
+                ToolTip.text: i18n("Switch location")
+                onClicked: locationMenu.open()
+
+                Menu {
+                    id: locationMenu
+                    y: locationSwitcherBtn.height
+
+                    // Current location
+                    MenuItem {
+                        text: (Plasmoid.configuration.locationName || i18n("Current")) + (Plasmoid.configuration.autoDetectLocation ? " (" + i18n("auto") + ")" : "")
+                        icon.name: "mark-location"
+                        font.bold: true
+                        enabled: false
+                    }
+
+                    MenuSeparator {}
+
+                    // Saved locations
+                    Instantiator {
+                        model: {
+                            try {
+                                var locs = JSON.parse(Plasmoid.configuration.savedLocations || "[]");
+                                return Array.isArray(locs) ? locs : [];
+                            } catch (e) { return []; }
+                        }
+                        delegate: MenuItem {
+                            required property var modelData
+                            text: modelData.name || i18n("Unknown")
+                            icon.name: "go-next"
+                            onTriggered: {
+                                // Switch to this saved location
+                                Plasmoid.configuration.autoDetectLocation = false;
+                                Plasmoid.configuration.locationName = modelData.name || "";
+                                Plasmoid.configuration.latitude = modelData.lat || 0;
+                                Plasmoid.configuration.longitude = modelData.lon || 0;
+                                if (modelData.altitude !== undefined)
+                                    Plasmoid.configuration.altitude = modelData.altitude;
+                                if (modelData.timezone)
+                                    Plasmoid.configuration.timezone = modelData.timezone;
+                                if (modelData.countryCode)
+                                    Plasmoid.configuration.countryCode = modelData.countryCode;
+                                // All properties set — refresh immediately
+                                if (weatherRoot)
+                                    weatherRoot.refreshWeather();
+                            }
+                        }
+                        onObjectAdded: function(index, object) { locationMenu.insertItem(index + 2, object) }
+                        onObjectRemoved: function(index, object) { locationMenu.removeItem(object) }
+                    }
+
+                    MenuSeparator {}
+
+                    MenuItem {
+                        text: i18n("Save current location…")
+                        icon.name: "list-add"
+                        onTriggered: {
+                            var name = Plasmoid.configuration.locationName || "";
+                            if (!name) return;
+                            var entry = {
+                                name: name,
+                                lat: Plasmoid.configuration.latitude,
+                                lon: Plasmoid.configuration.longitude,
+                                altitude: Plasmoid.configuration.altitude || 0,
+                                timezone: Plasmoid.configuration.timezone || "",
+                                countryCode: Plasmoid.configuration.countryCode || ""
+                            };
+                            var locs;
+                            try {
+                                locs = JSON.parse(Plasmoid.configuration.savedLocations || "[]");
+                                if (!Array.isArray(locs)) locs = [];
+                            } catch (e) { locs = []; }
+                            // Avoid duplicates by lat/lon
+                            var isDup = false;
+                            for (var i = 0; i < locs.length; i++) {
+                                if (Math.abs(locs[i].lat - entry.lat) < 0.01 && Math.abs(locs[i].lon - entry.lon) < 0.01) {
+                                    isDup = true;
+                                    break;
+                                }
+                            }
+                            if (!isDup) {
+                                locs.push(entry);
+                                Plasmoid.configuration.savedLocations = JSON.stringify(locs);
+                            }
+                        }
+                    }
+                }
             }
 
             PlasmaComponents.ToolButton {

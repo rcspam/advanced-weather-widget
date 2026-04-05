@@ -390,6 +390,7 @@ PlasmoidItem {
 
     /** Refresh current weather + forecast (called by button, timers, config changes) */
     function refreshWeather() {
+        refreshDebounce.stop();
         weatherService.refreshNow();
     }
 
@@ -808,8 +809,11 @@ PlasmoidItem {
     }
 
     onLoadingChanged: {
-        if (!loading && !isNaN(temperatureC))
-            _computeMoonTimes();
+        if (!loading) {
+            weatherService._safetyTimer.stop();
+            if (!isNaN(temperatureC))
+                _computeMoonTimes();
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1265,7 +1269,7 @@ PlasmoidItem {
     // all config keys to settle before a single real refresh is performed.
     Timer {
         id: refreshDebounce
-        interval: 350
+        interval: 600
         repeat: false
         onTriggered: refreshWeather()
     }
