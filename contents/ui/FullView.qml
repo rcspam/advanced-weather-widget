@@ -143,6 +143,58 @@ Rectangle {
         }
     }
 
+    // ── Restore default (starred) location on startup ─────────────────────
+    // Runs once after the widget initialises. If the currently active location
+    // differs from the starred entry in savedLocations, it switches back.
+    property bool _startupRestoreDone: false
+
+    function _restoreDefaultLocation() {
+        if (_startupRestoreDone)
+            return;
+        _startupRestoreDone = true;
+
+        var locs;
+        try {
+            locs = JSON.parse(Plasmoid.configuration.savedLocations || "[]");
+            if (!Array.isArray(locs)) locs = [];
+        } catch (e) { return; }
+
+        var starred = null;
+        for (var i = 0; i < locs.length; i++) {
+            if (locs[i].starred) { starred = locs[i]; break; }
+        }
+        if (!starred) return;
+
+        var curLat = Plasmoid.configuration.latitude || 0;
+        var curLon = Plasmoid.configuration.longitude || 0;
+        if (Math.abs(starred.lat - curLat) < 0.01 && Math.abs(starred.lon - curLon) < 0.01)
+            return; // already on the default location
+
+        Plasmoid.configuration.autoDetectLocation = false;
+        Plasmoid.configuration.locationName = starred.name || "";
+        Plasmoid.configuration.latitude = starred.lat || 0;
+        Plasmoid.configuration.longitude = starred.lon || 0;
+        if (starred.altitude !== undefined)
+            Plasmoid.configuration.altitude = starred.altitude;
+        if (starred.timezone)
+            Plasmoid.configuration.timezone = starred.timezone;
+        if (starred.countryCode)
+            Plasmoid.configuration.countryCode = starred.countryCode;
+        if (weatherRoot && typeof weatherRoot.refreshWeather === "function")
+            weatherRoot.refreshWeather();
+    }
+
+    // Small delay lets weatherRoot and Plasmoid.configuration fully initialise
+    // before the restore runs.
+    Timer {
+        id: _startupRestoreTimer
+        interval: 300
+        repeat: false
+        onTriggered: fullView._restoreDefaultLocation()
+    }
+
+    Component.onCompleted: _startupRestoreTimer.start()
+
     // ── No-location placeholder ───────────────────────────────────────────
     Item {
         anchors.fill: parent
@@ -263,8 +315,14 @@ Rectangle {
                         }
                         delegate: MenuItem {
                             required property var modelData
+                            readonly property bool isActive: {
+                                var dLat = Math.abs((modelData.lat || 0) - (Plasmoid.configuration.latitude || 0));
+                                var dLon = Math.abs((modelData.lon || 0) - (Plasmoid.configuration.longitude || 0));
+                                return dLat < 0.01 && dLon < 0.01;
+                            }
                             text: modelData.name || i18n("Unknown")
-                            icon.name: "go-next"
+                            icon.name: modelData.starred ? "starred-symbolic" : (isActive ? "dialog-ok-apply" : "go-next")
+                            font.bold: isActive
                             onTriggered: {
                                 // Switch to this saved location
                                 Plasmoid.configuration.autoDetectLocation = false;

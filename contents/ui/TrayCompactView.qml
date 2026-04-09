@@ -1,27 +1,7 @@
 /*
  * Copyright 2026  Petar Nedyalkov
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/**
- * TrayCompactView.qml — System tray icon (visual only)
- *
- * Shows a weather icon that fits the standard tray icon slot.
- * When a location is set, a compressed-mode temperature badge is overlaid.
- * No mouse handling — the MouseArea lives in CompactRepresentationInTray.
- */
 import QtQuick
 import QtQuick.Controls
 import org.kde.kirigami as Kirigami
@@ -38,7 +18,7 @@ Item {
         && weatherRoot.hasSelectedTown
         && !isNaN(weatherRoot.temperatureC)
 
-    // ── Weather icon ──────────────────────────────────────────────────
+    // Weather icon
     Kirigami.Icon {
         id: trayIcon
         anchors.fill: parent
@@ -53,7 +33,7 @@ Item {
         }
     }
 
-    // ── Temperature badge (compressed mode) ───────────────────────────
+    // Temperature badge (now scales nicely with larger icon)
     Rectangle {
         id: badgeRect
         visible: trayRoot._hasTemp
@@ -79,8 +59,7 @@ Item {
         radius: height / 2
         color: {
             var cc = Plasmoid.configuration.compressedBadgeColor || "";
-            var op = Plasmoid.configuration.compressedBadgeOpacity !== undefined
-                ? Plasmoid.configuration.compressedBadgeOpacity : 0.85;
+            var op = Plasmoid.configuration.compressedBadgeOpacity !== undefined ? Plasmoid.configuration.compressedBadgeOpacity : 0.85;
             if (cc.length > 0) {
                 var parsed = Qt.color(cc);
                 return Qt.rgba(parsed.r, parsed.g, parsed.b, op);

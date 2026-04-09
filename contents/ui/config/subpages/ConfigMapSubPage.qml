@@ -51,50 +51,47 @@ ColumnLayout {
     property int _searchMode: 0   // 0 = Location name, 1 = Coordinates
     property string _preferredLanguage: Qt.locale().name.split("_")[0]
 
+    // ── Set-as-default dialog state ─────────────────────────────────────
+    property real _defaultDialogLat: NaN
+    property real _defaultDialogLon: NaN
+    property string _defaultDialogName: ""
+    property bool _pendingIsNew: false
+
     function _applyToConfig() {
         if (isNaN(selectedLat) || isNaN(selectedLon))
             return;
-        configRoot.cfg_autoDetectLocation = false;
-        configRoot.cfg_latitude = selectedLat;
-        configRoot.cfg_longitude = selectedLon;
-        if (selectedName.length > 0)
-            configRoot.cfg_locationName = selectedName;
-        if (selectedAltitude !== 0)
-            configRoot.cfg_altitude = selectedAltitude;
-        if (selectedTimezone.length > 0)
-            configRoot.cfg_timezone = selectedTimezone;
-        if (selectedCountryCode.length > 0)
-            configRoot.cfg_countryCode = selectedCountryCode;
-        configRoot.verifyProviderLocation(selectedLat, selectedLon);
 
-        // Prepare save entry
-        var entry = {
-            name: configRoot.cfg_locationName,
-            lat: configRoot.cfg_latitude,
-            lon: configRoot.cfg_longitude,
-            altitude: configRoot.cfg_altitude || 0,
-            timezone: configRoot.cfg_timezone || "",
-            countryCode: configRoot.cfg_countryCode || ""
-        };
-        var existing;
+        // Check if already in saved list
+        var isNew = true;
+        var locs;
         try {
-            existing = JSON.parse(configRoot.cfg_savedLocations || "[]");
-            if (!Array.isArray(existing))
-                existing = [];
-        } catch (e) {
-            existing = [];
-        }
-        var isDup = false;
-        for (var k = 0; k < existing.length; k++) {
-            if (Math.abs(existing[k].lat - entry.lat) < 0.01 && Math.abs(existing[k].lon - entry.lon) < 0.01) {
-                isDup = true;
+            locs = JSON.parse(configRoot.cfg_savedLocations || "[]");
+            if (!Array.isArray(locs)) locs = [];
+        } catch (e) { locs = []; }
+        for (var k = 0; k < locs.length; k++) {
+            if (Math.abs(locs[k].lat - selectedLat) < 0.01 &&
+                Math.abs(locs[k].lon - selectedLon) < 0.01) {
+                isNew = false;
                 break;
             }
         }
-        configRoot._pendingSaveEntry = isDup ? null : entry;
 
-        // Stage only — the KCM Apply button will write to Plasmoid.configuration
-        configRoot._offerSave();
+        // Always stage to cfg_* so KCM Apply becomes active
+        configRoot.cfg_autoDetectLocation = false;
+        configRoot.cfg_latitude = selectedLat;
+        configRoot.cfg_longitude = selectedLon;
+        if (selectedName.length > 0) configRoot.cfg_locationName = selectedName;
+        if (selectedAltitude !== 0) configRoot.cfg_altitude = selectedAltitude;
+        if (selectedTimezone.length > 0) configRoot.cfg_timezone = selectedTimezone;
+        if (selectedCountryCode.length > 0) configRoot.cfg_countryCode = selectedCountryCode;
+        configRoot.verifyProviderLocation(selectedLat, selectedLon);
+
+        // Store pending state — dialog shown when user clicks Back
+        mapSubPageRoot._defaultDialogLat = selectedLat;
+        mapSubPageRoot._defaultDialogLon = selectedLon;
+        mapSubPageRoot._defaultDialogName = selectedName.length > 0
+            ? selectedName : (selectedLat.toFixed(4) + "°, " + selectedLon.toFixed(4) + "°");
+        mapSubPageRoot._pendingIsNew = isNew;
     }
 
     function _lookupLocation(lat, lon) {
@@ -251,7 +248,12 @@ ColumnLayout {
             icon.name: "go-previous"
             text: i18n("Back")
             flat: true
-            onClicked: stack.pop()
+            onClicked: {
+                if (!isNaN(mapSubPageRoot._defaultDialogLat) && mapSubPageRoot._pendingIsNew)
+                    setDefaultDialog.open();
+                else
+                    stack.pop();
+            }
         }
         Label {
             Layout.fillWidth: true
@@ -612,6 +614,120 @@ ColumnLayout {
         visible: isNaN(mapSubPageRoot.selectedLat)
         opacity: 0.6
         text: i18n("Click on the map to select a location")
+    }
+
+    // ── Set as default dialog ────────────────────────────────────────────
+    Kirigami.Dialog {
+        id: setDefaultDialog
+        title: i18n("Set as default?")
+        standardButtons: Kirigami.Dialog.NoButton
+        leftPadding: Kirigami.Units.gridUnit * 2
+        rightPadding: Kirigami.Units.gridUnit * 2
+        topPadding: Kirigami.Units.gridUnit
+        bottomPadding: Kirigami.Units.gridUnit
+
+        contentItem: Item {
+            implicitWidth: 360
+            implicitHeight: setDefaultCol.implicitHeight
+
+            ColumnLayout {
+                id: setDefaultCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                spacing: Kirigami.Units.largeSpacing
+
+                Kirigami.Icon {
+                    Layout.alignment: Qt.AlignHCenter
+                    source: "starred-symbolic"
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.huge
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.huge
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    textFormat: Text.RichText
+                    text: i18n("Set <b>%1</b> as your default location?", mapSubPageRoot._defaultDialogName)
+                }
+
+                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: Kirigami.Units.mediumSpacing
+
+                    Button {
+                        text: i18n("Yes")
+                        icon.name: "dialog-ok-apply"
+                        onClicked: {
+                            // Stage as active location
+                            configRoot.cfg_autoDetectLocation = false;
+                            configRoot.cfg_latitude = mapSubPageRoot.selectedLat;
+                            configRoot.cfg_longitude = mapSubPageRoot.selectedLon;
+                            if (mapSubPageRoot.selectedName.length > 0)
+                                configRoot.cfg_locationName = mapSubPageRoot.selectedName;
+                            if (mapSubPageRoot.selectedAltitude !== 0)
+                                configRoot.cfg_altitude = mapSubPageRoot.selectedAltitude;
+                            if (mapSubPageRoot.selectedTimezone.length > 0)
+                                configRoot.cfg_timezone = mapSubPageRoot.selectedTimezone;
+                            if (mapSubPageRoot.selectedCountryCode.length > 0)
+                                configRoot.cfg_countryCode = mapSubPageRoot.selectedCountryCode;
+                            configRoot.verifyProviderLocation(mapSubPageRoot.selectedLat, mapSubPageRoot.selectedLon);
+
+                            // Clear all stars, add starred entry at top of cfg_savedLocations
+                            var locs;
+                            try {
+                                locs = JSON.parse(configRoot.cfg_savedLocations || "[]");
+                                if (!Array.isArray(locs)) locs = [];
+                            } catch (e) { locs = []; }
+                            for (var i = 0; i < locs.length; i++)
+                                delete locs[i].starred;
+                            locs.unshift({
+                                name: mapSubPageRoot._defaultDialogName,
+                                lat: mapSubPageRoot._defaultDialogLat,
+                                lon: mapSubPageRoot._defaultDialogLon,
+                                altitude: mapSubPageRoot.selectedAltitude || 0,
+                                timezone: mapSubPageRoot.selectedTimezone || "",
+                                countryCode: mapSubPageRoot.selectedCountryCode || "",
+                                starred: true
+                            });
+                            configRoot.cfg_savedLocations = JSON.stringify(locs);
+                            mapSubPageRoot._pendingIsNew = false;
+                            setDefaultDialog.close();
+                            stack.pop();
+                        }
+                    }
+
+                    Button {
+                        text: i18n("No")
+                        icon.name: "dialog-cancel"
+                        onClicked: {
+                            // Save to list without starring — don't change active location
+                            var locs;
+                            try {
+                                locs = JSON.parse(configRoot.cfg_savedLocations || "[]");
+                                if (!Array.isArray(locs)) locs = [];
+                            } catch (e) { locs = []; }
+                            locs.push({
+                                name: mapSubPageRoot._defaultDialogName,
+                                lat: mapSubPageRoot._defaultDialogLat,
+                                lon: mapSubPageRoot._defaultDialogLon,
+                                altitude: mapSubPageRoot.selectedAltitude || 0,
+                                timezone: mapSubPageRoot.selectedTimezone || "",
+                                countryCode: mapSubPageRoot.selectedCountryCode || ""
+                            });
+                            configRoot.cfg_savedLocations = JSON.stringify(locs);
+                            mapSubPageRoot._pendingIsNew = false;
+                            setDefaultDialog.close();
+                            stack.pop();
+                        }
+                    }
+                }
+
+                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+            }
+        }
     }
 
     // ── WMO weather code helpers ────────────────────────────────────────

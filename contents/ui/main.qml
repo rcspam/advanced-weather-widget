@@ -142,23 +142,26 @@ PlasmoidItem {
     // Representations
     // ══════════════════════════════════════════════════════════════════════
 
-    toolTipMainText: {
-        if (!hasSelectedTown) return i18n("No location set");
-        return Plasmoid.configuration.locationName || i18n("Weather");
-    }
-    toolTipSubText: {
-        if (!hasSelectedTown || isNaN(temperatureC)) return "";
-        var parts = [];
-        parts.push(tempValue(temperatureC));
-        if (weatherCode >= 0)
-            parts.push(weatherCodeToText(weatherCode, isNightTime()));
-        if (!isNaN(humidityPercent))
-            parts.push(i18n("Humidity") + ": " + Math.round(humidityPercent) + "%");
-        if (!isNaN(windKmh))
-            parts.push(i18n("Wind") + ": " + windValue(windKmh));
-        return parts.join(" | ");
-    }
-    toolTipTextFormat: Text.PlainText
+    // toolTipMainText: {
+    //     if (!hasSelectedTown) return i18n("No location set");
+    //     return Plasmoid.configuration.locationName || i18n("Weather");
+    // }
+    // toolTipSubText: {
+    //     if (!hasSelectedTown || isNaN(temperatureC)) return "";
+    //     var parts = [];
+    //     parts.push(tempValue(temperatureC));
+    //     if (weatherCode >= 0)
+    //         parts.push(weatherCodeToText(weatherCode, isNightTime()));
+    //     if (!isNaN(humidityPercent))
+    //         parts.push(i18n("Humidity") + ": " + Math.round(humidityPercent) + "%");
+    //     if (!isNaN(windKmh))
+    //         parts.push(i18n("Wind") + ": " + windValue(windKmh));
+    //     return parts.join(" | ");
+    // }
+    // toolTipTextFormat: Text.PlainText
+
+    toolTipMainText: ""  // suppress Plasma's built-in metadata tooltip
+    toolTipSubText: ""
 
     // ── Separate Component declarations for panel vs tray ────────────────
     property Component cr: CompactView {

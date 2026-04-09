@@ -57,8 +57,42 @@ KCM.SimpleKCM {
     // to be written directly to Plasmoid.configuration.
     property bool _detectedLocationApplied: false
 
-    // Pending save entry — set by applySearchResult, consumed by saveLocationDialog
-    property var _pendingSaveEntry: null
+    // Silently add an entry to saved locations if it isn't already there.
+    function _autoSaveIfNew(entry) {
+        if (!entry)
+            return;
+        var locs;
+        try {
+            locs = JSON.parse(root.cfg_savedLocations || "[]");
+            if (!Array.isArray(locs))
+                locs = [];
+        } catch (e) {
+            locs = [];
+        }
+        for (var i = 0; i < locs.length; i++) {
+            if (Math.abs(locs[i].lat - entry.lat) < 0.01 && Math.abs(locs[i].lon - entry.lon) < 0.01)
+                return; // already saved
+        }
+        // First location ever added — make it the default automatically
+        if (locs.length === 0)
+            entry.starred = true;
+        locs.push(entry);
+        root.cfg_savedLocations = JSON.stringify(locs);
+        Plasmoid.configuration.savedLocations = root.cfg_savedLocations;
+    }
+
+    // Returns true if any saved location already has starred: true
+    function _hasStarredLocation() {
+        var locs;
+        try {
+            locs = JSON.parse(cfg_savedLocations || "[]");
+            if (!Array.isArray(locs)) locs = [];
+        } catch (e) { locs = []; }
+        for (var i = 0; i < locs.length; i++) {
+            if (locs[i].starred) return true;
+        }
+        return false;
+    }
 
     // Always show the confirmation dialog when auto-detecting via the
     // config UI so the user can review the detected place before it is saved.
@@ -99,6 +133,41 @@ KCM.SimpleKCM {
         showDetectedLocationDialog = false;
         _forceConfirmAutoDetect = false;
         _detectedLocationApplied = true;
+
+        // Always star the auto-detected location — it becomes the new default,
+        // clearing any previously starred entry.
+        var locs;
+        try {
+            locs = JSON.parse(cfg_savedLocations || "[]");
+            if (!Array.isArray(locs)) locs = [];
+        } catch (e) { locs = []; }
+        for (var i = 0; i < locs.length; i++) delete locs[i].starred;
+        var detected = {
+            name: detectedLocationName || "",
+            lat: detectedLatitude,
+            lon: detectedLongitude,
+            altitude: detectedAltitude || 0,
+            timezone: detectedTimezone || "",
+            countryCode: detectedCountryCode || "",
+            starred: true
+        };
+        var found = false;
+        for (var j = 0; j < locs.length; j++) {
+            if (Math.abs(locs[j].lat - detectedLatitude) < 0.01 && Math.abs(locs[j].lon - detectedLongitude) < 0.01) {
+                locs[j].starred = true;
+                if (detectedLocationName && detectedLocationName.length > 0)
+                    locs[j].name = detectedLocationName;
+                var existing = locs.splice(j, 1)[0];
+                locs.unshift(existing);
+                found = true;
+                break;
+            }
+        }
+        if (!found) locs.unshift(detected);
+        cfg_savedLocations = JSON.stringify(locs);
+        Plasmoid.configuration.savedLocations = cfg_savedLocations;
+
+        // Always apply as the active location
         Plasmoid.configuration.autoDetectLocation = true;
         Plasmoid.configuration.latitude = detectedLatitude;
         Plasmoid.configuration.longitude = detectedLongitude;
@@ -110,7 +179,6 @@ KCM.SimpleKCM {
             Plasmoid.configuration.locationName = detectedLocationName;
         if (detectedCountryCode && detectedCountryCode.length > 0)
             Plasmoid.configuration.countryCode = detectedCountryCode;
-        // Sync cfg_ back so the config dialog display stays consistent
         cfg_autoDetectLocation = Plasmoid.configuration.autoDetectLocation;
         cfg_latitude = Plasmoid.configuration.latitude;
         cfg_longitude = Plasmoid.configuration.longitude;
@@ -119,37 +187,7 @@ KCM.SimpleKCM {
         cfg_locationName = Plasmoid.configuration.locationName;
         cfg_countryCode = Plasmoid.configuration.countryCode;
 
-        // Verify the detected location is available on the current provider
         verifyProviderLocation(detectedLatitude, detectedLongitude);
-
-        // Offer to save the newly confirmed auto-detected location
-        var saveEntry = {
-            name: detectedLocationName || "",
-            lat: detectedLatitude,
-            lon: detectedLongitude,
-            altitude: detectedAltitude || 0,
-            timezone: detectedTimezone || "",
-            countryCode: detectedCountryCode || ""
-        };
-        var existingLocs;
-        try {
-            existingLocs = JSON.parse(cfg_savedLocations || "[]");
-            if (!Array.isArray(existingLocs))
-                existingLocs = [];
-        } catch (e) {
-            existingLocs = [];
-        }
-        var alreadySaved = false;
-        for (var si = 0; si < existingLocs.length; si++) {
-            if (Math.abs(existingLocs[si].lat - saveEntry.lat) < 0.01 && Math.abs(existingLocs[si].lon - saveEntry.lon) < 0.01) {
-                alreadySaved = true;
-                break;
-            }
-        }
-        if (!alreadySaved) {
-            _pendingSaveEntry = saveEntry;
-            saveLocationDialog.open();
-        }
     }
     function chooseManualLocation() {
         _forceConfirmAutoDetect = false;
@@ -187,16 +225,13 @@ KCM.SimpleKCM {
 
     function _immediateApplyAndOffer() {
         _applyTimer.restart();
-        if (_pendingSaveEntry)
-            saveLocationDialog.open();
     }
 
     // Like _immediateApplyAndOffer but WITHOUT the immediate Plasmoid.configuration
     // write — used by the map sub-page so changes are only committed when the
     // user clicks the KCM Apply button.
     function _offerSave() {
-        if (_pendingSaveEntry)
-            saveLocationDialog.open();
+        // No-op: locations are now saved automatically without a dialog.
     }
 
     property string preferredLanguage: Qt.locale().name.split("_")[0]
@@ -678,15 +713,9 @@ KCM.SimpleKCM {
     function applySearchResult(item) {
         if (!item)
             return;
-        // For Nominatim (OSM) results: use localizedDisplayName directly.
-        // It is the raw display_name from OSM — already fully localised and
-        // containing every address level (city → district → state → country).
-        // Example: "Царевци, Омуртаг, Търговище, България"
-        //
-        // For Open-Meteo results: build from the individual fields because
-        // Open-Meteo's geocoder only returns name/admin1/country.
+        var newName;
         if (item.providerKey === "nominatim" && item.localizedDisplayName && item.localizedDisplayName.length > 0) {
-            cfg_locationName = item.localizedDisplayName;
+            newName = item.localizedDisplayName;
         } else {
             var nameParts = [];
             if (item.name && item.name.length > 0)
@@ -697,23 +726,24 @@ KCM.SimpleKCM {
                 nameParts.push(item.admin1);
             if (item.country && item.country.length > 0)
                 nameParts.push(item.country);
-            cfg_locationName = nameParts.length > 0 ? nameParts.join(", ") : (item.localizedDisplayName || "");
+            newName = nameParts.length > 0 ? nameParts.join(", ") : (item.localizedDisplayName || "");
         }
-        // Full-precision coordinates
-        cfg_latitude = parseFloat(item.latitude);
-        cfg_longitude = parseFloat(item.longitude);
-        cfg_timezone = item.timezone ? item.timezone : cfg_timezone;
 
-        // Country code for MeteoAlarm alerts
-        if (item.countryCode && item.countryCode.length > 0)
-            cfg_countryCode = item.countryCode.toUpperCase();
-
-        // Always fetch accurate elevation from Open-Meteo elevation API.
-        // Nominatim does not return elevation at all; Open-Meteo geocoder
-        // returns elevation only for its own results.  The dedicated
-        // elevation endpoint is accurate for all coordinate pairs.
         var lat = parseFloat(item.latitude);
         var lon = parseFloat(item.longitude);
+        var newTimezone = item.timezone || cfg_timezone;
+        var newCountryCode = (item.countryCode && item.countryCode.length > 0)
+            ? item.countryCode.toUpperCase() : cfg_countryCode;
+
+        // Stage active location — committed to Plasmoid.configuration only on KCM Apply
+        cfg_autoDetectLocation = false;
+        cfg_locationName = newName;
+        cfg_latitude = lat;
+        cfg_longitude = lon;
+        cfg_timezone = newTimezone;
+        cfg_countryCode = newCountryCode;
+
+        // Fetch accurate elevation — updates cfg_altitude only, no Plasmoid.configuration write
         var elevReq = new XMLHttpRequest();
         elevReq.open("GET", "https://api.open-meteo.com/v1/elevation?latitude=" + encodeURIComponent(lat) + "&longitude=" + encodeURIComponent(lon));
         elevReq.onreadystatechange = function () {
@@ -721,18 +751,13 @@ KCM.SimpleKCM {
                 return;
             if (elevReq.status === 200) {
                 var data = JSON.parse(elevReq.responseText);
-                // Response: { "elevation": [123.4] }
-                if (data.elevation && data.elevation.length > 0 && !isNaN(data.elevation[0])) {
+                if (data.elevation && data.elevation.length > 0 && !isNaN(data.elevation[0]))
                     cfg_altitude = Math.round(data.elevation[0]);
-                    Plasmoid.configuration.altitude = cfg_altitude;
-                }
             }
         };
         elevReq.send();
 
-        // Always fetch timezone from Open-Meteo when a new location is selected.
-        // Do NOT guard with "if (!cfg_timezone)" — the old location's timezone
-        // would satisfy that check and the stale value would never be updated.
+        // Fetch timezone — updates cfg_timezone only, no Plasmoid.configuration write
         var tzReq = new XMLHttpRequest();
         tzReq.open("GET", "https://api.open-meteo.com/v1/forecast?latitude=" + encodeURIComponent(lat) + "&longitude=" + encodeURIComponent(lon) + "&current=temperature_2m&timezone=auto");
         tzReq.onreadystatechange = function () {
@@ -740,46 +765,13 @@ KCM.SimpleKCM {
                 return;
             if (tzReq.status === 200) {
                 var meta = JSON.parse(tzReq.responseText);
-                if (meta.timezone && meta.timezone.length > 0) {
+                if (meta.timezone && meta.timezone.length > 0)
                     cfg_timezone = meta.timezone;
-                    Plasmoid.configuration.timezone = cfg_timezone;
-                }
             }
         };
         tzReq.send();
 
-        // Verify the new location is available on the current provider
         verifyProviderLocation(lat, lon);
-
-        // Prepare save prompt — dialog shown when user navigates back
-        var entry = {
-            name: cfg_locationName,
-            lat: cfg_latitude,
-            lon: cfg_longitude,
-            altitude: cfg_altitude || 0,
-            timezone: cfg_timezone || "",
-            countryCode: cfg_countryCode || ""
-        };
-        // Check if already in saved locations
-        var existing;
-        try {
-            existing = JSON.parse(cfg_savedLocations || "[]");
-            if (!Array.isArray(existing))
-                existing = [];
-        } catch (e) {
-            existing = [];
-        }
-        var isDup = false;
-        for (var k = 0; k < existing.length; k++) {
-            if (Math.abs(existing[k].lat - entry.lat) < 0.01 && Math.abs(existing[k].lon - entry.lon) < 0.01) {
-                isDup = true;
-                break;
-            }
-        }
-        _pendingSaveEntry = isDup ? null : entry;
-
-        // Apply immediately — no KCM Apply needed
-        _immediateApplyAndOffer();
     }
 
     onCfg_autoDetectLocationChanged: {
@@ -879,83 +871,6 @@ KCM.SimpleKCM {
             detectedLocationDialog.open();
         else
             detectedLocationDialog.close();
-    }
-
-    // The save dialog is now opened directly by _immediateApplyAndOffer()
-    // and applyDetectedLocation() — no Connections trigger needed.
-
-    Kirigami.Dialog {
-        id: saveLocationDialog
-        title: i18n("Save location")
-        standardButtons: Kirigami.Dialog.NoButton
-        leftPadding: Kirigami.Units.gridUnit * 2
-        rightPadding: Kirigami.Units.gridUnit * 2
-        topPadding: Kirigami.Units.gridUnit
-        bottomPadding: Kirigami.Units.gridUnit
-        onClosed: root._pendingSaveEntry = null
-        contentItem: Item {
-            implicitWidth: 380
-            implicitHeight: saveDlgCol.implicitHeight
-            ColumnLayout {
-                id: saveDlgCol
-                anchors.left: parent.left
-                anchors.right: parent.right
-                spacing: Kirigami.Units.largeSpacing
-                Kirigami.Icon {
-                    Layout.alignment: Qt.AlignHCenter
-                    source: "bookmark-new"
-                    Layout.preferredWidth: Kirigami.Units.iconSizes.huge
-                    Layout.preferredHeight: Kirigami.Units.iconSizes.huge
-                }
-                Label {
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
-                    textFormat: Text.RichText
-                    text: root._pendingSaveEntry ? i18n("Save <b>%1</b> to your saved locations?", root._pendingSaveEntry.name || i18n("this location")) : ""
-                }
-                Item {
-                    Layout.preferredHeight: Kirigami.Units.largeSpacing
-                }
-                RowLayout {
-                    Layout.alignment: Qt.AlignHCenter
-                    spacing: Kirigami.Units.mediumSpacing
-                    Button {
-                        text: i18n("No, thanks")
-                        icon.name: "dialog-cancel"
-                        onClicked: {
-                            root._pendingSaveEntry = null;
-                            saveLocationDialog.close();
-                        }
-                    }
-                    Button {
-                        text: i18n("Save")
-                        icon.name: "bookmark-new"
-                        enabled: root._pendingSaveEntry !== null
-                        onClicked: {
-                            if (root._pendingSaveEntry) {
-                                var locs;
-                                try {
-                                    locs = JSON.parse(root.cfg_savedLocations || "[]");
-                                    if (!Array.isArray(locs))
-                                        locs = [];
-                                } catch (e) {
-                                    locs = [];
-                                }
-                                locs.push(root._pendingSaveEntry);
-                                root.cfg_savedLocations = JSON.stringify(locs);
-                                Plasmoid.configuration.savedLocations = root.cfg_savedLocations;
-                            }
-                            root._pendingSaveEntry = null;
-                            saveLocationDialog.close();
-                        }
-                    }
-                }
-                Item {
-                    Layout.preferredHeight: Kirigami.Units.smallSpacing
-                }
-            }
-        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1102,13 +1017,13 @@ KCM.SimpleKCM {
 
                                 property bool _renaming: false
                                 property bool _isActive: Math.abs(root.cfg_latitude - (modelData.lat || 0)) < 0.01 &&
-                                                         Math.abs(root.cfg_longitude - (modelData.lon || 0)) < 0.01
+                                Math.abs(root.cfg_longitude - (modelData.lon || 0)) < 0.01
 
                                 color: _isActive
-                                    ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.20)
-                                    : (savedLocMouse.containsMouse && !_renaming
-                                        ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.10)
-                                        : "transparent")
+                                ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.20)
+                                : (savedLocMouse.containsMouse && !_renaming
+                                ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.10)
+                                : "transparent")
                                 border.color: _isActive ? Kirigami.Theme.highlightColor : "transparent"
                                 border.width: _isActive ? 1 : 0
 
@@ -1121,41 +1036,22 @@ KCM.SimpleKCM {
                                     var locs;
                                     try {
                                         locs = JSON.parse(root.cfg_savedLocations || "[]");
-                                        if (!Array.isArray(locs))
-                                            locs = [];
-                                    } catch (e) {
-                                        locs = [];
-                                    }
+                                        if (!Array.isArray(locs)) locs = [];
+                                    } catch (e) { locs = []; }
                                     if (index >= 0 && index < locs.length) {
-                                        var updateActive = Math.abs(root.cfg_latitude - (locs[index].lat || 0)) < 0.01 &&
-                                                           Math.abs(root.cfg_longitude - (locs[index].lon || 0)) < 0.01;
                                         locs[index].name = newName;
                                         root.cfg_savedLocations = JSON.stringify(locs);
-                                        if (updateActive)
-                                            root.cfg_locationName = newName;
                                     }
                                     _renaming = false;
                                 }
 
+                                // Only the star button loads the location now
                                 MouseArea {
                                     id: savedLocMouse
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    enabled: !_renaming
-                                    cursorShape: _renaming ? Qt.ArrowCursor : Qt.PointingHandCursor
-                                    onClicked: {
-                                        root.cfg_autoDetectLocation = false;
-                                        root.cfg_locationName = modelData.name || "";
-                                        root.cfg_latitude = modelData.lat || 0;
-                                        root.cfg_longitude = modelData.lon || 0;
-                                        if (modelData.altitude !== undefined)
-                                            root.cfg_altitude = modelData.altitude;
-                                        if (modelData.timezone)
-                                            root.cfg_timezone = modelData.timezone;
-                                        if (modelData.countryCode)
-                                            root.cfg_countryCode = modelData.countryCode;
-                                        root.verifyProviderLocation(modelData.lat || 0, modelData.lon || 0);
-                                    }
+                                    cursorShape: _renaming ? Qt.ArrowCursor : Qt.ArrowCursor
+                                    // No onClicked → row click does nothing
                                 }
 
                                 RowLayout {
@@ -1208,45 +1104,102 @@ KCM.SimpleKCM {
                                         }
                                     }
 
-                                    // ── Star: mark as default location and apply it ──
+                                    // ── Star button (this is the ONLY place that loads the location) ──
+                                    // ── Star button with visual feedback ─────────────────────────────
+                                    // ── Star button with visual feedback ─────────────────────────────
                                     ToolButton {
-                                        icon.name: modelData.starred ? "starred-symbolic" : "non-starred-symbolic"
+                                        id: starButton
+                                        Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                                        Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                                         display: AbstractButton.IconOnly
                                         visible: !_renaming
+                                        flat: true
+
+                                        // Explicit Kirigami.Icon – this always renders
+                                        contentItem: Kirigami.Icon {
+                                            source: modelData.starred ? "starred-symbolic" : "non-starred-symbolic"
+                                            implicitWidth: Kirigami.Units.iconSizes.smallMedium
+                                            implicitHeight: Kirigami.Units.iconSizes.smallMedium
+                                            color: modelData.starred ? "#f5c518" : Kirigami.Theme.textColor
+                                        }
+
+                                        // Hover + pressed background
+                                        background: Rectangle {
+                                            radius: 4
+                                            color: starButton.pressed
+                                            ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.3)
+                                            : (starButton.hovered
+                                            ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.15)
+                                            : "transparent")
+                                        }
+
+                                        // Click animation (quick pop)
+                                        scale: 1.0
+                                        Behavior on scale {
+                                            NumberAnimation {
+                                                duration: 120
+                                                easing.type: Easing.OutQuad
+                                            }
+                                        }
+
                                         ToolTip.visible: hovered
-                                        ToolTip.text: modelData.starred ? i18n("Default location (click to unset)") : i18n("Set as default location")
+                                        ToolTip.text: modelData.starred
+                                        ? i18n("Default location (click to unset)")
+                                        : i18n("Set as default location")
+
                                         onClicked: {
+                                            // Quick pop animation
+                                            scale = 0.85
+                                            scaleAnimation.restart()
+
                                             var locs;
                                             try {
                                                 locs = JSON.parse(root.cfg_savedLocations || "[]");
-                                                if (!Array.isArray(locs))
-                                                    locs = [];
-                                            } catch (e) {
-                                                locs = [];
-                                            }
+                                                if (!Array.isArray(locs)) locs = [];
+                                            } catch (e) { locs = []; }
+
                                             var wasStarred = !!(locs[index] && locs[index].starred);
-                                            for (var i = 0; i < locs.length; i++)
+
+                                            // Clear all stars
+                                            for (var i = 0; i < locs.length; i++) {
                                                 delete locs[i].starred;
+                                            }
+
                                             if (!wasStarred) {
                                                 locs[index].starred = true;
-                                                // Also apply this location
+
+                                                // Auto-sort starred item to top
+                                                var starredItem = locs.splice(index, 1)[0];
+                                                locs.unshift(starredItem);
+
+                                                // Apply this location immediately
                                                 root.cfg_autoDetectLocation = false;
-                                                root.cfg_locationName = locs[index].name || "";
-                                                root.cfg_latitude = locs[index].lat || 0;
-                                                root.cfg_longitude = locs[index].lon || 0;
-                                                if (locs[index].altitude !== undefined)
-                                                    root.cfg_altitude = locs[index].altitude;
-                                                if (locs[index].timezone)
-                                                    root.cfg_timezone = locs[index].timezone;
-                                                if (locs[index].countryCode)
-                                                    root.cfg_countryCode = locs[index].countryCode;
-                                                root.verifyProviderLocation(locs[index].lat || 0, locs[index].lon || 0);
+                                                root.cfg_locationName = locs[0].name || "";
+                                                root.cfg_latitude = locs[0].lat || 0;
+                                                root.cfg_longitude = locs[0].lon || 0;
+
+                                                if (locs[0].altitude !== undefined)
+                                                    root.cfg_altitude = locs[0].altitude;
+                                                if (locs[0].timezone)
+                                                    root.cfg_timezone = locs[0].timezone;
+                                                if (locs[0].countryCode)
+                                                    root.cfg_countryCode = locs[0].countryCode;
                                             }
+
                                             root.cfg_savedLocations = JSON.stringify(locs);
+                                        }
+
+                                        // Animation helper
+                                        NumberAnimation on scale {
+                                            id: scaleAnimation
+                                            from: 0.85
+                                            to: 1.0
+                                            duration: 120
+                                            easing.type: Easing.OutQuad
                                         }
                                     }
 
-                                    // ── Rename confirm / cancel (while editing)
+                                    // Rename buttons
                                     ToolButton {
                                         icon.name: "dialog-ok-apply"
                                         display: AbstractButton.IconOnly
@@ -1264,7 +1217,6 @@ KCM.SimpleKCM {
                                         onClicked: _renaming = false
                                     }
 
-                                    // ── Rename button ────────────────────────
                                     ToolButton {
                                         icon.name: "edit-rename"
                                         display: AbstractButton.IconOnly
@@ -1304,11 +1256,8 @@ KCM.SimpleKCM {
                                             var locs;
                                             try {
                                                 locs = JSON.parse(root.cfg_savedLocations || "[]");
-                                                if (!Array.isArray(locs))
-                                                    locs = [];
-                                            } catch (e) {
-                                                locs = [];
-                                            }
+                                                if (!Array.isArray(locs)) locs = [];
+                                            } catch (e) { locs = []; }
                                             locs.splice(index, 1);
                                             root.cfg_savedLocations = JSON.stringify(locs);
                                         }
