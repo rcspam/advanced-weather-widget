@@ -94,6 +94,64 @@ KCM.SimpleKCM {
         return false;
     }
 
+    // Set by subpages when a brand-new location is selected and staged to cfg_*.
+    // Returns to main view. Back button calls this; it does NOT save the location —
+    // saving happens when the user clicks Apply (detected via Plasmoid.configuration change).
+    function _goBack() {
+        stack.currentIndex = 0;
+        searchPageLoader.active = false;
+        mapPageLoader.active = false;
+    }
+
+    // Called directly (e.g. _pendingEntry set after navigating back) or via the
+    // Connections block below when Apply causes Plasmoid.configuration.latitude to change.
+    function _commitPending() {
+        if (!root._pendingEntry)
+            return;
+        var entry = root._pendingEntry;
+        var locs;
+        try {
+            locs = JSON.parse(Plasmoid.configuration.savedLocations || "[]");
+            if (!Array.isArray(locs)) locs = [];
+        } catch (e) { locs = []; }
+        var isDup = locs.some(function(l) {
+            return Math.abs(l.lat - entry.lat) < 0.01 && Math.abs(l.lon - entry.lon) < 0.01;
+        });
+        if (isDup) {
+            root._pendingEntry = null;
+            return;
+        }
+        if (locs.length === 0) {
+            // First location ever — auto-star, save immediately
+            entry.starred = true;
+            locs.push(entry);
+            Plasmoid.configuration.savedLocations = JSON.stringify(locs);
+            root.cfg_savedLocations = Plasmoid.configuration.savedLocations;
+            root._pendingEntry = null;
+        } else {
+            // Ask the user whether to set it as default (dialog stays visible after Apply)
+            setDefaultDialog.open();
+        }
+    }
+
+    // Detect when the user clicks Apply: Apply causes Plasmoid.configuration.latitude
+    // to update (from cfg_latitude which was set on location selection).
+    // At that point the config dialog is still open (Apply ≠ Close), so the
+    // setDefaultDialog is visible and the user can answer it.
+    Connections {
+        target: Plasmoid.configuration
+        function onLatitudeChanged() { root._commitPending(); }
+        function onAutoDetectLocationChanged() {
+            // Auto-detect toggled: clear any stale pending entry
+            if (Plasmoid.configuration.autoDetectLocation)
+                root._pendingEntry = null;
+        }
+    }
+
+    // Staged by sub-pages when the user selects a new location.
+    // NOT written to cfg_savedLocations until Apply fires the Connections above.
+    property var _pendingEntry: null
+
     // Always show the confirmation dialog when auto-detecting via the
     // config UI so the user can review the detected place before it is saved.
     property bool _forceConfirmAutoDetect: false
@@ -397,10 +455,10 @@ KCM.SimpleKCM {
         return cfg_locationName && cfg_locationName.length > 0 ? cfg_locationName : i18n("None Selected");
     }
     function openSearchPage() {
-        stack.push(searchSubPage);
+        searchPageLoader.active = true; stack.currentIndex = 1;
     }
     function openMapPage() {
-        stack.push(mapSubPage);
+        mapPageLoader.active = true; stack.currentIndex = 2;
     }
 
     function reverseGeocode(lat, lon) {
@@ -873,11 +931,187 @@ KCM.SimpleKCM {
             detectedLocationDialog.close();
     }
 
+
+
+    // ── Set as default dialog (shown on KCM Apply for new locations) ──────
+    Kirigami.Dialog {
+        id: setDefaultDialog
+        // Buttons write directly to Plasmoid.configuration so the save is
+        // immediate and does not require a second Apply click.
+        title: i18n("Set as default?")
+        standardButtons: Kirigami.Dialog.NoButton
+        leftPadding: Kirigami.Units.gridUnit * 2
+        rightPadding: Kirigami.Units.gridUnit * 2
+        topPadding: Kirigami.Units.gridUnit
+        bottomPadding: Kirigami.Units.gridUnit
+        onClosed: root._pendingEntry = null
+
+        contentItem: Item {
+            implicitWidth: 360
+            implicitHeight: setDefaultDlgCol.implicitHeight
+            ColumnLayout {
+                id: setDefaultDlgCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                spacing: Kirigami.Units.largeSpacing
+                Kirigami.Icon {
+                    Layout.alignment: Qt.AlignHCenter
+                    source: "starred-symbolic"
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.huge
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.huge
+                }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    textFormat: Text.RichText
+                    text: root._pendingEntry
+                        ? i18n("Set <b>%1</b> as your default location?", root._pendingEntry.name)
+                        : ""
+                }
+                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: Kirigami.Units.mediumSpacing
+                    Button {
+                        text: i18n("Yes")
+                        icon.name: "dialog-ok-apply"
+                        onClicked: {
+                            var entry = root._pendingEntry;
+                            if (!entry) { setDefaultDialog.close(); return; }
+                            var locs;
+                            try {
+                                locs = JSON.parse(root.cfg_savedLocations || "[]");
+                                if (!Array.isArray(locs)) locs = [];
+                            } catch (e) { locs = []; }
+                            for (var i = 0; i < locs.length; i++)
+                                delete locs[i].starred;
+                            locs.unshift({
+                                name: entry.name, lat: entry.lat, lon: entry.lon,
+                                altitude: entry.altitude || 0,
+                                timezone: entry.timezone || "",
+                                countryCode: entry.countryCode || "",
+                                starred: true
+                            });
+                            root.cfg_savedLocations = JSON.stringify(locs);
+                            // Also update active location to the starred entry
+                            root.cfg_autoDetectLocation = false;
+                            root.cfg_locationName = entry.name;
+                            root.cfg_latitude = entry.lat;
+                            root.cfg_longitude = entry.lon;
+                            if (entry.altitude) root.cfg_altitude = entry.altitude;
+                            if (entry.timezone) root.cfg_timezone = entry.timezone;
+                            if (entry.countryCode) root.cfg_countryCode = entry.countryCode;
+                            setDefaultDialog.close();
+                        }
+                    }
+                    Button {
+                        text: i18n("No")
+                        icon.name: "dialog-cancel"
+                        onClicked: {
+                            var entry = root._pendingEntry;
+                            if (!entry) { setDefaultDialog.close(); return; }
+                            var locs;
+                            try {
+                                locs = JSON.parse(root.cfg_savedLocations || "[]");
+                                if (!Array.isArray(locs)) locs = [];
+                            } catch (e) { locs = []; }
+                            locs.push({
+                                name: entry.name, lat: entry.lat, lon: entry.lon,
+                                altitude: entry.altitude || 0,
+                                timezone: entry.timezone || "",
+                                countryCode: entry.countryCode || ""
+                            });
+                            root.cfg_savedLocations = JSON.stringify(locs);
+                            setDefaultDialog.close();
+                        }
+                    }
+                }
+                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+            }
+        }
+    }
+
+    // ── Delete last location confirmation dialog ───────────────────────────
+    property int _deleteLocIndex: -1
+
+    Kirigami.Dialog {
+        id: deleteLastLocDialog
+        title: i18n("Remove last location?")
+        standardButtons: Kirigami.Dialog.NoButton
+        leftPadding: Kirigami.Units.gridUnit * 2
+        rightPadding: Kirigami.Units.gridUnit * 2
+        topPadding: Kirigami.Units.gridUnit
+        bottomPadding: Kirigami.Units.gridUnit
+
+        contentItem: Item {
+            implicitWidth: 380
+            implicitHeight: deleteLastDlgCol.implicitHeight
+            ColumnLayout {
+                id: deleteLastDlgCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                spacing: Kirigami.Units.largeSpacing
+                Kirigami.Icon {
+                    Layout.alignment: Qt.AlignHCenter
+                    source: "edit-delete"
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.huge
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.huge
+                }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    text: i18n("Are you sure? This is your last saved location. If you remove it, the widget will no longer show weather information.")
+                }
+                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: Kirigami.Units.mediumSpacing
+                    Button {
+                        text: i18n("Yes, remove it")
+                        icon.name: "edit-delete"
+                        onClicked: {
+                            root.cfg_savedLocations = "[]";
+                            root.cfg_locationName = "";
+                            root.cfg_latitude = 0.0;
+                            root.cfg_longitude = 0.0;
+                            root.cfg_altitude = 0;
+                            root.cfg_timezone = "";
+                            root.cfg_countryCode = "";
+                            root.cfg_autoDetectLocation = false;
+                            root._deleteLocIndex = -1;
+                            deleteLastLocDialog.close();
+                        }
+                    }
+                    Button {
+                        text: i18n("Cancel")
+                        icon.name: "dialog-cancel"
+                        onClicked: {
+                            root._deleteLocIndex = -1;
+                            deleteLastLocDialog.close();
+                        }
+                    }
+                }
+                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+            }
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════════════
-    StackView {
+    // StackLayout replaces StackView to avoid Kirigami page-routing interference
+    // inside KCM.SimpleKCM. Navigation is done by setting currentIndex.
+    StackLayout {
         id: stack
         anchors.fill: parent
-        initialItem: mainPage
+        currentIndex: 0
+
+        // page 0 — main
+        Loader { id: mainPageLoader; sourceComponent: mainPage; active: true }
+        // page 1 — search
+        Loader { id: searchPageLoader; sourceComponent: searchSubPage; active: false }
+        // page 2 — map
+        Loader { id: mapPageLoader;    sourceComponent: mapSubPage;    active: false }
     }
 
     Component {
@@ -1109,8 +1343,8 @@ KCM.SimpleKCM {
                                     // ── Star button with visual feedback ─────────────────────────────
                                     ToolButton {
                                         id: starButton
-                                        Layout.preferredWidth: Kirigami.Units.iconSizes.medium
-                                        Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+                                        Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+                                        Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
                                         display: AbstractButton.IconOnly
                                         visible: !_renaming
                                         flat: true
@@ -1118,14 +1352,14 @@ KCM.SimpleKCM {
                                         // Explicit Kirigami.Icon – this always renders
                                         contentItem: Kirigami.Icon {
                                             source: modelData.starred ? "starred-symbolic" : "non-starred-symbolic"
-                                            implicitWidth: Kirigami.Units.iconSizes.smallMedium
-                                            implicitHeight: Kirigami.Units.iconSizes.smallMedium
+                                            implicitWidth: Kirigami.Units.iconSizes.small
+                                            implicitHeight: Kirigami.Units.iconSizes.small
                                             color: modelData.starred ? "#f5c518" : Kirigami.Theme.textColor
                                         }
 
                                         // Hover + pressed background
                                         background: Rectangle {
-                                            radius: 4
+                                            radius: 3
                                             color: starButton.pressed
                                             ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.3)
                                             : (starButton.hovered
@@ -1258,8 +1492,13 @@ KCM.SimpleKCM {
                                                 locs = JSON.parse(root.cfg_savedLocations || "[]");
                                                 if (!Array.isArray(locs)) locs = [];
                                             } catch (e) { locs = []; }
-                                            locs.splice(index, 1);
-                                            root.cfg_savedLocations = JSON.stringify(locs);
+                                            if (locs.length === 1) {
+                                                root._deleteLocIndex = index;
+                                                deleteLastLocDialog.open();
+                                            } else {
+                                                locs.splice(index, 1);
+                                                root.cfg_savedLocations = JSON.stringify(locs);
+                                            }
                                         }
                                     }
                                 }

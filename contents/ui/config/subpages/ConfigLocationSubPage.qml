@@ -34,12 +34,7 @@ ColumnLayout {
     property int searchRequestId: 0
     property var selectedResult: null
     property int selectedIndex: -1
-
-    // ── Set-as-default dialog state ─────────────────────────────────────
-    property real _defaultDialogLat: NaN
-    property real _defaultDialogLon: NaN
-    property string _defaultDialogName: ""
-    property var _pendingItemData: null
+    property var _pendingItemData: null  // tracks whether a new location was staged
 
     function performSearch(query) {
         if (!query || query.trim().length < 2) {
@@ -169,110 +164,7 @@ ColumnLayout {
         onTriggered: searchSubPageRoot.performSearch(searchField.text)
     }
 
-    // ── Set as default dialog ────────────────────────────────────────────
-    Kirigami.Dialog {
-        id: setDefaultDialog
-        title: i18n("Set as default?")
-        standardButtons: Kirigami.Dialog.NoButton
-        leftPadding: Kirigami.Units.gridUnit * 2
-        rightPadding: Kirigami.Units.gridUnit * 2
-        topPadding: Kirigami.Units.gridUnit
-        bottomPadding: Kirigami.Units.gridUnit
-
-        contentItem: Item {
-            implicitWidth: 360
-            implicitHeight: setDefaultCol.implicitHeight
-
-            ColumnLayout {
-                id: setDefaultCol
-                anchors.left: parent.left
-                anchors.right: parent.right
-                spacing: Kirigami.Units.largeSpacing
-
-                Kirigami.Icon {
-                    Layout.alignment: Qt.AlignHCenter
-                    source: "starred-symbolic"
-                    Layout.preferredWidth: Kirigami.Units.iconSizes.huge
-                    Layout.preferredHeight: Kirigami.Units.iconSizes.huge
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
-                    textFormat: Text.RichText
-                    text: i18n("Set <b>%1</b> as your default location?", searchSubPageRoot._defaultDialogName)
-                }
-
-                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
-
-                RowLayout {
-                    Layout.alignment: Qt.AlignHCenter
-                    spacing: Kirigami.Units.mediumSpacing
-
-                    Button {
-                        text: i18n("Yes")
-                        icon.name: "dialog-ok-apply"
-                        onClicked: {
-                            // Stage as active location
-                            configRoot.applySearchResult(searchSubPageRoot._pendingItemData);
-
-                            // Clear all stars, add starred entry at top of cfg_savedLocations
-                            var locs;
-                            try {
-                                locs = JSON.parse(configRoot.cfg_savedLocations || "[]");
-                                if (!Array.isArray(locs)) locs = [];
-                            } catch (e) { locs = []; }
-                            for (var i = 0; i < locs.length; i++)
-                                delete locs[i].starred;
-                            var item = searchSubPageRoot._pendingItemData;
-                            locs.unshift({
-                                name: searchSubPageRoot._defaultDialogName,
-                                lat: searchSubPageRoot._defaultDialogLat,
-                                lon: searchSubPageRoot._defaultDialogLon,
-                                altitude: 0,
-                                timezone: (item && item.timezone) ? item.timezone : "",
-                                countryCode: (item && item.countryCode) ? item.countryCode.toUpperCase() : "",
-                                starred: true
-                            });
-                            configRoot.cfg_savedLocations = JSON.stringify(locs);
-                            searchSubPageRoot._pendingItemData = null;
-                            setDefaultDialog.close();
-                            stack.pop();
-                        }
-                    }
-
-                    Button {
-                        text: i18n("No")
-                        icon.name: "dialog-cancel"
-                        onClicked: {
-                            // Save to list without starring — don't change active location
-                            var locs;
-                            try {
-                                locs = JSON.parse(configRoot.cfg_savedLocations || "[]");
-                                if (!Array.isArray(locs)) locs = [];
-                            } catch (e) { locs = []; }
-                            var item = searchSubPageRoot._pendingItemData;
-                            locs.push({
-                                name: searchSubPageRoot._defaultDialogName,
-                                lat: searchSubPageRoot._defaultDialogLat,
-                                lon: searchSubPageRoot._defaultDialogLon,
-                                altitude: 0,
-                                timezone: (item && item.timezone) ? item.timezone : "",
-                                countryCode: (item && item.countryCode) ? item.countryCode.toUpperCase() : ""
-                            });
-                            configRoot.cfg_savedLocations = JSON.stringify(locs);
-                            searchSubPageRoot._pendingItemData = null;
-                            setDefaultDialog.close();
-                            stack.pop();
-                        }
-                    }
-                }
-
-                Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
-            }
-        }
-    }
+    // ── Set as default dialog lives in configLocation.qml, shown on KCM Apply ──
 
     // ── Header ──────────────────────────────────────────────────────────
     RowLayout {
@@ -287,12 +179,7 @@ ColumnLayout {
             icon.name: "go-previous"
             text: i18n("Back")
             flat: true
-            onClicked: {
-                if (searchSubPageRoot._pendingItemData !== null)
-                    setDefaultDialog.open();
-                else
-                    stack.pop();
-            }
+            onClicked: configRoot._goBack()
         }
         Label {
             Layout.fillWidth: true
@@ -386,31 +273,33 @@ ColumnLayout {
 
                             var entryLat = parseFloat(modelData.latitude);
                             var entryLon = parseFloat(modelData.longitude);
-                            var isNew = true;
                             var locs;
                             try {
                                 locs = JSON.parse(configRoot.cfg_savedLocations || "[]");
                                 if (!Array.isArray(locs)) locs = [];
                             } catch (e) { locs = []; }
-                            for (var k = 0; k < locs.length; k++) {
-                                if (Math.abs(locs[k].lat - entryLat) < 0.01 &&
-                                    Math.abs(locs[k].lon - entryLon) < 0.01) {
-                                    isNew = false;
-                                    break;
-                                }
-                            }
+                            var isNew = !locs.some(function(l) {
+                                return Math.abs(l.lat - entryLat) < 0.01 && Math.abs(l.lon - entryLon) < 0.01;
+                            });
 
                             // Always stage to cfg_* so KCM Apply becomes active
                             configRoot.applySearchResult(modelData);
 
                             if (isNew) {
-                                // Store pending — dialog shown when user clicks Back
+                                // Store pending — saved on KCM Apply via onSaveClicked
+                                var entryName = configRoot.formatResultTitle(modelData);
+                                configRoot._pendingEntry = {
+                                    name: entryName,
+                                    lat: entryLat,
+                                    lon: entryLon,
+                                    altitude: 0,
+                                    timezone: modelData.timezone || "",
+                                    countryCode: (modelData.countryCode || "").toUpperCase()
+                                };
                                 searchSubPageRoot._pendingItemData = modelData;
-                                searchSubPageRoot._defaultDialogLat = entryLat;
-                                searchSubPageRoot._defaultDialogLon = entryLon;
-                                searchSubPageRoot._defaultDialogName = configRoot.formatResultTitle(modelData);
                             } else {
-                                // Already saved — no dialog needed
+                                // Already saved — clear pending
+                                configRoot._pendingEntry = null;
                                 searchSubPageRoot._pendingItemData = null;
                             }
                         }
