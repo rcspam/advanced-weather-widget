@@ -254,18 +254,8 @@ Rectangle {
                     id: locationMenu
                     y: locationSwitcherBtn.height
 
-                    // Current location
-                    MenuItem {
-                        text: (Plasmoid.configuration.locationName || i18n("Current")) + (Plasmoid.configuration.autoDetectLocation ? " (" + i18n("auto") + ")" : "")
-                        icon.name: "mark-location"
-                        font.bold: true
-                        enabled: false
-                    }
-
-                    MenuSeparator {}
-
-                    // Saved locations — Repeater works correctly in Qt6 QQC2 Menu;
-                    // Instantiator+insertItem breaks onTriggered in Qt6.
+                    // Saved locations only — header, separators, and "Save current location"
+                    // were removed for a cleaner switcher (manage entries via the config page).
                     Repeater {
                         model: {
                             try {
@@ -287,42 +277,6 @@ Rectangle {
                             onTriggered: {
                                 if (weatherRoot)
                                     weatherRoot.applyLocation(modelData);
-                            }
-                        }
-                    }
-
-                    MenuSeparator {}
-
-                    MenuItem {
-                        text: i18n("Save current location…")
-                        icon.name: "list-add"
-                        onTriggered: {
-                            var name = Plasmoid.configuration.locationName || "";
-                            if (!name) return;
-                            var entry = {
-                                name: name,
-                                lat: Plasmoid.configuration.latitude,
-                                lon: Plasmoid.configuration.longitude,
-                                altitude: Plasmoid.configuration.altitude || 0,
-                                timezone: Plasmoid.configuration.timezone || "",
-                                countryCode: Plasmoid.configuration.countryCode || ""
-                            };
-                            var locs;
-                            try {
-                                locs = JSON.parse(Plasmoid.configuration.savedLocations || "[]");
-                                if (!Array.isArray(locs)) locs = [];
-                            } catch (e) { locs = []; }
-                            // Avoid duplicates by lat/lon
-                            var isDup = false;
-                            for (var i = 0; i < locs.length; i++) {
-                                if (Math.abs(locs[i].lat - entry.lat) < 0.01 && Math.abs(locs[i].lon - entry.lon) < 0.01) {
-                                    isDup = true;
-                                    break;
-                                }
-                            }
-                            if (!isDup) {
-                                locs.push(entry);
-                                Plasmoid.configuration.savedLocations = JSON.stringify(locs);
                             }
                         }
                     }

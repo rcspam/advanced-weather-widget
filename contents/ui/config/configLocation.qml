@@ -31,6 +31,16 @@ KCM.SimpleKCM {
             cfg_autoDetectLocation = true;
     }
 
+    // Called when user clicks KCM Apply button — ensures pending entry is committed
+    // even if Plasmoid.configuration.latitude hasn't changed (e.g., same location re-selected).
+    function save() {
+        // Let default KCM save happen first, then commit any pending entry.
+        // Use callLater so the config write completes before we check _pendingEntry.
+        Qt.callLater(function() {
+            root._commitPending();
+        });
+    }
+
     property bool cfg_autoDetectLocation: true
     property string cfg_locationName: ""
     property real cfg_latitude: 0.0
@@ -101,6 +111,7 @@ KCM.SimpleKCM {
         stack.currentIndex = 0;
         searchPageLoader.active = false;
         mapPageLoader.active = false;
+        manualPageLoader.active = false;
     }
 
     // Called directly (e.g. _pendingEntry set after navigating back) or via the
@@ -134,10 +145,9 @@ KCM.SimpleKCM {
         }
     }
 
-    // Detect when the user clicks Apply: Apply causes Plasmoid.configuration.latitude
-    // to update (from cfg_latitude which was set on location selection).
-    // At that point the config dialog is still open (Apply ≠ Close), so the
-    // setDefaultDialog is visible and the user can answer it.
+    // Detect when location changes via Apply: either through save() or via
+    // Plasmoid.configuration.latitude update. Both trigger _commitPending()
+    // to show the setDefaultDialog for new locations.
     Connections {
         target: Plasmoid.configuration
         function onLatitudeChanged() { root._commitPending(); }
@@ -474,6 +484,9 @@ KCM.SimpleKCM {
     }
     function openMapPage() {
         mapPageLoader.active = true; stack.currentIndex = 2;
+    }
+    function openManualPage() {
+        manualPageLoader.active = true; stack.currentIndex = 3;
     }
 
     function reverseGeocode(lat, lon) {
@@ -1116,6 +1129,8 @@ KCM.SimpleKCM {
                             root.cfg_timezone = "";
                             root.cfg_countryCode = "";
                             root.cfg_autoDetectLocation = false;
+                            // Clear activeLocation so hasSelectedTown becomes false and weather stops showing
+                            Plasmoid.configuration.activeLocation = "{}";
                             root._deleteLocIndex = -1;
                             deleteLastLocDialog.close();
                         }
@@ -1148,6 +1163,8 @@ KCM.SimpleKCM {
         Loader { id: searchPageLoader; sourceComponent: searchSubPage; active: false }
         // page 2 — map
         Loader { id: mapPageLoader;    sourceComponent: mapSubPage;    active: false }
+        // page 3 — manual entry
+        Loader { id: manualPageLoader; sourceComponent: manualSubPage; active: false }
     }
 
     Component {
@@ -1234,6 +1251,12 @@ KCM.SimpleKCM {
                                 enabled: !root.cfg_autoDetectLocation
                                 onClicked: root.openMapPage()
                             }
+                            Button {
+                                text: i18n("Enter Manually")
+                                icon.name: "document-edit"
+                                enabled: !root.cfg_autoDetectLocation
+                                onClicked: root.openManualPage()
+                            }
                         }
                     }
 
@@ -1315,13 +1338,26 @@ KCM.SimpleKCM {
                                     _renaming = false;
                                 }
 
-                                // Only the star button loads the location now
+                                // Row click selects (activates) this location.
+                                // The star button is a separate concern — it only marks the default.
                                 MouseArea {
                                     id: savedLocMouse
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    cursorShape: _renaming ? Qt.ArrowCursor : Qt.ArrowCursor
-                                    // No onClicked → row click does nothing
+                                    cursorShape: _renaming ? Qt.ArrowCursor : Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (_renaming) return;
+                                        root.cfg_autoDetectLocation = false;
+                                        root.cfg_locationName = modelData.name || "";
+                                        root.cfg_latitude     = modelData.lat  || 0;
+                                        root.cfg_longitude    = modelData.lon  || 0;
+                                        if (modelData.altitude !== undefined)
+                                            root.cfg_altitude = modelData.altitude;
+                                        if (modelData.timezone)
+                                            root.cfg_timezone = modelData.timezone;
+                                        if (modelData.countryCode)
+                                            root.cfg_countryCode = modelData.countryCode;
+                                    }
                                 }
 
                                 RowLayout {
@@ -1430,30 +1466,16 @@ KCM.SimpleKCM {
 
                                             var wasStarred = !!(locs[index] && locs[index].starred);
 
-                                            // Clear all stars
+                                            // Clear all stars (only one default at a time)
                                             for (var i = 0; i < locs.length; i++) {
                                                 delete locs[i].starred;
                                             }
 
-                                            if (!wasStarred) {
+                                            // Toggle this entry's starred flag in place —
+                                            // do NOT reorder the list, do NOT change the active location.
+                                            // Selection (active location) is handled by row click.
+                                            if (!wasStarred && index >= 0 && index < locs.length) {
                                                 locs[index].starred = true;
-
-                                                // Auto-sort starred item to top
-                                                var starredItem = locs.splice(index, 1)[0];
-                                                locs.unshift(starredItem);
-
-                                                // Apply this location immediately
-                                                root.cfg_autoDetectLocation = false;
-                                                root.cfg_locationName = locs[0].name || "";
-                                                root.cfg_latitude = locs[0].lat || 0;
-                                                root.cfg_longitude = locs[0].lon || 0;
-
-                                                if (locs[0].altitude !== undefined)
-                                                    root.cfg_altitude = locs[0].altitude;
-                                                if (locs[0].timezone)
-                                                    root.cfg_timezone = locs[0].timezone;
-                                                if (locs[0].countryCode)
-                                                    root.cfg_countryCode = locs[0].countryCode;
                                             }
 
                                             root.cfg_savedLocations = JSON.stringify(locs);
@@ -1697,6 +1719,13 @@ KCM.SimpleKCM {
     Component {
         id: mapSubPage
         ConfigMapSubPage {
+            configRoot: root
+        }
+    }
+
+    Component {
+        id: manualSubPage
+        ConfigLocationManualSubPage {
             configRoot: root
         }
     }

@@ -184,6 +184,10 @@
     <entry name="widgetCardsHeight"     type="Int"><default>44</default><min>30</min><max>120</max></entry>
     <entry name="widgetExpandedCardsHeightAuto" type="Bool"><default>false</default></entry>
     <entry name="widgetExpandedCardsHeight"     type="Int"><default>200</default><min>120</min><max>500</max></entry>
+    <!-- Expanded view items visibility (comma-separated) -->
+    <entry name="aqiExpandedItems"          type="String"><default>pm2_5,pm10,no2,o3,so2,co</default></entry>
+    <entry name="pollenExpandedItems"       type="String"><default>alder,birch,grass,mugwort,olive,ragweed</default></entry>
+    <entry name="spaceWeatherExpandedItems" type="String"><default>gscale,kp,solarwind,aurora,bz,xray</default></entry>
     <!-- Legacy details booleans (superseded by widgetDetailsOrder; kept for back-compat) -->
     <entry name="widgetShowFeelsLike"   type="Bool"><default>true</default></entry>
     <entry name="widgetShowHumidity"    type="Bool"><default>true</default></entry>

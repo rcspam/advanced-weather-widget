@@ -75,7 +75,7 @@ ColumnLayout {
         configRoot.verifyProviderLocation(selectedLat, selectedLon);
 
         if (isNew) {
-            // Store pending — saved on KCM Apply via onSaveClicked in configLocation.qml
+            // Store pending — saved on KCM Apply via save() in configLocation.qml
             var entryName = selectedName.length > 0
                 ? selectedName : (selectedLat.toFixed(4) + "°, " + selectedLon.toFixed(4) + "°");
             configRoot._pendingEntry = {
@@ -223,8 +223,9 @@ ColumnLayout {
     }
 
     function _navigateToCoordinates() {
-        var lat = parseFloat(latField.text);
-        var lon = parseFloat(lonField.text);
+        // Normalize "," → "." so locales using "," as decimal separator still parse correctly.
+        var lat = parseFloat(String(latField.text).replace(",", "."));
+        var lon = parseFloat(String(lonField.text).replace(",", "."));
         if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180)
             return;
         osmMap.center = QtPositioning.coordinate(lat, lon);
@@ -287,10 +288,10 @@ ColumnLayout {
             Layout.preferredWidth: 120
             visible: _searchMode === 1
             placeholderText: i18n("Latitude")
-            validator: DoubleValidator {
-                bottom: -90
-                top: 90
-                notation: DoubleValidator.StandardNotation
+            // Locale-independent: accept both "." and "," as decimal separator.
+            // _navigateToCoordinates() normalizes "," → "." before parsing.
+            validator: RegularExpressionValidator {
+                regularExpression: /^-?(\d{1,2}([.,]\d{0,7})?)?$/
             }
             onAccepted: mapSubPageRoot._navigateToCoordinates()
         }
@@ -299,10 +300,8 @@ ColumnLayout {
             Layout.preferredWidth: 120
             visible: _searchMode === 1
             placeholderText: i18n("Longitude")
-            validator: DoubleValidator {
-                bottom: -180
-                top: 180
-                notation: DoubleValidator.StandardNotation
+            validator: RegularExpressionValidator {
+                regularExpression: /^-?(\d{1,3}([.,]\d{0,7})?)?$/
             }
             onAccepted: mapSubPageRoot._navigateToCoordinates()
         }

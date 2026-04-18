@@ -1094,6 +1094,12 @@ KCM.AbstractKCM {
     property bool cfg_widgetExpandedCardsHeightAuto: false
     property int cfg_widgetExpandedCardsHeight: 200
 
+    // ✦ NEW: Expanded card items visibility ✦
+    // Comma-separated lists of visible items in expanded views
+    property string cfg_aqiExpandedItems: "pm2_5,pm10,no2,o3,so2,co"
+    property string cfg_pollenExpandedItems: "alder,birch,grass,mugwort,olive,ragweed"
+    property string cfg_spaceWeatherExpandedItems: "gscale,kp,solarwind,aurora,bz,xray"
+
     // ── Tooltip config aliases ────────────────────────────────────────────
     property string cfg_tooltipItemOrder: "temperature;wind;humidity;pressure;suntimes"
     property string cfg_tooltipItemIcons: "temperature=1;condition=1;feelslike=1;wind=1;humidity=1;pressure=1;suntimes=1;moonphase=1;preciprate=1;uvindex=1;airquality=1;pollen=1;alerts=1;snowcover=1"

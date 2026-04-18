@@ -567,6 +567,9 @@ PlasmoidItem {
         if (loc.timezone)               Plasmoid.configuration.timezone     = loc.timezone;
         if (loc.countryCode)            Plasmoid.configuration.countryCode  = loc.countryCode;
         _batchingLocation = false;
+        // Now that Plasmoid.configuration.activeLocation is persisted,
+        // trigger a refresh so WeatherService reads the new coordinates.
+        refreshDebounce.restart();
     }
 
     /** Write all location fields as a single JSON config entry — one signal, one binding cascade. */
@@ -1459,6 +1462,28 @@ PlasmoidItem {
     // Panel scroll ticker removed — "scroll/cycle" mode was removed.
     // The multiline Timer in CompactView.qml handles scrolling independently.
 
+    // ══════════════════════════════════════════════════════════════════════
+    // System resume detection — refresh weather after hibernate/suspend
+    // ══════════════════════════════════════════════════════════════════════
+
+    // Heartbeat timer: detects time jumps indicating system was asleep.
+    // When the system wakes from hibernate/suspend, this timer runs immediately
+    // and detects that more time has passed than the interval.
+    property var _lastHeartbeat: Date.now()
+    Timer {
+        interval: 60000  // 1 minute
+        running: true
+        repeat: true
+        onTriggered: {
+            var now = Date.now();
+            var elapsed = now - root._lastHeartbeat;
+            root._lastHeartbeat = now;
+            // If more than 3 minutes passed since last tick, system was likely suspended
+            if (elapsed > 180000) {
+                refreshDebounce.restart();
+            }
+        }
+    }
 
     // ══════════════════════════════════════════════════════════════════════
     // Startup + config change reactions

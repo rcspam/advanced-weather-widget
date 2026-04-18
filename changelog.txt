@@ -22,9 +22,11 @@
 - Added support to save locations and switch them in the "Locations" menu or the widget
 - Added support for weather tray icon
 - Added support to choose manually location using a map (Powered by OpenStreetMap)
+- Added support to enter your location manually using longtitude, lattitude and attitude.
 - Added support to refresh or choose a location with a right click in the widget.
 - Added support to show/hide forecast and details in the widget
 - Added ability to change the location name 
+- Added ability to show/hide additional information for Air Quality, Space Weather and pollen in the expanded view
 
 --- BUG FIXES ---
 
@@ -33,5 +35,5 @@
 - Fix a critical bug where if you choose another provider unless open-meteo or adaptive mode enabled, you cannot find any location manually
 - Fix 18N_ARGUMENT_MISSING in some dialogs
 - Fix a bug where if you control the widget height/weight it was affected in the widget panel space
-- Fix an Air quality outline bug 
+- Fix an Air quality and Space weather outline bug 
 
