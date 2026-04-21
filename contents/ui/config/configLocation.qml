@@ -32,11 +32,21 @@ KCM.SimpleKCM {
         _rebuildSavedLocModel();
     }
 
-    // Called when user clicks KCM Apply button — ensures pending entry is committed
-    // even if Plasmoid.configuration.latitude hasn't changed (e.g., same location re-selected).
+    // Called when user clicks KCM Apply button.
+    // Writes activeLocation so main.qml's onActiveLocationChanged can update
+    // display fields (_activeLocName, etc.).  WeatherService reads individual
+    // Plasmoid.configuration.* entries (synced by KCM via cfg_*), NOT this JSON.
     function save() {
-        // Let default KCM save happen first, then commit any pending entry.
-        // Use callLater so the config write completes before we check _pendingEntry.
+        if (!root.cfg_autoDetectLocation) {
+            Plasmoid.configuration.activeLocation = JSON.stringify({
+                name:        root.cfg_locationName  || "",
+                lat:         root.cfg_latitude       || 0,
+                lon:         root.cfg_longitude      || 0,
+                altitude:    root.cfg_altitude       || 0,
+                timezone:    root.cfg_timezone       || "",
+                countryCode: root.cfg_countryCode    || ""
+            });
+        }
         Qt.callLater(function() {
             root._commitPending();
         });
@@ -436,14 +446,20 @@ KCM.SimpleKCM {
                 locationCheckState = 0;
                 return;
             }
+            var qwHost = (Plasmoid.configuration.qwApiHost || "").trim();
+            if (!qwHost) qwHost = "https://devapi.qweather.com";
+            qwHost = qwHost.replace(/\/+$/, "");
             var qwLoc = encodeURIComponent(parseFloat(lon).toFixed(2) + "," + parseFloat(lat).toFixed(2));
-            url = "https://devapi.qweather.com/v7/weather/now?location=" + qwLoc + "&key=" + encodeURIComponent(qwKey) + "&unit=m";
+            url = qwHost + "/v7/weather/now?location=" + qwLoc + "&unit=m";
         } else {
             locationCheckState = 0;
             return;
         }
         req.open("GET", url);
-        if (provider === "metno")
+        if (provider === "qWeather") {
+            var _qwKey = (Plasmoid.configuration.qwApiKey || "").trim();
+            req.setRequestHeader("X-QW-Api-Key", _qwKey);
+        } else if (provider === "metno")
             req.setRequestHeader("User-Agent", "AdvancedWeatherWidget/1.0 github.com/pnedyalkov91/advanced-weather-widget");
         req.onreadystatechange = function () {
             if (req.readyState !== XMLHttpRequest.DONE)
@@ -1015,9 +1031,19 @@ KCM.SimpleKCM {
                         Layout.alignment: Qt.AlignHCenter
                         spacing: Kirigami.Units.mediumSpacing
                         Button {
-                            text: i18n("Set manually")
+                            text: i18n("Search location")
                             icon.name: "edit-find"
                             onClicked: root.chooseManualLocation()
+                        }
+                        Button {
+                            text: i18n("Enter manually")
+                            icon.name: "document-edit"
+                            onClicked: {
+                                root.showDetectedLocationDialog = false;
+                                root._forceConfirmAutoDetect = false;
+                                root.cfg_autoDetectLocation = false;
+                                root.openManualPage();
+                            }
                         }
                         Button {
                             text: i18n("Choose on map")
@@ -1371,30 +1397,28 @@ KCM.SimpleKCM {
                     ListView {
                         id: savedLocList
                         Layout.fillWidth: true
-                        // Two problems with letting `contentHeight` size us:
-                        //   1. Inside a ColumnLayout the ListView's height is
-                        //      its own implicit/preferred size — but
-                        //      `contentHeight` is 0 until delegates realise,
-                        //      and delegates only realise when the ListView
-                        //      has visible area. Deadlock: the list collapses
-                        //      to 0 and stays that way.
-                        //   2. `cacheBuffer` alone doesn't break it because
-                        //      it only affects delegates already in flight.
-                        // Fix: give the ListView a concrete fall-back height
-                        // (count × typical row height) so delegates are
-                        // instantiated. Once they exist, `contentHeight`
-                        // becomes the real value and is used via Math.max.
+                        // Give the saved-locations list its own bounded,
+                        // scrollable viewport instead of relying on the outer
+                        // ScrollView. This keeps very long lists contained and
+                        // makes drag-and-drop reordering stable (the dragged
+                        // item no longer pops out of a 0-height viewport).
                         readonly property int _approxRowHeight: 56
-                        Layout.preferredHeight: Math.max(
-                            contentHeight,
-                            savedLocWorkingModel.count * _approxRowHeight + 4)
-                        Layout.minimumHeight: Layout.preferredHeight
-                        cacheBuffer: 100000
-                        interactive: false  // parent ScrollView does scrolling
+                        readonly property int _visibleRows: 5
+                        Layout.preferredHeight: Math.min(
+                            Math.max(savedLocWorkingModel.count, 1) * _approxRowHeight + 4,
+                            _visibleRows * _approxRowHeight + 4)
+                        Layout.minimumHeight: Math.min(
+                            Math.max(savedLocWorkingModel.count, 1) * _approxRowHeight + 4,
+                            _approxRowHeight + 4)
+                        interactive: true
                         reuseItems: false
                         spacing: 2
                         clip: true
                         model: savedLocWorkingModel
+                        boundsBehavior: Flickable.StopAtBounds
+                        ScrollBar.vertical: ScrollBar {
+                            policy: ScrollBar.AsNeeded
+                        }
 
                         moveDisplaced: Transition {
                             NumberAnimation {
@@ -1403,9 +1427,16 @@ KCM.SimpleKCM {
                                 easing.type: Easing.OutQuad
                             }
                         }
+                        displaced: Transition {
+                            NumberAnimation {
+                                properties: "y"
+                                duration: 120
+                                easing.type: Easing.OutQuad
+                            }
+                        }
 
-                        delegate: ItemDelegate {
-                            id: savedLocDelegate
+                        delegate: Item {
+                            id: savedLocDelegateRoot
                             required property int index
                             required property string name
                             required property real lat
@@ -1415,43 +1446,13 @@ KCM.SimpleKCM {
                             required property string countryCode
                             required property bool starred
 
-                            width: ListView.view.width
-                            implicitHeight: savedLocContent.implicitHeight + 12
-                            hoverEnabled: true
-                            down: false
+                            width: savedLocList.width
+                            implicitHeight: savedLocDelegate.implicitHeight
 
                             property bool _renaming: false
                             readonly property bool _isActive:
                                 Math.abs(root.cfg_latitude  - lat) < 0.01 &&
                                 Math.abs(root.cfg_longitude - lon) < 0.01
-
-                            background: Rectangle {
-                                radius: 4
-                                color: savedLocDelegate._isActive
-                                    ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.20)
-                                    : (savedLocDelegate.hovered && !savedLocDelegate._renaming
-                                        ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.10)
-                                        : "transparent")
-                                border.color: savedLocDelegate._isActive ? Kirigami.Theme.highlightColor : "transparent"
-                                border.width: savedLocDelegate._isActive ? 1 : 0
-                            }
-
-                            // Row click activates this location (unless renaming
-                            // or the user clicks a child button which consumes
-                            // the event first).
-                            onClicked: {
-                                if (_renaming) return;
-                                root.cfg_autoDetectLocation = false;
-                                root.cfg_locationName = name;
-                                root.cfg_latitude     = lat;
-                                root.cfg_longitude    = lon;
-                                if (altitude !== 0)
-                                    root.cfg_altitude = altitude;
-                                if (timezone && timezone.length > 0)
-                                    root.cfg_timezone = timezone;
-                                if (countryCode && countryCode.length > 0)
-                                    root.cfg_countryCode = countryCode;
-                            }
 
                             function _commitRename() {
                                 var newName = renameField.text.trim();
@@ -1471,172 +1472,218 @@ KCM.SimpleKCM {
                                 _renaming = false;
                             }
 
-                            contentItem: RowLayout {
-                                id: savedLocContent
-                                spacing: Kirigami.Units.smallSpacing
+                            ItemDelegate {
+                                id: savedLocDelegate
+                                width: parent.width
+                                implicitHeight: savedLocContent.implicitHeight + 12
+                                hoverEnabled: true
+                                down: false
 
-                                // ── Drag handle (replaces arrow up/down) ─────
-                                Kirigami.ListItemDragHandle {
-                                    listItem: savedLocDelegate
-                                    listView: savedLocList
-                                    enabled: !savedLocDelegate._renaming
-                                    opacity: enabled ? 1.0 : 0.0
-                                    onMoveRequested: function (oldIndex, newIndex) {
-                                        if (oldIndex !== newIndex)
-                                            savedLocWorkingModel.move(oldIndex, newIndex, 1);
-                                    }
-                                    onDropped: root._applySavedLocModel()
+                                background: Rectangle {
+                                    radius: 4
+                                    color: savedLocDelegateRoot._isActive
+                                        ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.20)
+                                        : (savedLocDelegate.hovered && !savedLocDelegateRoot._renaming
+                                            ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.10)
+                                            : "transparent")
+                                    border.color: savedLocDelegateRoot._isActive ? Kirigami.Theme.highlightColor : "transparent"
+                                    border.width: savedLocDelegateRoot._isActive ? 1 : 0
                                 }
 
-                                Kirigami.Icon {
-                                    source: "mark-location"
-                                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                                // Row click activates this location (unless renaming
+                                // or the user clicks a child button which consumes
+                                // the event first).
+                                onClicked: {
+                                    if (savedLocDelegateRoot._renaming) return;
+                                    root.cfg_autoDetectLocation = false;
+                                    root.cfg_locationName = savedLocDelegateRoot.name;
+                                    root.cfg_latitude     = savedLocDelegateRoot.lat;
+                                    root.cfg_longitude    = savedLocDelegateRoot.lon;
+                                    if (savedLocDelegateRoot.altitude !== 0)
+                                        root.cfg_altitude = savedLocDelegateRoot.altitude;
+                                    if (savedLocDelegateRoot.timezone && savedLocDelegateRoot.timezone.length > 0)
+                                        root.cfg_timezone = savedLocDelegateRoot.timezone;
+                                    if (savedLocDelegateRoot.countryCode && savedLocDelegateRoot.countryCode.length > 0)
+                                        root.cfg_countryCode = savedLocDelegateRoot.countryCode;
                                 }
 
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 0
+                                contentItem: RowLayout {
+                                    id: savedLocContent
+                                    spacing: Kirigami.Units.smallSpacing
 
-                                    Label {
-                                        Layout.fillWidth: true
-                                        visible: !savedLocDelegate._renaming
-                                        text: savedLocDelegate.name.length > 0 ? savedLocDelegate.name : i18n("Unknown")
-                                        elide: Text.ElideRight
-                                        font.bold: savedLocDelegate._isActive
-                                        color: savedLocDelegate._isActive ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
-                                    }
-                                    TextField {
-                                        id: renameField
-                                        Layout.fillWidth: true
-                                        visible: savedLocDelegate._renaming
-                                        onVisibleChanged: {
-                                            if (visible) {
-                                                text = savedLocDelegate.name;
-                                                selectAll();
-                                                forceActiveFocus();
-                                            }
+                                    // ── Drag handle ─────
+                                    Kirigami.ListItemDragHandle {
+                                        id: dragHandle
+                                        listItem: savedLocDelegate
+                                        listView: savedLocList
+                                        enabled: !savedLocDelegateRoot._renaming
+                                        opacity: enabled ? 1.0 : 0.0
+                                        onMoveRequested: function (oldIndex, newIndex) {
+                                            if (oldIndex !== newIndex)
+                                                savedLocWorkingModel.move(oldIndex, newIndex, 1);
                                         }
-                                        Keys.onReturnPressed: savedLocDelegate._commitRename()
-                                        Keys.onEscapePressed: savedLocDelegate._renaming = false
+                                        onDropped: root._applySavedLocModel()
                                     }
-                                    Label {
+
+                                    Kirigami.Icon {
+                                        source: "mark-location"
+                                        Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                                        Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                                    }
+
+                                    ColumnLayout {
                                         Layout.fillWidth: true
-                                        text: savedLocDelegate.lat.toFixed(4) + "°, " + savedLocDelegate.lon.toFixed(4) + "°"
-                                        opacity: 0.6
-                                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                        spacing: 0
+
+                                        Label {
+                                            Layout.fillWidth: true
+                                            visible: !savedLocDelegateRoot._renaming
+                                            text: savedLocDelegateRoot.name.length > 0 ? savedLocDelegateRoot.name : i18n("Unknown")
+                                            elide: Text.ElideRight
+                                            font.bold: savedLocDelegateRoot._isActive
+                                            color: savedLocDelegateRoot._isActive ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                                        }
+                                        TextField {
+                                            id: renameField
+                                            Layout.fillWidth: true
+                                            visible: savedLocDelegateRoot._renaming
+                                            onVisibleChanged: {
+                                                if (visible) {
+                                                    text = savedLocDelegateRoot.name;
+                                                    selectAll();
+                                                    forceActiveFocus();
+                                                }
+                                            }
+                                            Keys.onReturnPressed: savedLocDelegateRoot._commitRename()
+                                            Keys.onEscapePressed: savedLocDelegateRoot._renaming = false
+                                        }
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: {
+                                                var parts = [savedLocDelegateRoot.lat.toFixed(4) + "°, " + savedLocDelegateRoot.lon.toFixed(4) + "°"];
+                                                if (savedLocDelegateRoot.altitude !== 0)
+                                                    parts.push(i18n("Alt: %1 m", savedLocDelegateRoot.altitude));
+                                                if (savedLocDelegateRoot.timezone && savedLocDelegateRoot.timezone.length > 0)
+                                                    parts.push(savedLocDelegateRoot.timezone);
+                                                return parts.join("  ·  ");
+                                            }
+                                            opacity: 0.6
+                                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                            elide: Text.ElideRight
+                                        }
                                     }
-                                }
 
-                                // ── Star button (marks default; does NOT reorder) ──
-                                ToolButton {
-                                    id: starButton
-                                    Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
-                                    Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
-                                    display: AbstractButton.IconOnly
-                                    visible: !savedLocDelegate._renaming
-                                    flat: true
+                                    // ── Star button (marks default; does NOT reorder) ──
+                                    ToolButton {
+                                        id: starButton
+                                        Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+                                        Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+                                        display: AbstractButton.IconOnly
+                                        visible: !savedLocDelegateRoot._renaming
+                                        flat: true
 
-                                    contentItem: Kirigami.Icon {
-                                        source: savedLocDelegate.starred ? "starred-symbolic" : "non-starred-symbolic"
-                                        implicitWidth: Kirigami.Units.iconSizes.small
-                                        implicitHeight: Kirigami.Units.iconSizes.small
-                                        color: savedLocDelegate.starred ? "#f5c518" : Kirigami.Theme.textColor
-                                    }
-                                    background: Rectangle {
-                                        radius: 3
-                                        color: starButton.pressed
-                                            ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.3)
-                                            : (starButton.hovered
-                                                ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.15)
-                                                : "transparent")
-                                    }
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: savedLocDelegate.starred
-                                        ? i18n("Default location (click to unset)")
-                                        : i18n("Set as default location")
-                                    onClicked: {
-                                        var locs;
-                                        try {
-                                            locs = JSON.parse(root.cfg_savedLocations || "[]");
-                                            if (!Array.isArray(locs)) locs = [];
-                                        } catch (e) { locs = []; }
-                                        var wasStarred = !!(locs[savedLocDelegate.index] && locs[savedLocDelegate.index].starred);
-                                        for (var i = 0; i < locs.length; i++)
-                                            delete locs[i].starred;
-                                        if (!wasStarred && savedLocDelegate.index >= 0 && savedLocDelegate.index < locs.length)
-                                            locs[savedLocDelegate.index].starred = true;
-                                        root.cfg_savedLocations = JSON.stringify(locs);
-                                    }
-                                }
-
-                                // Rename buttons
-                                ToolButton {
-                                    icon.name: "dialog-ok-apply"
-                                    display: AbstractButton.IconOnly
-                                    visible: savedLocDelegate._renaming
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: i18n("Confirm rename")
-                                    onClicked: savedLocDelegate._commitRename()
-                                }
-                                ToolButton {
-                                    icon.name: "dialog-cancel"
-                                    display: AbstractButton.IconOnly
-                                    visible: savedLocDelegate._renaming
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: i18n("Cancel rename")
-                                    onClicked: savedLocDelegate._renaming = false
-                                }
-
-                                ToolButton {
-                                    icon.name: "edit-rename"
-                                    display: AbstractButton.IconOnly
-                                    visible: !savedLocDelegate._renaming
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: i18n("Rename location")
-                                    onClicked: savedLocDelegate._renaming = true
-                                }
-
-                                // ── Settings: opens the Manual-entry sub-page
-                                // pre-populated with this entry's values. The
-                                // user edits name / lat / lon / altitude /
-                                // timezone and commits via KCM Apply.
-                                ToolButton {
-                                    icon.name: "configure"
-                                    display: AbstractButton.IconOnly
-                                    visible: !savedLocDelegate._renaming
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: i18n("Edit location details")
-                                    onClicked: {
-                                        root.openManualPageForEdit({
-                                            name:        savedLocDelegate.name,
-                                            lat:         savedLocDelegate.lat,
-                                            lon:         savedLocDelegate.lon,
-                                            altitude:    savedLocDelegate.altitude,
-                                            timezone:    savedLocDelegate.timezone,
-                                            countryCode: savedLocDelegate.countryCode
-                                        }, savedLocDelegate.index);
-                                    }
-                                }
-
-                                ToolButton {
-                                    icon.name: "edit-delete"
-                                    display: AbstractButton.IconOnly
-                                    visible: !savedLocDelegate._renaming
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: i18n("Remove saved location")
-                                    onClicked: {
-                                        var locs;
-                                        try {
-                                            locs = JSON.parse(root.cfg_savedLocations || "[]");
-                                            if (!Array.isArray(locs)) locs = [];
-                                        } catch (e) { locs = []; }
-                                        if (locs.length === 1) {
-                                            root._deleteLocIndex = savedLocDelegate.index;
-                                            deleteLastLocDialog.open();
-                                        } else {
-                                            locs.splice(savedLocDelegate.index, 1);
+                                        contentItem: Kirigami.Icon {
+                                            source: savedLocDelegateRoot.starred ? "starred-symbolic" : "non-starred-symbolic"
+                                            implicitWidth: Kirigami.Units.iconSizes.small
+                                            implicitHeight: Kirigami.Units.iconSizes.small
+                                            isMask: true
+                                            color: savedLocDelegateRoot.starred ? "#f5c518" : Kirigami.Theme.textColor
+                                        }
+                                        background: Rectangle {
+                                            radius: 3
+                                            color: starButton.pressed
+                                                ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.3)
+                                                : (starButton.hovered
+                                                    ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.15)
+                                                    : "transparent")
+                                        }
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: savedLocDelegateRoot.starred
+                                            ? i18n("Default location (click to unset)")
+                                            : i18n("Set as default location")
+                                        onClicked: {
+                                            var locs;
+                                            try {
+                                                locs = JSON.parse(root.cfg_savedLocations || "[]");
+                                                if (!Array.isArray(locs)) locs = [];
+                                            } catch (e) { locs = []; }
+                                            var wasStarred = !!(locs[savedLocDelegateRoot.index] && locs[savedLocDelegateRoot.index].starred);
+                                            for (var i = 0; i < locs.length; i++)
+                                                delete locs[i].starred;
+                                            if (!wasStarred && savedLocDelegateRoot.index >= 0 && savedLocDelegateRoot.index < locs.length)
+                                                locs[savedLocDelegateRoot.index].starred = true;
                                             root.cfg_savedLocations = JSON.stringify(locs);
+                                        }
+                                    }
+
+                                    // Rename buttons
+                                    ToolButton {
+                                        icon.name: "dialog-ok-apply"
+                                        display: AbstractButton.IconOnly
+                                        visible: savedLocDelegateRoot._renaming
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: i18n("Confirm rename")
+                                        onClicked: savedLocDelegateRoot._commitRename()
+                                    }
+                                    ToolButton {
+                                        icon.name: "dialog-cancel"
+                                        display: AbstractButton.IconOnly
+                                        visible: savedLocDelegateRoot._renaming
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: i18n("Cancel rename")
+                                        onClicked: savedLocDelegateRoot._renaming = false
+                                    }
+
+                                    ToolButton {
+                                        icon.name: "edit-rename"
+                                        display: AbstractButton.IconOnly
+                                        visible: !savedLocDelegateRoot._renaming
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: i18n("Rename location")
+                                        onClicked: savedLocDelegateRoot._renaming = true
+                                    }
+
+                                    // ── Settings: opens the Manual-entry sub-page
+                                    // pre-populated with this entry's values. The
+                                    // user edits name / lat / lon / altitude /
+                                    // timezone and commits via KCM Apply.
+                                    ToolButton {
+                                        icon.name: "configure"
+                                        display: AbstractButton.IconOnly
+                                        visible: !savedLocDelegateRoot._renaming
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: i18n("Edit location details")
+                                        onClicked: {
+                                            root.openManualPageForEdit({
+                                                name:        savedLocDelegateRoot.name,
+                                                lat:         savedLocDelegateRoot.lat,
+                                                lon:         savedLocDelegateRoot.lon,
+                                                altitude:    savedLocDelegateRoot.altitude,
+                                                timezone:    savedLocDelegateRoot.timezone,
+                                                countryCode: savedLocDelegateRoot.countryCode
+                                            }, savedLocDelegateRoot.index);
+                                        }
+                                    }
+
+                                    ToolButton {
+                                        icon.name: "edit-delete"
+                                        display: AbstractButton.IconOnly
+                                        visible: !savedLocDelegateRoot._renaming
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: i18n("Remove saved location")
+                                        onClicked: {
+                                            var locs;
+                                            try {
+                                                locs = JSON.parse(root.cfg_savedLocations || "[]");
+                                                if (!Array.isArray(locs)) locs = [];
+                                            } catch (e) { locs = []; }
+                                            if (locs.length === 1) {
+                                                root._deleteLocIndex = savedLocDelegateRoot.index;
+                                                deleteLastLocDialog.open();
+                                            } else {
+                                                locs.splice(savedLocDelegateRoot.index, 1);
+                                                root.cfg_savedLocations = JSON.stringify(locs);
+                                            }
                                         }
                                     }
                                 }

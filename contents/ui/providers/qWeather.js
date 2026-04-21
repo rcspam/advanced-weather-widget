@@ -23,14 +23,13 @@
  * W (weather.js) is passed as a parameter by the caller.
  *
  * QWeather API docs: https://dev.qweather.com/en/docs/api/weather/
- * Authentication: API KEY via query parameter `key=` or header `X-QW-Api-Key`.
+ * Authentication: API KEY via `X-QW-Api-Key` request header.
  * Location format: longitude,latitude (up to 2 decimal places).
  *
- * Uses the legacy shared API host (devapi.qweather.com) which is still
- * supported.  Users with a dedicated API host can override via config.
+ * API host is user-configurable (service._qwHost()) because QWeather
+ * assigns a project-specific host to each developer account.
+ * Falls back to devapi.qweather.com when no host is configured.
  */
-
-var _BASE = "https://devapi.qweather.com";
 
 /**
  * Map a QWeather icon code to WMO weather code.
@@ -91,7 +90,7 @@ function _qwCodeToWmo(code) {
  */
 function _isDay(iconCode) {
     var code = parseInt(iconCode, 10);
-    if ((c >= 150 && c <= 153) || code === 350 || code === 351 || code === 456 || code === 457)
+    if ((code >= 150 && code <= 153) || code === 350 || code === 351 || code === 456 || code === 457)
         return 0;
     return 1;
 }
@@ -99,26 +98,28 @@ function _isDay(iconCode) {
 function _calcDewPoint(T, rh) {
     if (isNaN(T) || isNaN(rh) || rh <= 0)
         return NaN;
-    var b = 17.67, code = 243.5;
+    var b = 17.67, c = 243.5;
     var gamma = Math.log(rh / 100.0) + (b * T) / (c + T);
     return Math.round((c * gamma) / (b - gamma) * 10) / 10;
 }
 
 function fetchCurrent(service, W, chain, idx) {
     var gen = service._refreshGen;
-    var weatherRootService =  service.weatherRoot;
+    var r = service.weatherRoot;
     var key = service._qwKey();
     if (!key) {
         service._tryProvider(chain, idx + 1);
         return;
     }
+    var base = service._qwHost();
     // QWeather location format: longitude,latitude (up to 2 decimals)
-    var locode = service.longitude.toFixed(2) + "," + service.latitude.toFixed(2);
-    var url = _BASE + "/v7/weather/now?location=" + encodeURIComponent(loc)
-        + "&key=" + encodeURIComponent(key) + "&unit=m";
+    var loc = service.longitude.toFixed(2) + "," + service.latitude.toFixed(2);
+    var url = base + "/v7/weather/now?location=" + encodeURIComponent(loc)
+        + "&unit=m";
 
     var req = new XMLHttpRequest();
     req.open("GET", url);
+    req.setRequestHeader("X-QW-Api-Key", key);
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE) return;
         if (service._refreshGen !== gen) return;
@@ -157,19 +158,20 @@ function fetchCurrent(service, W, chain, idx) {
             sunsetTimeText:  "--",
             dailyData:       []
         };
-        _fetchDaily(service, W, key, loc, gen);
+        _fetchDaily(service, W, key, loc, gen, base);
     };
     req.send();
 }
 
-function _fetchDaily(service, W, key, loc, gen) {
-    var weatherRootService =  service.weatherRoot;
+function _fetchDaily(service, W, key, loc, gen, base) {
+    var r = service.weatherRoot;
     var days = Math.min(service.forecastDays, 7);
-    var url = _BASE + "/v7/weather/" + days + "d?location=" + encodeURIComponent(loc)
-        + "&key=" + encodeURIComponent(key) + "&unit=m";
+    var url = base + "/v7/weather/" + days + "d?location=" + encodeURIComponent(loc)
+        + "&unit=m";
 
     var req = new XMLHttpRequest();
     req.open("GET", url);
+    req.setRequestHeader("X-QW-Api-Key", key);
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE) return;
         if (service._refreshGen !== gen) return;
@@ -206,7 +208,7 @@ function _fetchDaily(service, W, key, loc, gen) {
         r.updateText = service._formatUpdateText("qWeather");
 
         service._fetchAlertsIfNeeded();
-        _fetchAirQuality(service, W, key, loc, gen);
+        _fetchAirQuality(service, W, key, loc, gen, base);
     };
     req.send();
 }
@@ -222,13 +224,13 @@ function _qwAqiLabel(category) {
     return "";
 }
 
-function _fetchAirQuality(service, W, key, loc, gen) {
-    var weatherRootService =  service.weatherRoot;
-    var url = _BASE + "/airquality/v1/current?location=" + encodeURIComponent(loc)
-        + "&key=" + encodeURIComponent(key);
+function _fetchAirQuality(service, W, key, loc, gen, base) {
+    var r = service.weatherRoot;
+    var url = base + "/airquality/v1/current?location=" + encodeURIComponent(loc);
 
     var req = new XMLHttpRequest();
     req.open("GET", url);
+    req.setRequestHeader("X-QW-Api-Key", key);
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE) return;
         if (service._refreshGen !== gen) return;
@@ -257,18 +259,20 @@ function _fetchAirQuality(service, W, key, loc, gen) {
 
 function fetchHourly(service, W, dateStr) {
     var gen = service._refreshGen;
-    var weatherRootService =  service.weatherRoot;
+    var r = service.weatherRoot;
     var key = service._qwKey();
     if (!key) {
         r.hourlyData = [];
         return;
     }
-    var locode = service.longitude.toFixed(2) + "," + service.latitude.toFixed(2);
-    var url = _BASE + "/v7/weather/24h?location=" + encodeURIComponent(loc)
-        + "&key=" + encodeURIComponent(key) + "&unit=m";
+    var base = service._qwHost();
+    var loc = service.longitude.toFixed(2) + "," + service.latitude.toFixed(2);
+    var url = base + "/v7/weather/24h?location=" + encodeURIComponent(loc)
+        + "&unit=m";
 
     var req = new XMLHttpRequest();
     req.open("GET", url);
+    req.setRequestHeader("X-QW-Api-Key", key);
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE) return;
         if (service._refreshGen !== gen) return;
@@ -280,7 +284,7 @@ function fetchHourly(service, W, dateStr) {
                 for (var i = 0; i < d.hourly.length; i++) {
                     var h = d.hourly[i];
                     var fxTime = new Date(h.fxTime);
-                    var fxDateStweatherRootService =  Qt.formatDate(fxTime, "yyyy-MM-dd");
+                    var fxDateStr = Qt.formatDate(fxTime, "yyyy-MM-dd");
                     if (fxDateStr !== dateStr) continue;
                     hours.push({
                         hour: Qt.formatTime(fxTime, "HH:mm"),

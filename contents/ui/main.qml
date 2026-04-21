@@ -175,7 +175,14 @@ PlasmoidItem {
         _activeLocTz   = o.timezone    || "";
         _activeLocCC   = o.countryCode || "";
         _activeLocAlt  = o.altitude    !== undefined ? o.altitude : 0;
-        refreshDebounce.restart();
+        // No refreshDebounce here — activeLocation (the source for
+        // WeatherService._activeLoc) hasn't been written yet at this point.
+        // The actual refresh is triggered by:
+        //  • Popup path:    _applyPendingLocFields() writes activeLocation
+        //                   first, then calls refreshDebounce.restart()
+        //  • KCM Apply:     save() writes activeLocation first, then
+        //                   KCM syncs individual props → onLatitudeChanged
+        //                   → refreshDebounce.restart()
     }
 
     function _locName() { return _activeLocName || Plasmoid.configuration.locationName || ""; }
@@ -567,8 +574,6 @@ PlasmoidItem {
         if (loc.timezone)               Plasmoid.configuration.timezone     = loc.timezone;
         if (loc.countryCode)            Plasmoid.configuration.countryCode  = loc.countryCode;
         _batchingLocation = false;
-        // Now that Plasmoid.configuration.activeLocation is persisted,
-        // trigger a refresh so WeatherService reads the new coordinates.
         refreshDebounce.restart();
     }
 
@@ -1539,16 +1544,20 @@ PlasmoidItem {
             root.activeLocStaged = {};
         }
         function onLocationNameChanged() {
+            root._activeLocName = Plasmoid.configuration.locationName || "";
             root._updateHasSelectedTown();
             if (!root._batchingLocation) refreshDebounce.restart();
         }
         function onLatitudeChanged() {
+            root._activeLocLat = Plasmoid.configuration.latitude || 0;
             if (!root._batchingLocation) refreshDebounce.restart();
         }
         function onLongitudeChanged() {
+            root._activeLocLon = Plasmoid.configuration.longitude || 0;
             if (!root._batchingLocation) refreshDebounce.restart();
         }
         function onTimezoneChanged() {
+            root._activeLocTz = (Plasmoid.configuration.timezone || "").trim();
             if (!root._batchingLocation) refreshDebounce.restart();
         }
         function onWeatherProviderChanged() {

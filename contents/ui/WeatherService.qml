@@ -48,20 +48,19 @@ QtObject {
     property var weatherRoot
 
     // ── Config mirrors (accessible from non-pragma JS providers) ──────────
-    // Parse activeLocation once per location switch (single config signal) with
-    // fallback to individual entries for config-page writes that bypass applyLocation().
-    readonly property var _activeLoc: {
-        var s = Plasmoid.configuration.activeLocation || "{}";
-        try { var o = JSON.parse(s); if (o && typeof o === "object") return o; } catch(e) {}
-        return {};
-    }
-    readonly property real latitude:      (_activeLoc.lat  !== undefined && _activeLoc.lat  !== 0) ? _activeLoc.lat  : Plasmoid.configuration.latitude
-    readonly property real longitude:     (_activeLoc.lon  !== undefined && _activeLoc.lon  !== 0) ? _activeLoc.lon  : Plasmoid.configuration.longitude
-    readonly property string timezone:    ((_activeLoc.timezone    || Plasmoid.configuration.timezone    || "")).trim()
-    readonly property int forecastDays:   Plasmoid.configuration.forecastDays
-    readonly property real altitude:      (_activeLoc.altitude    !== undefined) ? _activeLoc.altitude    : Plasmoid.configuration.altitude
-    readonly property string countryCode: ((_activeLoc.countryCode || Plasmoid.configuration.countryCode || "")).toUpperCase()
-    readonly property string locationName: _activeLoc.name || Plasmoid.configuration.locationName || ""
+    // Read directly from individual Plasmoid.configuration entries.
+    // KCM Apply syncs cfg_* → Plasmoid.configuration.* for these keys.
+    // The popup's _applyPendingLocFields() also writes them directly.
+    // NOTE: We intentionally do NOT read from activeLocation here because
+    // the KCM framework has no cfg_activeLocation property and therefore
+    // never syncs it — the JSON would stay stale after KCM Apply.
+    readonly property real latitude:       Plasmoid.configuration.latitude
+    readonly property real longitude:      Plasmoid.configuration.longitude
+    readonly property string timezone:     (Plasmoid.configuration.timezone || "").trim()
+    readonly property int forecastDays:    Plasmoid.configuration.forecastDays
+    readonly property real altitude:       Plasmoid.configuration.altitude
+    readonly property string countryCode:  (Plasmoid.configuration.countryCode || "").toUpperCase()
+    readonly property string locationName: Plasmoid.configuration.locationName || ""
 
     // ── Private: API key helpers ─────────────────────────────────────────
     function _owKey() {
@@ -87,6 +86,12 @@ QtObject {
     }
     function _qwKey() {
         return (Plasmoid.configuration.qwApiKey || "").trim();
+    }
+    function _qwHost() {
+        var h = (Plasmoid.configuration.qwApiHost || "").trim();
+        if (!h) return "https://devapi.qweather.com";
+        // Strip trailing slash
+        return h.replace(/\/+$/, "");
     }
 
     // ── Private: space weather cache timestamp ──────────────────────────

@@ -187,8 +187,11 @@ ColumnLayout {
         if (p === "qWeather") {
             var qw = (cfg.qwApiKey || "").trim();
             if (!qw) return { missingKey: true };
+            var qwHost = (cfg.qwApiHost || "").trim();
+            if (!qwHost) qwHost = "https://devapi.qweather.com";
+            qwHost = qwHost.replace(/\/+$/, "");
             var qwLoc = encodeURIComponent(parseFloat(lon).toFixed(2) + "," + parseFloat(lat).toFixed(2));
-            return { url: "https://devapi.qweather.com/v7/weather/now?location=" + qwLoc + "&key=" + encodeURIComponent(qw) + "&unit=m" };
+            return { url: qwHost + "/v7/weather/now?location=" + qwLoc + "&unit=m", qwApiKey: qw };
         }
         return null;
     }
@@ -219,7 +222,9 @@ ColumnLayout {
             req.open("GET", info.url);
             if (p === "metno")
                 req.setRequestHeader("User-Agent", "AdvancedWeatherWidget/1.0 github.com/pnedyalkov91/advanced-weather-widget");
-            if (info.useAuthHeader)
+            if (info.qwApiKey)
+                req.setRequestHeader("X-QW-Api-Key", info.qwApiKey);
+            else if (info.useAuthHeader)
                 req.setRequestHeader("Authorization", info.authKey);
 
             // 10s timeout per request

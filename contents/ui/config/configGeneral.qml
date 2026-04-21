@@ -35,6 +35,7 @@ KCM.SimpleKCM {
     property string cfg_sgApiKey: ""
     property string cfg_wbApiKey: ""
     property string cfg_qwApiKey: ""
+    property string cfg_qwApiHost: ""
     property bool cfg_autoRefresh: true
     property int cfg_refreshIntervalMinutes: 15
 
@@ -135,9 +136,11 @@ KCM.SimpleKCM {
         } else if (provider === "qWeather") {
             var qwKey = (cfg_qwApiKey || "").trim();
             if (!qwKey) { locationCheckState = 0; return; }
+            var qwHost = (cfg_qwApiHost || "").trim();
+            if (!qwHost) qwHost = "https://devapi.qweather.com";
+            qwHost = qwHost.replace(/\/+$/, "");
             var qwLoc = encodeURIComponent(lon.toFixed(2) + "," + lat.toFixed(2));
-            url = "https://devapi.qweather.com/v7/weather/now?location=" + qwLoc
-                + "&key=" + encodeURIComponent(qwKey) + "&unit=m";
+            url = qwHost + "/v7/weather/now?location=" + qwLoc + "&unit=m";
         } else {
             locationCheckState = 0;
             return;
@@ -148,6 +151,8 @@ KCM.SimpleKCM {
                 "AdvancedWeatherWidget/1.0 github.com/pnedyalkov91/advanced-weather-widget");
         if (provider === "stormGlass")
             req.setRequestHeader("Authorization", (cfg_sgApiKey || "").trim());
+        if (provider === "qWeather")
+            req.setRequestHeader("X-QW-Api-Key", (cfg_qwApiKey || "").trim());
         req.onreadystatechange = function () {
             if (req.readyState !== XMLHttpRequest.DONE)
                 return;
@@ -212,14 +217,18 @@ KCM.SimpleKCM {
             url = "https://api.weatherbit.io/v2.0/current?lat=42.7&lon=23.3&key="
                 + encodeURIComponent(key) + "&units=M";
         } else if (root.isQWeather) {
-            url = "https://devapi.qweather.com/v7/weather/now?location=23.30,42.70&key="
-                + encodeURIComponent(key) + "&unit=m";
+            var qwHost = (root.cfg_qwApiHost || "").trim();
+            if (!qwHost) qwHost = "https://devapi.qweather.com";
+            qwHost = qwHost.replace(/\/+$/, "");
+            url = qwHost + "/v7/weather/now?location=23.30,42.70&unit=m";
+            useAuthHeader = true;
         } else {
             url = "https://api.weatherapi.com/v1/current.json?key="
                 + encodeURIComponent(key) + "&q=42.7,23.3";
         }
         req.open("GET", url);
-        if (useAuthHeader) req.setRequestHeader("Authorization", key);
+        if (root.isQWeather) req.setRequestHeader("X-QW-Api-Key", key);
+        else if (useAuthHeader) req.setRequestHeader("Authorization", key);
         req.onreadystatechange = function () {
             if (req.readyState !== XMLHttpRequest.DONE)
                 return;
@@ -584,6 +593,34 @@ KCM.SimpleKCM {
                         visible: root.apiTestState === 3
                         type: Kirigami.MessageType.Error
                         text: root.apiTestMessage
+                    }
+                }
+
+                // ── QWeather API Host section ─────────────────────────────
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 8
+                    spacing: 8
+                    visible: root.isQWeather && !root.isAdaptive
+
+                    Label {
+                        text: i18n("QWeather API Host:")
+                        font.bold: true
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        opacity: 0.7
+                        text: i18n("Each QWeather project has a unique API host. Find yours at console.qweather.com under your project settings.")
+                    }
+                    TextField {
+                        id: qwHostField
+                        Layout.fillWidth: true
+                        placeholderText: "https://xxxxx.re.qweatherapi.com"
+                        text: root.cfg_qwApiHost
+                        selectByMouse: true
+                        onTextEdited: root.cfg_qwApiHost = text
+                        onEditingFinished: root.cfg_qwApiHost = text.trim()
                     }
                 }
             }
