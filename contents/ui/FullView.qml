@@ -442,7 +442,7 @@ Rectangle {
         }
 
         Item {
-            Layout.preferredHeight: (fullView.showDetailsTab && fullView.showForecastTab) ? 12 : 0
+            Layout.preferredHeight: fullView.showAnyTab ? 12 : 0
         }
 
         // ── Tab bar — only shown when both tabs are enabled ────────────
@@ -507,7 +507,7 @@ Rectangle {
         }
 
         Item {
-            Layout.preferredHeight: (fullView.showDetailsTab && fullView.showForecastTab) ? 10 : 0
+            Layout.preferredHeight: fullView.showAnyTab ? 10 : 0
         }
 
         // ── Tab content ───────────────────────────────────────────────

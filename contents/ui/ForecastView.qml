@@ -256,7 +256,85 @@ Item {
                             ScrollBar.vertical.policy: ScrollBar.AlwaysOff
                             ScrollBar.horizontal.policy: ScrollBar.AsNeeded
 
+                            // Auto-scroll to current hour for "Today" (index === 0)
+                            Timer {
+                                id: scrollTimer
+                                interval: 150
+                                onTriggered: {
+                                    if (index !== 0 || !weatherRoot.hourlyData.length) return;
+                                    var now = new Date();
+                                    var currentTotalMins = now.getHours() * 60 + now.getMinutes();
+                                    // Find the closest hour in the data
+                                    var closestIdx = 0;
+                                    var minDiff = 86400;
+                                    for (var i = 0; i < weatherRoot.hourlyData.length; i++) {
+                                        var h = weatherRoot.hourlyData[i].hour;
+                                        if (!h) continue;
+                                        var parts = h.split(":");
+                                        if (parts.length < 2) continue;
+                                        var hm = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+                                        var diff = Math.abs(hm - currentTotalMins);
+                                        if (diff < minDiff) {
+                                            minDiff = diff;
+                                            closestIdx = i;
+                                        }
+                                    }
+                                    // Account for sunrise/sunset cards inserted before this index
+                                    if (forecastRoot.showSunEvents && weatherRoot.sunriseTimeText && weatherRoot.sunsetTimeText) {
+                                        function toMins(t) {
+                                            if (!t || t === "--") return -1;
+                                            var p = t.split(":"); return p.length < 2 ? -1 : parseInt(p[0],10)*60+parseInt(p[1],10);
+                                        }
+                                        var rise = toMins(weatherRoot.sunriseTimeText);
+                                        var set_ = toMins(weatherRoot.sunsetTimeText);
+                                        var targetMins = closestIdx < weatherRoot.hourlyData.length ? toMins(weatherRoot.hourlyData[closestIdx].hour) : -1;
+                                        if (rise >= 0 && targetMins >= 0 && rise < targetMins) closestIdx++;
+                                        if (set_ >= 0 && targetMins >= 0 && set_ < targetMins) closestIdx++;
+                                    }
+                                    // Calculate scroll position using actual card widths
+                                    var hourlyWidth = 100;
+                                    var sunWidth = 70;
+                                    var spacing = 6;
+                                    var scrollPos = 0;
+                                    // Count cards before closestIdx (accounting for sun cards)
+                                    if (forecastRoot.showSunEvents && weatherRoot.sunriseTimeText && weatherRoot.sunsetTimeText) {
+                                        function toMins2(t) {
+                                            if (!t || t === "--") return -1;
+                                            var p = t.split(":"); return p.length < 2 ? -1 : parseInt(p[0],10)*60+parseInt(p[1],10);
+                                        }
+                                        var rise2 = toMins2(weatherRoot.sunriseTimeText);
+                                        var set2 = toMins2(weatherRoot.sunsetTimeText);
+                                        for (var j = 0; j < closestIdx; j++) {
+                                            var hm2 = toMins2(weatherRoot.hourlyData[j].hour);
+                                            // Check if a sun card appears before this hour
+                                            if (rise2 >= 0 && hm2 > rise2) { scrollPos += sunWidth + spacing; rise2 = -1; }
+                                            if (set2 >= 0 && hm2 > set2) { scrollPos += sunWidth + spacing; set2 = -1; }
+                                            scrollPos += hourlyWidth + spacing;
+                                        }
+                                    } else {
+                                        scrollPos = closestIdx * (hourlyWidth + spacing);
+                                    }
+                                    var bar = hourlyScrollView.ScrollBar.horizontal;
+                                    if (!bar) return;
+                                    var contentW = hourlyRow.implicitWidth || hourlyRow.width || (weatherRoot.hourlyData.length * (hourlyWidth + spacing));
+                                    var viewW = hourlyScrollView.width;
+                                    if (contentW > viewW) {
+                                        var maxPos = Math.max(0, contentW - viewW);
+                                        var targetPos = Math.min(scrollPos, maxPos);
+                                        bar.position = targetPos / contentW;
+                                    }
+                                }
+                            }
+                            Connections {
+                                target: weatherRoot
+                                function onHourlyDataChanged() {
+                                    if (index !== 0 || !weatherRoot.hourlyData.length) return;
+                                    scrollTimer.start();
+                                }
+                            }
+
                             Row {
+                                id: hourlyRow
                                 spacing: 6
                                 height: parent.height
 
