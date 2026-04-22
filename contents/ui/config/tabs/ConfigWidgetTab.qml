@@ -92,20 +92,14 @@ ColumnLayout {
 
         // ── SUB-TAB 0: General ────────────────────────────────────────
         Kirigami.FormLayout {
-            spacing: Kirigami.Units.smallSpacing
-
             // ═══════════════════════════════════════════════════════════════
             // SECTION: Appearance
             // ═══════════════════════════════════════════════════════════════
             Kirigami.Separator {
-                Layout.fillWidth: true
-                Layout.topMargin: Kirigami.Units.smallSpacing
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Appearance")
             }
-            Kirigami.Heading {
-                level: 5
-                text: i18n("Appearance")
-                opacity: 0.7
-            }
+
             Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
 
             RowLayout {
@@ -134,13 +128,10 @@ ColumnLayout {
             // SECTION: Behavior
             // ═══════════════════════════════════════════════════════════════
             Kirigami.Separator {
-                Layout.fillWidth: true
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Behavior")
             }
-            Kirigami.Heading {
-                level: 5
-                text: i18n("Behavior")
-                opacity: 0.7
-            }
+
             Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
 
             RowLayout {
@@ -191,16 +182,13 @@ ColumnLayout {
             Item { Layout.preferredHeight: Kirigami.Units.largeSpacing }
 
             // ═══════════════════════════════════════════════════════════════
-            // SECTION: Popup Size
+            // SECTION: Widget popup size
             // ═══════════════════════════════════════════════════════════════
             Kirigami.Separator {
-                Layout.fillWidth: true
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Widget Size")
             }
-            Kirigami.Heading {
-                level: 5
-                text: i18n("Popup Size")
-                opacity: 0.7
-            }
+
             Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
 
             RowLayout {
@@ -265,19 +253,12 @@ ColumnLayout {
 
         // ── SUB-TAB 1: Details ────────────────────────────────────────
         Kirigami.FormLayout {
-            spacing: Kirigami.Units.smallSpacing
-
             // ═══════════════════════════════════════════════════════════════
             // SECTION: Icons
             // ═══════════════════════════════════════════════════════════════
             Kirigami.Separator {
-                Layout.fillWidth: true
-                Layout.topMargin: Kirigami.Units.smallSpacing
-            }
-            Kirigami.Heading {
-                level: 5
-                text: i18n("Icons")
-                opacity: 0.7
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Icons")
             }
             Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
 
@@ -345,12 +326,8 @@ ColumnLayout {
             // SECTION: Layout
             // ═══════════════════════════════════════════════════════════════
             Kirigami.Separator {
-                Layout.fillWidth: true
-            }
-            Kirigami.Heading {
-                level: 5
-                text: i18n("Layout")
-                opacity: 0.7
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Layout")
             }
             Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
 
@@ -443,12 +420,8 @@ ColumnLayout {
             // SECTION: Items
             // ═══════════════════════════════════════════════════════════════
             Kirigami.Separator {
-                Layout.fillWidth: true
-            }
-            Kirigami.Heading {
-                level: 5
-                text: i18n("Items")
-                opacity: 0.7
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Details Items")
             }
             Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
 

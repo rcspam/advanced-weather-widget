@@ -987,7 +987,7 @@ KCM.SimpleKCM {
             root._forceConfirmAutoDetect = false;
         }
         contentItem: Item {
-            implicitWidth: 420
+            implicitWidth: 540
             implicitHeight: contentCol.implicitHeight
             ColumnLayout {
                 id: contentCol
