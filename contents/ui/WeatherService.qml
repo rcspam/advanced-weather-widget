@@ -31,6 +31,12 @@ import "providers/openMeteo.js" as OpenMeteoJS
 import "providers/openWeather.js" as OpenWeatherJS
 import "providers/weatherApi.js" as WeatherApiJS
 import "providers/metNo.js" as MetNoJS
+import "providers/pirateWeather.js" as PirateWeatherJS
+import "providers/visualCrossing.js" as VisualCrossingJS
+import "providers/tomorrowIo.js" as TomorrowIoJS
+import "providers/stormGlass.js" as StormGlassJS
+import "providers/weatherbit.js" as WeatherbitJS
+import "providers/qWeather.js" as QWeatherJS
 import "providers/alerts.js" as AlertsJS
 import "providers/spaceWeather_provider.js" as SpaceWeatherJS
 
@@ -42,12 +48,18 @@ QtObject {
     property var weatherRoot
 
     // ── Config mirrors (accessible from non-pragma JS providers) ──────────
-    readonly property real latitude: Plasmoid.configuration.latitude
-    readonly property real longitude: Plasmoid.configuration.longitude
-    readonly property string timezone: (Plasmoid.configuration.timezone || "").trim()
-    readonly property int forecastDays: Plasmoid.configuration.forecastDays
-    readonly property real altitude: Plasmoid.configuration.altitude
-    readonly property string countryCode: (Plasmoid.configuration.countryCode || "").toUpperCase()
+    // Read directly from individual Plasmoid.configuration entries.
+    // KCM Apply syncs cfg_* → Plasmoid.configuration.* for these keys.
+    // The popup's _applyPendingLocFields() also writes them directly.
+    // NOTE: We intentionally do NOT read from activeLocation here because
+    // the KCM framework has no cfg_activeLocation property and therefore
+    // never syncs it — the JSON would stay stale after KCM Apply.
+    readonly property real latitude:       Plasmoid.configuration.latitude
+    readonly property real longitude:      Plasmoid.configuration.longitude
+    readonly property string timezone:     (Plasmoid.configuration.timezone || "").trim()
+    readonly property int forecastDays:    Plasmoid.configuration.forecastDays
+    readonly property real altitude:       Plasmoid.configuration.altitude
+    readonly property string countryCode:  (Plasmoid.configuration.countryCode || "").toUpperCase()
     readonly property string locationName: Plasmoid.configuration.locationName || ""
 
     // ── Private: API key helpers ─────────────────────────────────────────
@@ -57,57 +69,94 @@ QtObject {
     function _waKey() {
         return (Plasmoid.configuration.waApiKey || "").trim();
     }
+    function _pwKey() {
+        return (Plasmoid.configuration.pwApiKey || "").trim();
+    }
+    function _vcKey() {
+        return (Plasmoid.configuration.vcApiKey || "").trim();
+    }
+    function _tioKey() {
+        return (Plasmoid.configuration.tioApiKey || "").trim();
+    }
+    function _sgKey() {
+        return (Plasmoid.configuration.sgApiKey || "").trim();
+    }
+    function _wbKey() {
+        return (Plasmoid.configuration.wbApiKey || "").trim();
+    }
+    function _qwKey() {
+        return (Plasmoid.configuration.qwApiKey || "").trim();
+    }
+    function _qwHost() {
+        var h = (Plasmoid.configuration.qwApiHost || "").trim();
+        if (!h) return "https://devapi.qweather.com";
+        // Strip trailing slash
+        return h.replace(/\/+$/, "");
+    }
+
+    // ── Private: space weather cache timestamp ──────────────────────────
+    property real _lastSpaceWeatherFetch: 0
+
+    // ── Request lifecycle — generation guard ────────────────────────────
+    // _refreshGen increments on each refreshNow().  Callbacks captured at
+    // send time compare their gen to the live value; a mismatch means a
+    // newer refresh has started and the callback should silently bail out.
+    // We intentionally do NOT call abort() on old XHRs — Qt QML's
+    // XMLHttpRequest.abort() can block the JS thread on some platforms.
+    property int _refreshGen: 0
+
+    // Safety timer — if loading stays true for 20 s, force-reset state
+    // so the widget never gets stuck in "Loading…" forever.
+    property Timer _safetyTimer: Timer {
+        interval: 20000
+        repeat: false
+        onTriggered: {
+            if (weatherRoot && weatherRoot.loading) {
+                console.warn("[WeatherService] Safety timeout — forcing loading=false");
+                weatherRoot.loading = false;
+                weatherRoot.updateText = i18n("Update timed out. Tap to retry.");
+            }
+        }
+    }
 
     // ── Public methods ────────────────────────────────────────────────────
 
     /** Full weather refresh — current + daily forecast */
     function refreshNow() {
+        _refreshGen++;
+        _safetyTimer.stop();
+
         var r = weatherRoot;
         if (!r.hasSelectedTown) {
             r.loading = false;
             r.updateText = "";
-            r.temperatureC = NaN;
-            r.apparentC = NaN;
-            r.windKmh = NaN;
-            r.windDirection = NaN;
-            r.pressureHpa = NaN;
-            r.humidityPercent = NaN;
-            r.visibilityKm = NaN;
-            r.dewPointC = NaN;
-            r.precipMmh = NaN;
-            r.uvIndex = NaN;
-            r.airQualityIndex = NaN;
-            r.airQualityLabel = "";
-            r.aqiPm10 = NaN;
-            r.aqiPm2_5 = NaN;
-            r.aqiCo = NaN;
-            r.aqiNo2 = NaN;
-            r.aqiSo2 = NaN;
-            r.aqiO3 = NaN;
-            r.pollenData = [];
+            r.weatherDataStaged = null;
+            r.aqiDataStaged = null;
+            r.pollenDataStaged = [];
             r.spaceWeather = null;
             r.weatherAlerts = [];
-            r.snowDepthCm = NaN;
-            r.sunriseTimeText = "--";
-            r.sunsetTimeText = "--";
-            r.weatherCode = -1;
-            r.isDay = -1;
-            r.dailyData = [];
             r.hourlyData = [];
             return;
         }
         r.loading = true;
+        _safetyTimer.restart();
         r.weatherAlerts = [];  // reset before parallel fetch
 
         var provider = Plasmoid.configuration.weatherProvider || "adaptive";
-        var chain = (provider === "adaptive") ? ["openMeteo", "openWeather", "weatherApi", "metno"] : [provider];
+        var chain = (provider === "adaptive") ? ["openMeteo", "metno", "pirateWeather", "visualCrossing", "tomorrowIo", "stormGlass", "weatherbit", "qWeather", "openWeather", "weatherApi"] : [provider];
+        chain._gen = _refreshGen;
 
         _tryProvider(chain, 0);
-
-        // Fetch alerts independently (MeteoAlarm → met.no fallback)
-        AlertsJS.fetchAlerts(service);
-        // Fetch NOAA space weather independently (no location needed)
-        SpaceWeatherJS.fetchSpaceWeather(service);
+        // Fetch air quality + pollen in parallel with the main weather request
+        // (independent of provider — always uses Open-Meteo air-quality API)
+        _fetchAirQualityOpenMeteo();
+        // Fetch NOAA space weather independently (location-independent)
+        // Skip if data was fetched recently (< 10 min) since it doesn't change with location
+        var now = Date.now();
+        if (!_lastSpaceWeatherFetch || (now - _lastSpaceWeatherFetch) > 600000) {
+            _lastSpaceWeatherFetch = now;
+            SpaceWeatherJS.fetchSpaceWeather(service);
+        }
     }
 
     /** Hourly data fetch for a specific date string (yyyy-MM-dd) */
@@ -117,6 +166,10 @@ QtObject {
 
         if (ap === "openMeteo") {
             OpenMeteoJS.fetchHourly(service, dateStr);
+            return;
+        }
+        if (ap === "pirateWeather") {
+            PirateWeatherJS.fetchHourly(service, W, dateStr);
             return;
         }
         if (ap === "openWeather") {
@@ -131,12 +184,47 @@ QtObject {
             MetNoJS.fetchHourly(service, W, dateStr);
             return;
         }
+        if (ap === "visualCrossing") {
+            VisualCrossingJS.fetchHourly(service, W, dateStr);
+            return;
+        }
+        if (ap === "tomorrowIo") {
+            TomorrowIoJS.fetchHourly(service, W, dateStr);
+            return;
+        }
+        if (ap === "stormGlass") {
+            StormGlassJS.fetchHourly(service, W, dateStr);
+            return;
+        }
+        if (ap === "weatherbit") {
+            WeatherbitJS.fetchHourly(service, W, dateStr);
+            return;
+        }
+        if (ap === "qWeather") {
+            QWeatherJS.fetchHourly(service, W, dateStr);
+            return;
+        }
         weatherRoot.hourlyData = [];
     }
 
     // ── Private: provider chain ───────────────────────────────────────────
 
     property var _failed: []
+
+    /**
+     * Called by each provider after setting r.loading = false.
+     * If the provider already populated weatherAlerts (native alerts),
+     * this is a no-op.  Otherwise it falls back to MeteoAlarm / NWS.
+     */
+    function _fetchAlertsIfNeeded() {
+        var r = weatherRoot;
+        if (!r.weatherAlerts || r.weatherAlerts.length === 0) {
+            console.log("[WeatherService] No native alerts → fetching via AlertsJS (countryCode=" + countryCode + ")");
+            AlertsJS.fetchAlerts(service);
+        } else {
+            console.log("[WeatherService] Provider set", r.weatherAlerts.length, "native alert(s) → skipping AlertsJS");
+        }
+    }
 
     function _formatUpdateText(p) {
         var t = Qt.formatTime(new Date(), Qt.locale().timeFormat(Locale.ShortFormat));
@@ -150,6 +238,24 @@ QtObject {
         } else if (p === "metno") {
             name = "MET Norway";
             url = "https://www.met.no";
+        } else if (p === "pirateWeather") {
+            name = "Pirate Weather";
+            url = "https://pirateweather.net";
+        } else if (p === "visualCrossing") {
+            name = "Visual Crossing";
+            url = "https://www.visualcrossing.com";
+        } else if (p === "tomorrowIo") {
+            name = "Tomorrow.io";
+            url = "https://www.tomorrow.io";
+        } else if (p === "stormGlass") {
+            name = "StormGlass";
+            url = "https://stormglass.io";
+        } else if (p === "weatherbit") {
+            name = "Weatherbit";
+            url = "https://www.weatherbit.io";
+        } else if (p === "qWeather") {
+            name = "QWeather";
+            url = "https://www.qweather.com";
         } else {
             name = "Open-Meteo";
             url = "https://open-meteo.com";
@@ -164,20 +270,62 @@ QtObject {
             return "WeatherAPI.com";
         if (p === "metno")
             return "met.no";
+        if (p === "pirateWeather")
+            return "Pirate Weather";
+        if (p === "visualCrossing")
+            return "Visual Crossing";
+        if (p === "tomorrowIo")
+            return "Tomorrow.io";
+        if (p === "stormGlass")
+            return "StormGlass";
+        if (p === "weatherbit")
+            return "Weatherbit";
+        if (p === "qWeather")
+            return "QWeather";
         return "Open-Meteo";
     }
 
     function _tryProvider(chain, idx) {
+        // If a newer refresh has started, stop advancing this chain
+        if (idx > 0 && _refreshGen !== chain._gen) return;
+
         if (idx >= chain.length) {
             weatherRoot.loading = false;
+            _safetyTimer.stop();
             var names = chain.map(function (p) {
                 return _providerLabel(p);
             });
             weatherRoot.updateText = i18n("Failed: %1", names.join(", "));
             _failed = [];
+            // Still fetch alerts even if all weather providers failed
+            _fetchAlertsIfNeeded();
             return;
         }
         var p = chain[idx];
+        if (p === "pirateWeather") {
+            PirateWeatherJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
+        if (p === "visualCrossing") {
+            VisualCrossingJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
+        if (p === "tomorrowIo") {
+            TomorrowIoJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
+        if (p === "stormGlass") {
+            StormGlassJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
+        if (p === "weatherbit") {
+            WeatherbitJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
+        if (p === "qWeather") {
+            QWeatherJS.fetchCurrent(service, W, chain, idx);
+            return;
+        }
         if (p === "openWeather") {
             OpenWeatherJS.fetchCurrent(service, W, chain, idx);
             return;
@@ -193,6 +341,71 @@ QtObject {
         OpenMeteoJS.fetchCurrent(service, chain, idx); // default
     }
 
+    // ─── Shared Open-Meteo air-quality + pollen fallback ────────────────────
+
+    /**
+     * Fetches AQI, pollutant concentrations, and pollen from the Open-Meteo
+     * air-quality API and writes them into weatherRoot.
+     * Called by providers that don't supply this data natively.
+     */
+    function _fetchAirQualityOpenMeteo() {
+        var gen = _refreshGen;
+        var r = weatherRoot;
+        var tz = (Plasmoid.configuration.timezone || "").trim();
+        var url = "https://air-quality-api.open-meteo.com/v1/air-quality"
+            + "?latitude=" + Plasmoid.configuration.latitude
+            + "&longitude=" + Plasmoid.configuration.longitude
+            + "&current=european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone"
+            + ",alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen"
+            + "&timezone=" + encodeURIComponent(tz.length > 0 ? tz : "auto");
+        var req = new XMLHttpRequest();
+        req.open("GET", url);
+        req.onreadystatechange = function () {
+            if (req.readyState !== XMLHttpRequest.DONE) return;
+            if (_refreshGen !== gen) return;
+            if (req.status !== 200) return;
+            try {
+                var d = JSON.parse(req.responseText);
+                var c = d.current || {};
+                var aqi = c.european_aqi;
+                var label = "";
+                if (aqi !== undefined) {
+                    if      (aqi <= 20)  label = "Good";
+                    else if (aqi <= 40)  label = "Fair";
+                    else if (aqi <= 60)  label = "Moderate";
+                    else if (aqi <= 80)  label = "Poor";
+                    else if (aqi <= 100) label = "Very Poor";
+                    else                 label = "Hazardous";
+                }
+                r.aqiDataStaged = {
+                    index: (aqi !== undefined) ? aqi : NaN,
+                    label: label,
+                    pm10:  (c.pm10            !== undefined) ? c.pm10            : NaN,
+                    pm2_5: (c.pm2_5           !== undefined) ? c.pm2_5           : NaN,
+                    no2:   (c.nitrogen_dioxide !== undefined) ? c.nitrogen_dioxide : NaN,
+                    so2:   (c.sulphur_dioxide  !== undefined) ? c.sulphur_dioxide  : NaN,
+                    o3:    (c.ozone            !== undefined) ? c.ozone            : NaN,
+                    co:    (c.carbon_monoxide  !== undefined) ? c.carbon_monoxide / 1000.0 : NaN
+                };
+                var pollenKeys = [
+                    { key: "alder",   field: "alder_pollen"   },
+                    { key: "birch",   field: "birch_pollen"   },
+                    { key: "grass",   field: "grass_pollen"   },
+                    { key: "mugwort", field: "mugwort_pollen" },
+                    { key: "olive",   field: "olive_pollen"   },
+                    { key: "ragweed", field: "ragweed_pollen" }
+                ];
+                var pd = [];
+                pollenKeys.forEach(function (p) {
+                    var v = c[p.field];
+                    pd.push({ key: p.key, value: (v !== undefined && v !== null) ? v : NaN });
+                });
+                r.pollenDataStaged = pd;
+            } catch (e) {}
+        };
+        req.send();
+    }
+
     // ─── Sunrise/sunset fallback for providers that don't supply it ─────────
 
     /**
@@ -201,6 +414,7 @@ QtObject {
      * and isNightTime() work correctly even without a primary API for these.
      */
     function _fetchSunTimesOpenMeteo() {
+        var gen = _refreshGen;
         var r = weatherRoot;
         var tz = (Plasmoid.configuration.timezone || "").trim();
         var today = Qt.formatDate(new Date(), "yyyy-MM-dd");
@@ -210,14 +424,21 @@ QtObject {
         req.onreadystatechange = function () {
             if (req.readyState !== XMLHttpRequest.DONE)
                 return;
+            if (_refreshGen !== gen) return;
             if (req.status !== 200)
                 return;  // leave "--" in place — better than crashing
             try {
                 var d = JSON.parse(req.responseText);
-                if (d.daily && d.daily.sunrise && d.daily.sunrise.length > 0)
-                    r.sunriseTimeText = Qt.formatTime(new Date(d.daily.sunrise[0]), "HH:mm");
-                if (d.daily && d.daily.sunset && d.daily.sunset.length > 0)
-                    r.sunsetTimeText = Qt.formatTime(new Date(d.daily.sunset[0]), "HH:mm");
+                if (r.weatherData && (
+                    (d.daily && d.daily.sunrise && d.daily.sunrise.length > 0) ||
+                    (d.daily && d.daily.sunset  && d.daily.sunset.length  > 0))) {
+                    var patched = Object.assign({}, r.weatherData);
+                    if (d.daily.sunrise && d.daily.sunrise.length > 0)
+                        patched.sunriseTimeText = Qt.formatTime(new Date(d.daily.sunrise[0]), "HH:mm");
+                    if (d.daily.sunset && d.daily.sunset.length > 0)
+                        patched.sunsetTimeText = Qt.formatTime(new Date(d.daily.sunset[0]), "HH:mm");
+                    r.weatherDataStaged = patched;
+                }
             } catch (e) {}
         };
         req.send();

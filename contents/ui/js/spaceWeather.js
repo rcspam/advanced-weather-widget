@@ -157,6 +157,47 @@ function xrayClassTextColor(cls) {
     }
 }
 
+// ─── Text level descriptions (for UI labels) ──────────────────────────────────
+
+/**
+ * Returns a text level description for Kp index.
+ * Levels: Quiet, Unsettled, Active, Minor Storm, Major Storm, Severe Storm
+ */
+function kpTextLevel(kp) {
+    if (isNaN(kp)) return I18N_NOOP("--");
+    if (kp >= 9)  return I18N_NOOP("Extreme");
+    if (kp >= 7)  return I18N_NOOP("Strong");
+    if (kp >= 5)  return I18N_NOOP("Storm");
+    if (kp >= 4)  return I18N_NOOP("Active");
+    if (kp >= 2)  return I18N_NOOP("Unsettled");
+    return I18N_NOOP("Quiet");
+}
+
+/**
+ * Returns a text level description for solar wind speed.
+ * Levels: Low, Moderate, High, Extreme
+ */
+function solarWindTextLevel(speed) {
+    if (isNaN(speed)) return I18N_NOOP("--");
+    if (speed >= 800) return I18N_NOOP("Extreme");
+    if (speed >= 600) return I18N_NOOP("High");
+    if (speed >= 400) return I18N_NOOP("Moderate");
+    return I18N_NOOP("Low");
+}
+
+/**
+ * Returns a text level description for aurora visibility percent.
+ * Levels: None, Low, Moderate, High, Excellent
+ */
+function auroraTextLevel(percent) {
+    if (isNaN(percent)) return I18N_NOOP("--");
+    if (percent >= 80) return I18N_NOOP("Excellent");
+    if (percent >= 60) return I18N_NOOP("High");
+    if (percent >= 30) return I18N_NOOP("Moderate");
+    if (percent >= 10) return I18N_NOOP("Low");
+    return I18N_NOOP("None");
+}
+
 // ─── Activity flags ───────────────────────────────────────────────────────────
 
 /**

@@ -68,6 +68,7 @@ function _apiTimeTo24h(s) {
 }
 
 function fetchCurrent(service, W, chain, idx) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var key = service._waKey();
     if (!key) {
@@ -79,13 +80,14 @@ function fetchCurrent(service, W, chain, idx) {
         + encodeURIComponent(key)
         + "&q=" + encodeURIComponent(
             service.latitude + "," + service.longitude)
-        + "&days=" + days + "&aqi=yes&alerts=no";
+        + "&days=" + days + "&aqi=yes&alerts=yes";
 
     var req = new XMLHttpRequest();
     req.open("GET", url);
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             service._tryProvider(chain, idx + 1);
             return;
@@ -95,45 +97,19 @@ function fetchCurrent(service, W, chain, idx) {
             service._tryProvider(chain, idx + 1);
             return;
         }
-        r.temperatureC = d.current.temp_c;
-        r.apparentC = d.current.feelslike_c;
-        r.humidityPercent = d.current.humidity;
-        r.pressureHpa = d.current.pressure_mb;
-        r.windKmh = d.current.wind_kph;
-        r.windDirection = (d.current.wind_degree !== undefined) ? d.current.wind_degree : NaN;
-        r.dewPointC = (d.current.dewpoint_c !== undefined && d.current.dewpoint_c !== null)
-            ? d.current.dewpoint_c
-            : _calcDewPoint(d.current.temp_c, d.current.humidity);
-        r.visibilityKm = d.current.vis_km;
-        r.precipMmh = (d.current.precip_mm !== undefined) ? d.current.precip_mm : NaN;
-        r.uvIndex = (d.current.uv !== undefined) ? d.current.uv : NaN;
-        r.snowDepthCm = NaN;  // not available as current cover
-        // Air quality
-        if (d.current.air_quality) {
-            var aq = d.current.air_quality;
-            var epa = aq["us-epa-index"];
-            r.airQualityIndex = (epa !== undefined) ? epa : NaN;
-            r.airQualityLabel = _waAqiLabel(epa);
+        var aq = d.current.air_quality;
+        var epa = aq ? aq["us-epa-index"] : undefined;
+        if (aq) {
+            r.aqiDataStaged = { index: (epa !== undefined) ? epa : NaN, label: _waAqiLabel(epa) };
         } else {
-            r.airQualityIndex = NaN;
-            r.airQualityLabel = "";
+            r.aqiData = null;
         }
-        r.pollenData = []; // not available in WeatherAPI free tier
-        r.weatherCode = d.current.condition
-            ? W.weatherApiCodeToWmo(d.current.condition.code) : 2;
-        r.isDay = (d.current.is_day !== undefined) ? d.current.is_day : -1;
-        if (d.forecast && d.forecast.forecastday && d.forecast.forecastday.length > 0) {
-            var astro = d.forecast.forecastday[0].astro;
-            r.sunriseTimeText = astro ? _apiTimeTo24h(astro.sunrise) : "--";
-            r.sunsetTimeText = astro ? _apiTimeTo24h(astro.sunset) : "--";
-        } else {
-            r.sunriseTimeText = "--";
-            r.sunsetTimeText = "--";
-        }
+        r.pollenData = [];
+        var astro = (d.forecast && d.forecast.forecastday && d.forecast.forecastday.length > 0)
+            ? d.forecast.forecastday[0].astro : null;
         var nd = [];
         if (d.forecast && d.forecast.forecastday) {
-            var maxD = Math.min(service.forecastDays,
-                d.forecast.forecastday.length);
+            var maxD = Math.min(service.forecastDays, d.forecast.forecastday.length);
             for (var i = 0; i < maxD; ++i) {
                 var f = d.forecast.forecastday[i];
                 nd.push({
@@ -147,14 +123,87 @@ function fetchCurrent(service, W, chain, idx) {
                 });
             }
         }
-        r.dailyData = nd;
+        r.weatherDataStaged = {
+            temperatureC:    d.current.temp_c,
+            apparentC:       d.current.feelslike_c,
+            humidityPercent: d.current.humidity,
+            pressureHpa:     d.current.pressure_mb,
+            windKmh:         d.current.wind_kph,
+            windDirection:   (d.current.wind_degree !== undefined) ? d.current.wind_degree : NaN,
+            dewPointC:       (d.current.dewpoint_c !== undefined && d.current.dewpoint_c !== null)
+                                ? d.current.dewpoint_c
+                                : _calcDewPoint(d.current.temp_c, d.current.humidity),
+            visibilityKm:    d.current.vis_km,
+            precipMmh:       (d.current.precip_mm !== undefined) ? d.current.precip_mm : NaN,
+            uvIndex:         (d.current.uv !== undefined) ? d.current.uv : NaN,
+            snowDepthCm:     NaN,
+            weatherCode:     d.current.condition ? W.weatherApiCodeToWmo(d.current.condition.code) : 2,
+            isDay:           (d.current.is_day !== undefined) ? d.current.is_day : -1,
+            locationUtcOffsetMins: 0,
+            sunriseTimeText: astro ? _apiTimeTo24h(astro.sunrise) : "--",
+            sunsetTimeText:  astro ? _apiTimeTo24h(astro.sunset)  : "--",
+            dailyData:       nd
+        };
         r.loading = false;
         r.updateText = service._formatUpdateText("weatherApi");
+
+        // Parse native alerts if available
+        if (d.alerts && d.alerts.alert && d.alerts.alert.length > 0) {
+            _parseAlerts(r, d.alerts.alert);
+        }
+
+        // Fall back to MeteoAlarm / NWS if no native alerts
+        service._fetchAlertsIfNeeded();
     };
     req.send();
 }
 
+function _parseAlerts(r, alerts) {
+    var parsed = [];
+    var now = new Date();
+    for (var i = 0; i < alerts.length; i++) {
+        var a = alerts[i];
+        // Skip expired
+        if (a.expires) {
+            var exp = new Date(a.expires);
+            if (exp < now) continue;
+        }
+
+        // Map severity to MeteoAlarm-compatible color
+        var color = "";
+        var severity = (a.severity || "").toLowerCase();
+        if (severity === "extreme") color = "red";
+        else if (severity === "severe") color = "red";
+        else if (severity === "moderate") color = "orange";
+        else if (severity === "minor") color = "yellow";
+
+        parsed.push({
+            headline: a.headline || a.event || "",
+            displayName: a.event || a.headline || "",
+            severity: a.severity || "",
+            description: a.desc || "",
+            event: a.event || "",
+            area: a.areas || "",
+            color: color,
+            awarenessType: 0,
+            onset: a.effective || "",
+            effective: a.effective || "",
+            expires: a.expires || "",
+            instruction: a.instruction || "",
+            web: "",
+            source: "WeatherAPI",
+            action: a.msgtype || "",
+            senderName: a.note || ""
+        });
+    }
+
+    if (parsed.length > 0) {
+        r.weatherAlerts = parsed;
+    }
+}
+
 function fetchHourly(service, W, dateStr) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var key = service._waKey();
     if (!key) {
@@ -171,6 +220,7 @@ function fetchHourly(service, W, dateStr) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             r.hourlyData = [];
             return;

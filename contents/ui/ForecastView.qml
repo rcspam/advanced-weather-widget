@@ -26,6 +26,7 @@ import org.kde.plasma.plasmoid
 
 import "js/weather.js" as W
 import "js/iconResolver.js" as IconResolver
+import "js/configUtils.js" as ConfigUtils
 import "components"
 
 Item {
@@ -54,57 +55,14 @@ Item {
     readonly property string iconTheme: widgetIconTheme
     readonly property bool showSunEvents: Plasmoid.configuration.forecastShowSunEvents !== false
 
-    /** Resolve a condition icon, handling the "custom" theme with per-condition overrides */
+    /** Resolve a condition icon, handling the "custom" theme with per-condition overrides.
+     *  Delegates to ConfigUtils.resolveCustomConditionIcon() — single source of truth. */
     function resolveConditionIcon(code, isNight, iconSize) {
-        if (forecastRoot.widgetIconTheme === "custom") {
-            var raw = Plasmoid.configuration.widgetConditionCustomIcons || "";
-            var m = {};
-            if (raw.length > 0) {
-                raw.split(";").forEach(function (pair) {
-                    var kv = pair.split("=");
-                    if (kv.length === 2 && kv[0].trim().length > 0)
-                        m[kv[0].trim()] = kv[1].trim();
-                });
-            }
-            if (m["condition-custom"] === "1") {
-                var condKey;
-                if (code === 0)
-                    condKey = isNight ? "condition-clear-night" : "condition-clear";
-                else if (code === 1)
-                    condKey = isNight ? "condition-few-clouds-night" : "condition-few-clouds";
-                else if (code === 2)
-                    condKey = isNight ? "condition-cloudy-night" : "condition-cloudy-day";
-                else if (code === 3)
-                    condKey = "condition-overcast";
-                else if (code === 45 || code === 48)
-                    condKey = "condition-fog";
-                else if (code === 51 || code === 53 || code === 55 || code === 61 || code === 80)
-                    condKey = isNight ? "condition-showers-scattered-night" : "condition-showers-scattered-day";
-                else if (code === 63 || code === 65 || code === 81 || code === 82)
-                    condKey = isNight ? "condition-showers-night" : "condition-showers-day";
-                else if (code === 56 || code === 66)
-                    condKey = isNight ? "condition-freezing-scattered-rain-night" : "condition-freezing-scattered-rain-day";
-                else if (code === 57 || code === 67)
-                    condKey = isNight ? "condition-freezing-rain-night" : "condition-freezing-rain-day";
-                else if (code === 71 || code === 77 || code === 85)
-                    condKey = isNight ? "condition-snow-scattered-night" : "condition-snow-scattered-day";
-                else if (code === 73 || code === 75 || code === 86)
-                    condKey = isNight ? "condition-snow-night" : "condition-snow-day";
-                else if (code === 95)
-                    condKey = isNight ? "condition-storm-night" : "condition-storm-day";
-                else if (code === 96)
-                    condKey = isNight ? "condition-hail-storm-rain-night" : "condition-hail-storm-rain-day";
-                else if (code === 99)
-                    condKey = isNight ? "condition-hail-storm-snow-night" : "condition-hail-storm-snow-day";
-                else
-                    condKey = isNight ? "condition-clear-night" : "condition-clear";
-                var fallback = W.weatherCodeToIcon(code, isNight);
-                var saved = (condKey in m && m[condKey].length > 0) ? m[condKey] : fallback;
-                return { type: "kde", source: saved, svgFallback: "", isMask: false };
-            }
-            return IconResolver.resolveCondition(code, isNight, iconSize, forecastRoot.iconsBaseDir, "kde");
-        }
-        return IconResolver.resolveCondition(code, isNight, iconSize, forecastRoot.iconsBaseDir, forecastRoot.widgetIconTheme);
+        return ConfigUtils.resolveCustomConditionIcon(
+            code, isNight, iconSize, forecastRoot.iconsBaseDir,
+            forecastRoot.widgetIconTheme,
+            Plasmoid.configuration.widgetConditionCustomIcons || "",
+            W.weatherCodeToIcon, IconResolver.resolveCondition);
     }
 
     // ── empty state ───────────────────────────────────────────────────────
@@ -290,6 +248,7 @@ Item {
                         }
 
                         ScrollView {
+                            id: hourlyScrollView
                             anchors.fill: parent
                             anchors.margins: 8
                             visible: weatherRoot && weatherRoot.hourlyData.length > 0
@@ -297,7 +256,85 @@ Item {
                             ScrollBar.vertical.policy: ScrollBar.AlwaysOff
                             ScrollBar.horizontal.policy: ScrollBar.AsNeeded
 
+                            // Auto-scroll to current hour for "Today" (index === 0)
+                            Timer {
+                                id: scrollTimer
+                                interval: 150
+                                onTriggered: {
+                                    if (index !== 0 || !weatherRoot.hourlyData.length) return;
+                                    var now = new Date();
+                                    var currentTotalMins = now.getHours() * 60 + now.getMinutes();
+                                    // Find the closest hour in the data
+                                    var closestIdx = 0;
+                                    var minDiff = 86400;
+                                    for (var i = 0; i < weatherRoot.hourlyData.length; i++) {
+                                        var h = weatherRoot.hourlyData[i].hour;
+                                        if (!h) continue;
+                                        var parts = h.split(":");
+                                        if (parts.length < 2) continue;
+                                        var hm = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+                                        var diff = Math.abs(hm - currentTotalMins);
+                                        if (diff < minDiff) {
+                                            minDiff = diff;
+                                            closestIdx = i;
+                                        }
+                                    }
+                                    // Account for sunrise/sunset cards inserted before this index
+                                    if (forecastRoot.showSunEvents && weatherRoot.sunriseTimeText && weatherRoot.sunsetTimeText) {
+                                        function toMins(t) {
+                                            if (!t || t === "--") return -1;
+                                            var p = t.split(":"); return p.length < 2 ? -1 : parseInt(p[0],10)*60+parseInt(p[1],10);
+                                        }
+                                        var rise = toMins(weatherRoot.sunriseTimeText);
+                                        var set_ = toMins(weatherRoot.sunsetTimeText);
+                                        var targetMins = closestIdx < weatherRoot.hourlyData.length ? toMins(weatherRoot.hourlyData[closestIdx].hour) : -1;
+                                        if (rise >= 0 && targetMins >= 0 && rise < targetMins) closestIdx++;
+                                        if (set_ >= 0 && targetMins >= 0 && set_ < targetMins) closestIdx++;
+                                    }
+                                    // Calculate scroll position using actual card widths
+                                    var hourlyWidth = 100;
+                                    var sunWidth = 70;
+                                    var spacing = 6;
+                                    var scrollPos = 0;
+                                    // Count cards before closestIdx (accounting for sun cards)
+                                    if (forecastRoot.showSunEvents && weatherRoot.sunriseTimeText && weatherRoot.sunsetTimeText) {
+                                        function toMins2(t) {
+                                            if (!t || t === "--") return -1;
+                                            var p = t.split(":"); return p.length < 2 ? -1 : parseInt(p[0],10)*60+parseInt(p[1],10);
+                                        }
+                                        var rise2 = toMins2(weatherRoot.sunriseTimeText);
+                                        var set2 = toMins2(weatherRoot.sunsetTimeText);
+                                        for (var j = 0; j < closestIdx; j++) {
+                                            var hm2 = toMins2(weatherRoot.hourlyData[j].hour);
+                                            // Check if a sun card appears before this hour
+                                            if (rise2 >= 0 && hm2 > rise2) { scrollPos += sunWidth + spacing; rise2 = -1; }
+                                            if (set2 >= 0 && hm2 > set2) { scrollPos += sunWidth + spacing; set2 = -1; }
+                                            scrollPos += hourlyWidth + spacing;
+                                        }
+                                    } else {
+                                        scrollPos = closestIdx * (hourlyWidth + spacing);
+                                    }
+                                    var bar = hourlyScrollView.ScrollBar.horizontal;
+                                    if (!bar) return;
+                                    var contentW = hourlyRow.implicitWidth || hourlyRow.width || (weatherRoot.hourlyData.length * (hourlyWidth + spacing));
+                                    var viewW = hourlyScrollView.width;
+                                    if (contentW > viewW) {
+                                        var maxPos = Math.max(0, contentW - viewW);
+                                        var targetPos = Math.min(scrollPos, maxPos);
+                                        bar.position = targetPos / contentW;
+                                    }
+                                }
+                            }
+                            Connections {
+                                target: weatherRoot
+                                function onHourlyDataChanged() {
+                                    if (index !== 0 || !weatherRoot.hourlyData.length) return;
+                                    scrollTimer.start();
+                                }
+                            }
+
                             Row {
+                                id: hourlyRow
                                 spacing: 6
                                 height: parent.height
 
@@ -507,6 +544,21 @@ Item {
                                 } // Repeater
                             } // ScrollView content Row
                         } // ScrollView
+
+                        // Overlay: translate vertical mouse-wheel → horizontal scroll
+                        MouseArea {
+                            anchors.fill: hourlyScrollView
+                            visible: hourlyScrollView.visible
+                            acceptedButtons: Qt.NoButton
+                            onWheel: function(wheel) {
+                                var bar = hourlyScrollView.ScrollBar.horizontal
+                                if (!bar) return
+                                var delta = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x
+                                var step = 0.15 * (delta > 0 ? -1 : 1)
+                                bar.position = Math.max(0, Math.min(1.0 - bar.size, bar.position + step))
+                                wheel.accepted = true
+                            }
+                        }
                     }
 
                     Rectangle {

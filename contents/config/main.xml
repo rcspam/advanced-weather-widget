@@ -68,10 +68,22 @@
     <entry name="altitude"           type="Int"><default>0</default></entry>
     <entry name="timezone"           type="String"><default></default></entry>
     <entry name="countryCode"        type="String"><default></default></entry>
+    <!-- Single-write active location: JSON {name,lat,lon,altitude,timezone,countryCode}.
+         Written atomically by applyLocation() to avoid 6 separate config-change signals. -->
+    <entry name="activeLocation"     type="String"><default>{}</default></entry>
     <entry name="weatherProvider"    type="String"><default>adaptive</default></entry>
+    <!-- Saved locations: JSON array of {name, lat, lon, altitude, timezone, countryCode} -->
+    <entry name="savedLocations"     type="String"><default>[]</default></entry>
     <!-- User API keys: empty = use widget's bundled key -->
     <entry name="owApiKey"           type="String"><default></default></entry>
     <entry name="waApiKey"           type="String"><default></default></entry>
+    <entry name="pwApiKey"           type="String"><default></default></entry>
+    <entry name="vcApiKey"           type="String"><default></default></entry>
+    <entry name="tioApiKey"          type="String"><default></default></entry>
+    <entry name="sgApiKey"           type="String"><default></default></entry>
+    <entry name="wbApiKey"           type="String"><default></default></entry>
+    <entry name="qwApiKey"           type="String"><default></default></entry>
+    <entry name="qwApiHost"          type="String"><default></default></entry>
 
     <!-- ── Behaviour ─────────────────────────────────────────────────── -->
     <entry name="keepOpen"           type="Bool"><default>false</default></entry>
@@ -160,6 +172,7 @@
     <entry name="widgetMinHeightMode" type="String"><default>auto</default></entry>
     <entry name="widgetMinHeight"     type="Int"><default>750</default><min>200</min><max>2000</max></entry>
     <entry name="widgetDefaultTab" type="String"><default>details</default></entry>
+    <entry name="widgetVisibleTabs" type="String"><default>both</default></entry>
 
     <!-- ── Widget — details view ──────────────────────────────────────── -->
     <entry name="widgetDetailsOrder"    type="String"><default>feelslike;humidity;pressure;wind;dewpoint;visibility;moonphase;suntimes;preciprate;precipsum;uvindex;airquality;pollen;spaceweather;alerts;snowcover</default></entry>
@@ -172,6 +185,10 @@
     <entry name="widgetCardsHeight"     type="Int"><default>44</default><min>30</min><max>120</max></entry>
     <entry name="widgetExpandedCardsHeightAuto" type="Bool"><default>false</default></entry>
     <entry name="widgetExpandedCardsHeight"     type="Int"><default>200</default><min>120</min><max>500</max></entry>
+    <!-- Expanded view items visibility (comma-separated) -->
+    <entry name="aqiExpandedItems"          type="String"><default>pm2_5,pm10,no2,o3,so2,co</default></entry>
+    <entry name="pollenExpandedItems"       type="String"><default>alder,birch,grass,mugwort,olive,ragweed</default></entry>
+    <entry name="spaceWeatherExpandedItems" type="String"><default>gscale,kp,solarwind,aurora,bz,xray</default></entry>
     <!-- Legacy details booleans (superseded by widgetDetailsOrder; kept for back-compat) -->
     <entry name="widgetShowFeelsLike"   type="Bool"><default>true</default></entry>
     <entry name="widgetShowHumidity"    type="Bool"><default>true</default></entry>

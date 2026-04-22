@@ -70,35 +70,65 @@ var _isoToSlug = {
 
 /**
  * Main entry point — called from WeatherService.refreshNow().
- * Tries MeteoAlarm first, falls back to met.no MetAlerts.
+ * Tries NWS for US, MeteoAlarm for Europe, falls back to met.no MetAlerts.
  */
 function fetchAlerts(service) {
-    var r = service.weatherRoot;  // FIX: r was undefined here, causing silent failure
+    var r = service.weatherRoot;
     var isoCode = (service.countryCode || "").toUpperCase();
+
+    // US locations: use NWS alerts API
+    if (isoCode === "US") {
+        console.log("[Alerts] countryCode=US → fetching NWS alerts");
+        _fetchNws(service);
+        return;
+    }
+
+    // If countryCode is not set, try a quick bounding-box check for the US
+    // (CONUS + Alaska + Hawaii) to avoid the Nominatim round-trip.
+    if (isoCode.length === 0 && _looksLikeUS(service.latitude, service.longitude)) {
+        console.log("[Alerts] no countryCode but coordinates look like US → fetching NWS alerts");
+        _fetchNws(service);
+        return;
+    }
+
     var slug = _isoToSlug[isoCode];
 
     if (slug) {
+        console.log("[Alerts] countryCode=" + isoCode + " → fetching MeteoAlarm (" + slug + ")");
         _fetchMeteoAlarm(service, slug, function (ok) {
             if (!ok) {
                 _fetchMetNo(service);
             }
         });
     } else if (isoCode.length > 0) {
-        // Known country code but not in MeteoAlarm — mark unsupported
-        r.weatherAlerts = [{ headline: "Alerts not available for your country",
-            displayName: "Not Supported", severity: "", description: "",
-            event: "", area: "", color: "", awarenessType: 0,
-            onset: "", effective: "", expires: "", instruction: "",
-            web: "", source: "none", action: "", senderName: "" }];
+        console.log("[Alerts] countryCode=" + isoCode + " → not supported by MeteoAlarm or NWS");
     } else {
         // Country code not set — try reverse-geocoding to determine it
+        console.log("[Alerts] no countryCode → reverse-geocoding via Nominatim");
         _resolveCountryThenFetch(service);
     }
+}
+
+/**
+ * Quick bounding-box check: does lat/lon fall inside CONUS, Alaska, or Hawaii?
+ * Used as a fast fallback when countryCode is not configured.
+ */
+function _looksLikeUS(lat, lon) {
+    lat = parseFloat(lat);  lon = parseFloat(lon);
+    if (isNaN(lat) || isNaN(lon)) return false;
+    // CONUS: lat 24–50, lon –125 to –66
+    if (lat >= 24 && lat <= 50 && lon >= -125 && lon <= -66) return true;
+    // Alaska: lat 51–72, lon –180 to –129
+    if (lat >= 51 && lat <= 72 && lon >= -180 && lon <= -129) return true;
+    // Hawaii: lat 18–23, lon –161 to –154
+    if (lat >= 18 && lat <= 23 && lon >= -161 && lon <= -154) return true;
+    return false;
 }
 
 // ── Reverse-geocode fallback for missing countryCode ──────────────────
 
 function _resolveCountryThenFetch(service) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;  // FIX: r was undefined here, causing silent failure
     var lat = service.latitude;
     var lon = service.longitude;
@@ -119,6 +149,7 @@ function _resolveCountryThenFetch(service) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         var isoCode = "";
         var adminTerms = [];
         if (req.status === 200) {
@@ -139,18 +170,19 @@ function _resolveCountryThenFetch(service) {
             } catch (e) { /* ignore */ }
         }
         var slug = _isoToSlug[isoCode];
-        if (slug) {
+        if (isoCode === "US") {
+            console.log("[Alerts] Nominatim resolved US → fetching NWS alerts");
+            _fetchNws(service);
+        } else if (slug) {
+            console.log("[Alerts] Nominatim resolved " + isoCode + " → fetching MeteoAlarm (" + slug + ")");
             _fetchMeteoAlarm(service, slug, function (ok) {
                 if (!ok)
                     _fetchMetNo(service);
             }, adminTerms);
+        } else if (isoCode.length > 0) {
+            console.log("[Alerts] Nominatim resolved " + isoCode + " → not supported");
         } else {
-            // Resolved country not in MeteoAlarm — mark unsupported
-            r.weatherAlerts = [{ headline: "Alerts not available for your country",
-                displayName: "Not Supported", severity: "", description: "",
-                event: "", area: "", color: "", awarenessType: 0,
-                onset: "", effective: "", expires: "", instruction: "",
-                web: "", source: "none", action: "", senderName: "" }];
+            console.warn("[Alerts] Nominatim reverse-geocode failed or returned no country");
         }
     };
     req.send();
@@ -159,6 +191,7 @@ function _resolveCountryThenFetch(service) {
 // ── MeteoAlarm Atom feeds ─────────────────────────────────────────────
 
 function _fetchMeteoAlarm(service, slug, callback, prefetchedTerms) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var feedUrl = "https://feeds.meteoalarm.org/api/v1/warnings/feeds-" + slug;
 
@@ -168,6 +201,8 @@ function _fetchMeteoAlarm(service, slug, callback, prefetchedTerms) {
     function _tryComplete() {
         if (state.feedData === undefined || state.localTerms === undefined)
             return;
+        // Stale generation — a newer refresh superseded us
+        if (service._refreshGen !== gen) return;
         if (state.feedData === false) {
             callback(false);
             return;
@@ -189,6 +224,7 @@ function _fetchMeteoAlarm(service, slug, callback, prefetchedTerms) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             state.feedData = false;
         } else {
@@ -208,14 +244,14 @@ function _fetchMeteoAlarm(service, slug, callback, prefetchedTerms) {
         state.localTerms = prefetchedTerms;
         _tryComplete();
     } else {
-        _getLocalAdminTerms(service.latitude, service.longitude, function (terms) {
+        _getLocalAdminTerms(service, gen, service.latitude, service.longitude, function (terms) {
             state.localTerms = terms;
             _tryComplete();
         });
     }
 }
 
-function _getLocalAdminTerms(lat, lon, callback) {
+function _getLocalAdminTerms(service, gen, lat, lon, callback) {
     if (!lat || !lon) { callback([]); return; }
     var req = new XMLHttpRequest();
     // Use accept-language=en so we always get Latin-script names.
@@ -232,6 +268,7 @@ function _getLocalAdminTerms(lat, lon, callback) {
         "AdvancedWeatherWidget/1.0 (KDE Plasma plasmoid)");
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE) return;
+        if (service._refreshGen !== gen) return;
         var terms = [];
         if (req.status === 200) {
             try {
@@ -577,6 +614,7 @@ function _haversineKm(lat1, lon1, lat2, lon2) {
 // ── MET Norway MetAlerts ──────────────────────────────────────────────
 
 function _fetchMetNo(service) {
+    var gen = service._refreshGen;
     var r = service.weatherRoot;
     var url = "https://api.met.no/weatherapi/metalerts/2.0/current.json"
         + "?lat=" + service.latitude
@@ -589,6 +627,7 @@ function _fetchMetNo(service) {
     req.onreadystatechange = function () {
         if (req.readyState !== XMLHttpRequest.DONE)
             return;
+        if (service._refreshGen !== gen) return;
         if (req.status !== 200) {
             // Both sources failed — leave alerts as-is (already [])
             return;
@@ -665,4 +704,135 @@ function _parseMetNoAlerts(data) {
     });
 
     return alerts;
+}
+
+// ── NWS (National Weather Service) — US alerts ───────────────────────
+
+/**
+ * Fetches weather alerts from the NWS API (api.weather.gov) for US locations.
+ * Uses the /alerts/active endpoint with lat/lon point query.
+ * Docs: https://www.weather.gov/documentation/services-web-api
+ */
+function _fetchNws(service) {
+    var gen = service._refreshGen;
+    var r = service.weatherRoot;
+    var lat = parseFloat(service.latitude);
+    var lon = parseFloat(service.longitude);
+    if (isNaN(lat) || isNaN(lon)) {
+        console.warn("[Alerts/NWS] invalid coordinates:", service.latitude, service.longitude);
+        return;
+    }
+
+    // Round to 4 decimal places (NWS best practice)
+    var latStr = lat.toFixed(4);
+    var lonStr = lon.toFixed(4);
+
+    // NWS alerts API — active alerts for a geographic point
+    var url = "https://api.weather.gov/alerts/active?point="
+        + latStr + "," + lonStr
+        + "&status=actual&message_type=alert,update";
+
+    console.log("[Alerts/NWS] fetching:", url);
+
+    var req = new XMLHttpRequest();
+    req.open("GET", url);
+    req.setRequestHeader("User-Agent",
+        "AdvancedWeatherWidget/1.0 (KDE Plasma plasmoid)");
+    req.setRequestHeader("Accept", "application/geo+json");
+    req.onreadystatechange = function () {
+        if (req.readyState !== XMLHttpRequest.DONE)
+            return;
+        if (service._refreshGen !== gen) return;
+        if (req.status !== 200) {
+            console.warn("[Alerts/NWS] HTTP", req.status, "for", url);
+            return;
+        }
+        try {
+            var data = JSON.parse(req.responseText);
+            var alerts = _parseNwsAlerts(data);
+            console.log("[Alerts/NWS] parsed", alerts.length, "active alerts");
+            if (alerts.length > 0) {
+                r.weatherAlerts = alerts;
+            }
+        } catch (e) {
+            console.warn("[Alerts/NWS] parse error:", e);
+        }
+    };
+    req.send();
+}
+
+function _parseNwsAlerts(data) {
+    var now = new Date();
+    var alerts = [];
+    if (!data.features || !Array.isArray(data.features))
+        return alerts;
+
+    data.features.forEach(function (f) {
+        var p = f.properties;
+        if (!p) return;
+
+        // Skip expired
+        if (p.expires) {
+            var exp = new Date(p.expires);
+            if (exp < now) return;
+        }
+
+        // Map NWS severity to a MeteoAlarm-compatible color
+        var color = "";
+        var severity = (p.severity || "").toLowerCase();
+        if (severity === "extreme")  color = "red";
+        else if (severity === "severe") color = "red";
+        else if (severity === "moderate") color = "orange";
+        else if (severity === "minor") color = "yellow";
+
+        // Map NWS certainty/urgency for awareness type
+        var awarenessType = 0;
+        var event = (p.event || "").toLowerCase();
+        if (event.indexOf("tornado") >= 0) awarenessType = 1;
+        else if (event.indexOf("wind") >= 0) awarenessType = 1;
+        else if (event.indexOf("snow") >= 0 || event.indexOf("ice") >= 0 || event.indexOf("blizzard") >= 0) awarenessType = 2;
+        else if (event.indexOf("thunder") >= 0) awarenessType = 3;
+        else if (event.indexOf("fog") >= 0) awarenessType = 4;
+        else if (event.indexOf("heat") >= 0) awarenessType = 5;
+        else if (event.indexOf("cold") >= 0 || event.indexOf("freeze") >= 0 || event.indexOf("frost") >= 0 || event.indexOf("chill") >= 0) awarenessType = 6;
+        else if (event.indexOf("coastal") >= 0 || event.indexOf("tsunami") >= 0 || event.indexOf("storm surge") >= 0) awarenessType = 7;
+        else if (event.indexOf("fire") >= 0) awarenessType = 8;
+        else if (event.indexOf("avalanche") >= 0) awarenessType = 9;
+        else if (event.indexOf("rain") >= 0) awarenessType = 10;
+        else if (event.indexOf("flood") >= 0) awarenessType = 11;
+
+        var areas = "";
+        if (p.areaDesc) areas = p.areaDesc;
+
+        alerts.push({
+            headline: p.headline || p.event || "",
+            displayName: p.event || p.headline || "",
+            severity: p.severity || "",
+            description: p.description || "",
+            event: p.event || "",
+            area: areas,
+            color: color,
+            awarenessType: awarenessType,
+            onset: p.onset || p.effective || "",
+            effective: p.effective || "",
+            expires: p.expires || "",
+            instruction: p.instruction || "",
+            web: (p.id && p.id.indexOf("http") === 0) ? p.id : "",
+            source: "NWS",
+            action: p.response || "",
+            senderName: p.senderName || "National Weather Service"
+        });
+    });
+
+    // Deduplicate by event + onset
+    var seen = {};
+    var unique = [];
+    alerts.forEach(function (a) {
+        var key = (a.displayName || a.headline) + "|" + (a.onset || a.effective || "");
+        if (!seen[key]) {
+            seen[key] = true;
+            unique.push(a);
+        }
+    });
+    return unique;
 }

@@ -92,6 +92,16 @@ ColumnLayout {
 
         // ── SUB-TAB 0: General ────────────────────────────────────────
         Kirigami.FormLayout {
+            // ═══════════════════════════════════════════════════════════════
+            // SECTION: Appearance
+            // ═══════════════════════════════════════════════════════════════
+            Kirigami.Separator {
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Appearance")
+            }
+
+            Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+
             RowLayout {
                 Kirigami.FormData.label: i18n("Weather icon theme:")
                 spacing: Kirigami.Units.largeSpacing
@@ -107,10 +117,23 @@ ColumnLayout {
             }
             Button {
                 visible: widgetTab.configRoot.cfg_conditionIconTheme === "custom"
-                text: i18n("Configure weather icons\u2026")
+                text: i18n("Configure weather icons…")
                 icon.name: "configure"
                 onClicked: widgetTab.configRoot.conditionIconDialog.openWithContext("widget")
             }
+
+            Item { Layout.preferredHeight: Kirigami.Units.largeSpacing }
+
+            // ═══════════════════════════════════════════════════════════════
+            // SECTION: Behavior
+            // ═══════════════════════════════════════════════════════════════
+            Kirigami.Separator {
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Behavior")
+            }
+
+            Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+
             RowLayout {
                 Kirigami.FormData.label: i18n("Default tab:")
                 spacing: Kirigami.Units.largeSpacing
@@ -126,6 +149,29 @@ ColumnLayout {
                     onActivated: widgetTab.configRoot.cfg_widgetDefaultTab = model[currentIndex].value
                 }
             }
+            RowLayout {
+                Kirigami.FormData.label: i18n("Visible tabs:")
+                spacing: Kirigami.Units.largeSpacing
+                ComboBox {
+                    id: visibleTabsCombo
+                    Layout.preferredWidth: 200
+                    textRole: "text"
+                    model: [
+                        { text: i18n("Both"),          value: "both"     },
+                        { text: i18n("Details only"),  value: "details"  },
+                        { text: i18n("Forecast only"), value: "forecast" },
+                        { text: i18n("None"),          value: "none"    }
+                    ]
+                    Component.onCompleted: {
+                        var v = widgetTab.configRoot.cfg_widgetVisibleTabs || "both";
+                        if (v === "details") currentIndex = 1;
+                        else if (v === "forecast") currentIndex = 2;
+                        else if (v === "none") currentIndex = 3;
+                        else currentIndex = 0;
+                    }
+                    onActivated: widgetTab.configRoot.cfg_widgetVisibleTabs = model[currentIndex].value
+                }
+            }
             CheckBox {
                 Kirigami.FormData.label: i18n("Footer:")
                 text: i18n("Show update time and provider")
@@ -133,7 +179,18 @@ ColumnLayout {
                 onToggled: widgetTab.configRoot.cfg_showUpdateText = checked
             }
 
-            // ── Minimum popup size ────────────────────────────────────
+            Item { Layout.preferredHeight: Kirigami.Units.largeSpacing }
+
+            // ═══════════════════════════════════════════════════════════════
+            // SECTION: Widget popup size
+            // ═══════════════════════════════════════════════════════════════
+            Kirigami.Separator {
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Widget Size")
+            }
+
+            Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+
             RowLayout {
                 Kirigami.FormData.label: i18n("Minimum width:")
                 spacing: Kirigami.Units.largeSpacing
@@ -154,10 +211,11 @@ ColumnLayout {
                     to: 2000
                     stepSize: 10
                     value: widgetTab.configRoot.cfg_widgetMinWidthMode === "manual"
-                        ? widgetTab.configRoot.cfg_widgetMinWidth : 750
+                        ? widgetTab.configRoot.cfg_widgetMinWidth : 540
                     onValueModified: widgetTab.configRoot.cfg_widgetMinWidth = value
                 }
                 Label {
+                    visible: widgetTab.configRoot.cfg_widgetMinWidthMode === "manual"
                     text: "px"
                     opacity: 0.65
                 }
@@ -182,7 +240,7 @@ ColumnLayout {
                     to: 2000
                     stepSize: 10
                     value: widgetTab.configRoot.cfg_widgetMinHeightMode === "manual"
-                        ? widgetTab.configRoot.cfg_widgetMinHeight : 750
+                        ? widgetTab.configRoot.cfg_widgetMinHeight : 550
                     onValueModified: widgetTab.configRoot.cfg_widgetMinHeight = value
                 }
                 Label {
@@ -195,7 +253,15 @@ ColumnLayout {
 
         // ── SUB-TAB 1: Details ────────────────────────────────────────
         Kirigami.FormLayout {
-            // Icon theme + Icon size on same row
+            // ═══════════════════════════════════════════════════════════════
+            // SECTION: Icons
+            // ═══════════════════════════════════════════════════════════════
+            Kirigami.Separator {
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Icons")
+            }
+            Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+
             RowLayout {
                 Kirigami.FormData.label: i18n("Icon theme:")
                 spacing: Kirigami.Units.largeSpacing
@@ -233,6 +299,8 @@ ColumnLayout {
                 }
             }
 
+            Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+
             // ── Warning — KDE themes lack some item icons ──
             Kirigami.InlineMessage {
                 Layout.fillWidth: true
@@ -252,7 +320,17 @@ ColumnLayout {
                 ]
             }
 
-            // Details layout
+            Item { Layout.preferredHeight: Kirigami.Units.largeSpacing }
+
+            // ═══════════════════════════════════════════════════════════════
+            // SECTION: Layout
+            // ═══════════════════════════════════════════════════════════════
+            Kirigami.Separator {
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Layout")
+            }
+            Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
+
             RowLayout {
                 Kirigami.FormData.label: i18n("Details layout:")
                 ComboBox {
@@ -335,6 +413,17 @@ ColumnLayout {
                     opacity: 0.65
                 }
             }
+
+            Item { Layout.preferredHeight: Kirigami.Units.largeSpacing }
+
+            // ═══════════════════════════════════════════════════════════════
+            // SECTION: Items
+            // ═══════════════════════════════════════════════════════════════
+            Kirigami.Separator {
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Details Items")
+            }
+            Item { Layout.preferredHeight: Kirigami.Units.smallSpacing }
 
             // Details items configurator
             Item {

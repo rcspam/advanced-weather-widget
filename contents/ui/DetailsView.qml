@@ -21,6 +21,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import Qt5Compat.GraphicalEffects
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
@@ -31,6 +32,7 @@ import "js/moonpath.js" as MoonPath
 import "js/sunpath.js" as SunPath
 import "js/suncalc.js" as SC
 import "js/iconResolver.js" as IconResolver
+import "js/configUtils.js" as ConfigUtils
 import "js/airQuality.js" as AQI
 import "js/pollen.js" as Pollen
 import "js/spaceWeather.js" as SW
@@ -174,6 +176,39 @@ Item {
         return m !== "times" && m !== "moonrise" && m !== "moonset" && m !== "upcoming-times";
     }
 
+    // ── Expanded view item visibility helpers ─────────────────────────────
+    // Empty string == user explicitly disabled all items (no fallback to defaults).
+    // undefined/null == schema not yet ready; fall back to defaults.
+    function _aqiItemVisible(key) {
+        var itemsStr = Plasmoid.configuration.aqiExpandedItems;
+        if (itemsStr === undefined || itemsStr === null)
+            return ["pm2_5","pm10","no2","o3","so2","co"].indexOf(key) >= 0;
+        return itemsStr.split(",").indexOf(key) >= 0;
+    }
+    function _pollenItemVisible(key) {
+        var itemsStr = Plasmoid.configuration.pollenExpandedItems;
+        if (itemsStr === undefined || itemsStr === null)
+            return ["alder","birch","grass","mugwort","olive","ragweed"].indexOf(key) >= 0;
+        return itemsStr.split(",").indexOf(key) >= 0;
+    }
+    function _swItemVisible(key) {
+        var itemsStr = Plasmoid.configuration.spaceWeatherExpandedItems;
+        if (itemsStr === undefined || itemsStr === null)
+            return ["gscale","kp","solarwind","aurora","bz","xray"].indexOf(key) >= 0;
+        return itemsStr.split(",").indexOf(key) >= 0;
+    }
+    function _anyAqiVisible()    { return ["pm2_5","pm10","no2","o3","so2","co"].some(_aqiItemVisible); }
+    function _anyPollenVisible() { return ["alder","birch","grass","mugwort","olive","ragweed"].some(_pollenItemVisible); }
+    function _anySwVisible()     { return ["gscale","kp","solarwind","aurora","bz","xray"].some(_swItemVisible); }
+
+    // Auto-collapse expanded cards when their sub-items are all disabled
+    Connections {
+        target: Plasmoid.configuration
+        function onAqiExpandedItemsChanged()          { if (!root._anyAqiVisible())    root._aqiExpanded    = false; }
+        function onPollenExpandedItemsChanged()       { if (!root._anyPollenVisible()) root._pollenExpanded = false; }
+        function onSpaceWeatherExpandedItemsChanged() { if (!root._anySwVisible())     root._swExpanded     = false; }
+    }
+
     // Collapse state for the two arc cards.
     property bool _sunExpanded: true
     property bool _moonExpanded: true
@@ -183,24 +218,16 @@ Item {
     property bool _swExpanded: false
     property int _currentAlertIndex: 0
 
-
     readonly property int regularCardHeight: Plasmoid.configuration.widgetCardsHeightAuto ? 30 : (Plasmoid.configuration.widgetCardsHeight || 30)
 
     // ── Resolved icons base URL ───────────────────────────────────────────
     readonly property string iconsBaseDir: Qt.resolvedUrl("../icons/")
 
     // ── Icon resolution via IconResolver ──────────────────────────────────
-    /** Returns a saved custom icon name for the given item, or "" */
+    /** Returns a saved custom icon name for the given item, or "".
+     *  Delegates to ConfigUtils.parseConfigMap() — single source of truth. */
     function getDetailsCustomIcon(itemId) {
-        var raw = Plasmoid.configuration.widgetDetailsCustomIcons || "";
-        if (raw.length === 0)
-            return "";
-        var m = {};
-        raw.split(";").forEach(function (pair) {
-            var kv = pair.split("=");
-            if (kv.length === 2 && kv[0].trim().length > 0)
-                m[kv[0].trim()] = kv[1].trim();
-        });
+        var m = ConfigUtils.parseConfigMap(Plasmoid.configuration.widgetDetailsCustomIcons || "");
         return (itemId in m) ? m[itemId] : "";
     }
     /** Resolves an icon for the given detail card ID */
@@ -319,19 +346,85 @@ Item {
     }
 
     // List of detail IDs in configured order
-    property var detailIds: (Plasmoid.configuration.widgetDetailsOrder || "feelslike;humidity;pressure;wind;suntimes;dewpoint;visibility;moonphase").split(";").map(s => s.trim()).filter(s => s.length > 0)
+    readonly property var detailIds: (Plasmoid.configuration.widgetDetailsOrder || "feelslike;humidity;pressure;wind;suntimes;dewpoint;visibility;moonphase").split(";").map(s => s.trim()).filter(s => s.length > 0)
 
-    // Per-item icon visibility map (parsed from "id=1;id=0;…" config string)
-    readonly property var iconShowMap: {
-        var map = {};
-        var raw = Plasmoid.configuration.widgetDetailsItemIcons || "";
-        raw.split(";").forEach(function (pair) {
-            var kv = pair.split("=");
-            if (kv.length === 2)
-                map[kv[0].trim()] = (kv[1].trim() === "1");
-        });
-        return map;
+    // Cached row layout — only rebuilds when detailIds or isList changes,
+    // not on every weatherRoot property update.
+    readonly property var _cachedRows: buildRows()
+
+    // Per-detail cached values computed at root level.
+    // Each card delegate uses _detailValue(id) which reads one of these root properties,
+    // so each card only subscribes to its own relevant property — not the full switch.
+    readonly property string _dvFeelslike:   weatherRoot ? weatherRoot.tempValue(weatherRoot.apparentC) : "--"
+    readonly property string _dvHumidity:    weatherRoot && !isNaN(weatherRoot.humidityPercent) ? Math.round(weatherRoot.humidityPercent) + "%" : "--"
+    readonly property string _dvPressure:    weatherRoot ? weatherRoot.pressureValue(weatherRoot.pressureHpa) : "--"
+    readonly property string _dvDewpoint:    weatherRoot ? weatherRoot.tempValue(weatherRoot.dewPointC) : "--"
+    readonly property string _dvVisibility:  weatherRoot && !isNaN(weatherRoot.visibilityKm) ? weatherRoot.visibilityKm.toFixed(1) + " km" : "--"
+    readonly property string _dvCondition:   weatherRoot ? weatherRoot.weatherCodeToText(weatherRoot.weatherCode, weatherRoot.isNightTime()) : "--"
+    readonly property string _dvPreciprate:  weatherRoot ? weatherRoot.precipValue(weatherRoot.precipMmh) : "--"
+    readonly property string _dvPrecipsum:   weatherRoot ? weatherRoot.precipSumText(weatherRoot.precipSumMm) : "--"
+    readonly property string _dvUvindex:     weatherRoot ? weatherRoot.uvIndexText(weatherRoot.uvIndex) : "--"
+    readonly property string _dvAirquality:  weatherRoot ? weatherRoot.airQualityText() : "--"
+    readonly property string _dvPollen:      weatherRoot ? weatherRoot.pollenText() : "--"
+    readonly property string _dvSpaceweather: weatherRoot ? weatherRoot.spaceWeatherText() : "--"
+    readonly property string _dvAlerts:      weatherRoot ? weatherRoot.alertsText() : "--"
+    readonly property string _dvSnowcover:   weatherRoot ? weatherRoot.snowDepthText(weatherRoot.snowDepthCm) : "--"
+
+    function _detailValue(id) {
+        switch (id) {
+        case "feelslike":    return _dvFeelslike;
+        case "humidity":     return _dvHumidity;
+        case "pressure":     return _dvPressure;
+        case "dewpoint":     return _dvDewpoint;
+        case "visibility":   return _dvVisibility;
+        case "condition":    return _dvCondition;
+        case "preciprate":   return _dvPreciprate;
+        case "precipsum":    return _dvPrecipsum;
+        case "uvindex":      return _dvUvindex;
+        case "airquality":   return _dvAirquality;
+        case "pollen":       return _dvPollen;
+        case "spaceweather": return _dvSpaceweather;
+        case "alerts":       return _dvAlerts;
+        case "snowcover":    return _dvSnowcover;
+        default:             return "--";
+        }
     }
+
+    // AQI computed once at root level — not per-delegate — to avoid
+    // re-running AQI.infoForIndex() and building pollutants array N times.
+    readonly property real aqiRootValue: weatherRoot ? (weatherRoot.aqiData, weatherRoot.airQualityIndex()) : NaN
+    readonly property var  aqiRootBand:  !isNaN(aqiRootValue) ? AQI.infoForIndex(aqiRootValue) : null
+    readonly property real aqiRootAqhi:  !isNaN(aqiRootValue) ? AQI.aqhiFromAqi(aqiRootValue) : NaN
+    readonly property var  aqiRootPollutants: {
+        if (!weatherRoot) return [];
+        var r = weatherRoot;
+        return [
+            { key: "pm2_5", value: r.aqiPm2_5(), si: AQI.subIndex("pm2_5", r.aqiPm2_5()) },
+            { key: "pm10",  value: r.aqiPm10(),  si: AQI.subIndex("pm10",  r.aqiPm10())  },
+            { key: "no2",   value: r.aqiNo2(),   si: AQI.subIndex("no2",   r.aqiNo2())   },
+            { key: "o3",    value: r.aqiO3(),    si: AQI.subIndex("o3",    r.aqiO3())    },
+            { key: "so2",   value: r.aqiSo2(),   si: AQI.subIndex("so2",   r.aqiSo2())   },
+            { key: "co",    value: r.aqiCo(),    si: AQI.subIndex("co",    r.aqiCo())    }
+        ];
+    }
+
+    // Pollen computed once at root level — not per-delegate — to avoid
+    // re-running filter() N times (once per card) on every pollenData write.
+    readonly property var pollenEntries: {
+        var pd = weatherRoot ? weatherRoot.pollenData : null;
+        if (!pd) return [];
+        return pd.filter(function(p) { return !isNaN(p.value); });
+    }
+    readonly property var pollenDominant: {
+        var best = null;
+        for (var i = 0; i < pollenEntries.length; i++) {
+            if (!best || pollenEntries[i].value > best.value) best = pollenEntries[i];
+        }
+        return best;
+    }
+
+    // Per-item icon visibility map — delegates to ConfigUtils.parseBoolMap()
+    readonly property var iconShowMap: ConfigUtils.parseBoolMap(Plasmoid.configuration.widgetDetailsItemIcons || "")
     function showIconFor(itemId) {
         return (itemId in iconShowMap) ? iconShowMap[itemId] : true;
     }
@@ -387,7 +480,7 @@ Item {
             bottomPadding: 4
 
             Repeater {
-                model: root.buildRows()
+                model: root._cachedRows
 
                 delegate: RowLayout {
                     id: rowItem
@@ -506,7 +599,7 @@ Item {
                                 // scalar value
                                 Label {
                                     visible: card.modelData !== "wind"
-                                    text: root.dataValue(card.modelData)
+                                    text: root._detailValue(card.modelData)
                                     color: root.valueColor
                                     font: weatherRoot ? weatherRoot.wf(13, true) : Qt.font({
                                         bold: true
@@ -576,23 +669,11 @@ Item {
                                 clip: true
                                 visible: card.modelData === "airquality"
 
-                                readonly property real aqiValue: weatherRoot ? weatherRoot.airQualityIndex : NaN
-                                readonly property var  aqiBand:  !isNaN(aqiValue) ? AQI.infoForIndex(aqiValue) : null
-                                readonly property real aqhiValue: !isNaN(aqiValue) ? AQI.aqhiFromAqi(aqiValue) : NaN
-
-                                // Helper: build the 6 pollutant row data objects
-                                readonly property var pollutants: {
-                                    if (!weatherRoot) return [];
-                                    var r = weatherRoot;
-                                    return [
-                                        { key: "pm2_5", value: r.aqiPm2_5, si: AQI.subIndex("pm2_5", r.aqiPm2_5) },
-                                        { key: "pm10",  value: r.aqiPm10,  si: AQI.subIndex("pm10",  r.aqiPm10)  },
-                                        { key: "no2",   value: r.aqiNo2,   si: AQI.subIndex("no2",   r.aqiNo2)   },
-                                        { key: "o3",    value: r.aqiO3,    si: AQI.subIndex("o3",    r.aqiO3)    },
-                                        { key: "so2",   value: r.aqiSo2,   si: AQI.subIndex("so2",   r.aqiSo2)   },
-                                        { key: "co",    value: r.aqiCo,    si: AQI.subIndex("co",    r.aqiCo)    }
-                                    ];
-                                }
+                                // Computed once at root level to avoid per-delegate re-evaluation
+                                readonly property real aqiValue:   root.aqiRootValue
+                                readonly property var  aqiBand:    root.aqiRootBand
+                                readonly property real aqhiValue:  root.aqiRootAqhi
+                                readonly property var  pollutants: root.aqiRootPollutants
 
                                 // ── Collapsed header row ──────────────────────────────
                                 RowLayout {
@@ -638,7 +719,7 @@ Item {
 
                                     // Expand chevron
                                     Item {
-                                        visible: !root.isList
+                                        visible: !root.isList && root._anyAqiVisible()
                                         implicitWidth: 14; implicitHeight: 14
                                         Layout.alignment: Qt.AlignVCenter
                                         Kirigami.Icon {
@@ -720,7 +801,8 @@ Item {
                                         delegate: Item {
                                             required property var modelData
                                             Layout.fillWidth: true
-                                            implicitHeight: 48
+                                            implicitHeight: root._aqiItemVisible(modelData.key) ? 48 : 0
+                                            visible: root._aqiItemVisible(modelData.key)
 
                                             readonly property var band: !isNaN(modelData.si) ? AQI.bandForSubIndex(modelData.si) : null
                                             readonly property real pct: !isNaN(modelData.si) ? AQI.scalePercent(modelData.si, 150) : 0
@@ -843,15 +925,24 @@ Item {
                                                         visible: !isNaN(modelData.si)
 
                                                         Text {
+                                                            id: thumbValueText
                                                             anchors.centerIn: parent
                                                             text: Math.round(modelData.si)
-                                                            color: "white"
+                                                            color: Kirigami.Theme.textColor
                                                             font.pixelSize: 11
                                                             font.bold: true
                                                             horizontalAlignment: Text.AlignHCenter
                                                             verticalAlignment: Text.AlignVCenter
-                                                            style: root.isDark ? Text.Outline : Text.Normal
-                                                            styleColor: Qt.rgba(0, 0, 0, 0.55)
+                                                        }
+
+                                                        DropShadow {
+                                                            anchors.fill: thumbValueText
+                                                            source: thumbValueText
+                                                            radius: 3
+                                                            samples: 16
+                                                            spread: 0.8
+                                                            color: Kirigami.Theme.backgroundColor
+                                                            cached: true
                                                         }
                                                     }
                                                 }
@@ -870,20 +961,9 @@ Item {
                                 clip: true
                                 visible: card.modelData === "pollen"
 
-                                // Filter to only pollen entries that have real values
-                                readonly property var entries: {
-                                    if (!weatherRoot || !weatherRoot.pollenData) return [];
-                                    return weatherRoot.pollenData.filter(function(p) { return !isNaN(p.value); });
-                                }
-
-                                // Dominant pollen (highest value)
-                                readonly property var dominant: {
-                                    var best = null;
-                                    for (var i = 0; i < entries.length; i++) {
-                                        if (!best || entries[i].value > best.value) best = entries[i];
-                                    }
-                                    return best;
-                                }
+                                // Computed once at root level to avoid per-delegate re-evaluation
+                                readonly property var entries:  root.pollenEntries
+                                readonly property var dominant: root.pollenDominant
 
                                 function pollenName(key) {
                                     switch (key) {
@@ -948,7 +1028,7 @@ Item {
 
                                     // Expand chevron
                                     Item {
-                                        visible: !root.isList
+                                        visible: !root.isList && root._anyPollenVisible()
                                         implicitWidth: 14; implicitHeight: 14
                                         Layout.alignment: Qt.AlignVCenter
                                         Kirigami.Icon {
@@ -1041,7 +1121,8 @@ Item {
                                                     id: pollenRow
                                                     required property var modelData
                                                     Layout.fillWidth: true
-                                                    Layout.preferredHeight: 40
+                                                    Layout.preferredHeight: root._pollenItemVisible(modelData.key) ? 40 : 0
+                                                    visible: root._pollenItemVisible(modelData.key)
                                                     spacing: 10
 
                                                     readonly property var band: Pollen.bandForValue(modelData.value)
@@ -1079,19 +1160,19 @@ Item {
                                                             Rectangle {
                                                                 anchors.fill: parent
                                                                 radius: 4
-                                                                color: Kirigami.Theme.separatorColor
+                                                                color: root.isDark ? "white" : "black"
                                                                 opacity: 0.4
                                                             }
                                                             Rectangle {
                                                                 width: parent.width * pollenRow.pct / 100
                                                                 height: parent.height
                                                                 radius: 4
-                                                                color: pollenRow.band.color
+                                                                color: pollenRow.band ? pollenRow.band.color : "transparent"
                                                                 opacity: 0.85
                                                             }
                                                         }
                                                         Label {
-                                                            text: i18n(pollenRow.band.label)
+                                                            text: pollenRow.band ? i18n(pollenRow.band.label) : ""
                                                             color: root.bandTextColor(pollenRow.band)
                                                             font: weatherRoot ? weatherRoot.wf(9, true) : Qt.font({ bold: true })
                                                             Layout.alignment: Qt.AlignHCenter
@@ -1102,7 +1183,7 @@ Item {
                                                         Layout.alignment: Qt.AlignVCenter
                                                         active: true
                                                         mainItem: Label {
-                                                            text: i18n(pollenRow.band.description)
+                                                            text: pollenRow.band ? i18n(pollenRow.band.description) : ""
                                                             wrapMode: Text.Wrap
                                                             width: 260
                                                         }
@@ -1130,11 +1211,11 @@ Item {
                                 readonly property var sw: weatherRoot ? weatherRoot.spaceWeather : null
                                 readonly property real kp: sw && !isNaN(sw.kp) ? sw.kp : NaN
                                 readonly property string gScale: sw ? (sw.gScale || "G0") : "G0"
-                                readonly property color gColor: Qt.color(root.isDark ? SW.gScaleColor(gScale) : SW.gScaleTextColor(gScale))
+                                readonly property color gColor: Qt.color((root.isDark ? SW.gScaleColor(gScale) : SW.gScaleTextColor(gScale)) || "#4CAF50")
                                 readonly property color kpColor: kp >= 5 ? gColor
                                     : (kp >= 3 ? Qt.color(root.isDark ? "#FFEB3B" : "#5D4800") : Qt.color(root.isDark ? "#4CAF50" : "#1B5E20"))
                                 // Vivid variants for progress bar fills (always use bright colors)
-                                readonly property color gColorVivid: Qt.color(SW.gScaleColor(gScale))
+                                readonly property color gColorVivid: Qt.color(SW.gScaleColor(gScale) || "#4CAF50")
                                 readonly property color kpColorVivid: kp >= 5 ? gColorVivid
                                     : (kp >= 3 ? Qt.color("#FFEB3B") : Qt.color("#4CAF50"))
 
@@ -1166,7 +1247,7 @@ Item {
                                         Layout.alignment: Qt.AlignVCenter
                                     }
                                     Item {
-                                        visible: !root.isList
+                                        visible: !root.isList && root._anySwVisible()
                                         implicitWidth: 14; implicitHeight: 14
                                         Layout.alignment: Qt.AlignVCenter
                                         Kirigami.Icon {
@@ -1182,9 +1263,13 @@ Item {
                                     }
                                 }
 
-                                // ── Expanded view ─────────────────────────────────────
+                                // ── Expanded view — lazy-loaded to avoid binding errors
+                                // before Kirigami is fully initialised.
+                                Loader {
+                                    active: card._isArcExpanded
+                                    anchors.fill: parent
+                                    sourceComponent: Component {
                                 ColumnLayout {
-                                    visible: card._isArcExpanded
                                     anchors {
                                         fill: parent
                                         leftMargin: 10; rightMargin: 10
@@ -1244,21 +1329,31 @@ Item {
                                     // Row 1: Geomagnetic Storm (G Scale)
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 40
+                                        Layout.preferredHeight: root._swItemVisible("gscale") ? 40 : 0
+                                        visible: root._swItemVisible("gscale")
                                         spacing: 10
 
                                         Rectangle {
+                                            id: gScaleBadge
                                             width: root.glyphIconSize + 6; height: root.glyphIconSize + 6
                                             radius: (root.glyphIconSize + 6) / 2
                                             color: swCard.gColorVivid
                                             Layout.alignment: Qt.AlignVCenter
                                             Label {
+                                                id: gScaleText
                                                 anchors.centerIn: parent
                                                 text: swCard.gScale
                                                 font: weatherRoot ? weatherRoot.wf(8, true) : Qt.font({ bold: true })
                                                 color: "white"
-                                                style: Text.Outline
-                                                styleColor: Qt.rgba(0, 0, 0, 0.4)
+                                            }
+                                            DropShadow {
+                                                anchors.fill: gScaleText
+                                                source: gScaleText
+                                                radius: 3
+                                                samples: 16
+                                                spread: 0.8
+                                                color: Kirigami.Theme.backgroundColor
+                                                cached: true
                                             }
                                         }
                                         ColumnLayout {
@@ -1281,13 +1376,10 @@ Item {
                                     }
 
                                     // Row 2: Kp Index
-                                    Rectangle {
-                                        Layout.fillWidth: true; height: 1
-                                        color: Kirigami.Theme.separatorColor; opacity: 0.5
-                                    }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 40
+                                        Layout.preferredHeight: root._swItemVisible("kp") ? 40 : 0
+                                        visible: root._swItemVisible("kp")
                                         spacing: 10
 
                                         Text {
@@ -1307,39 +1399,19 @@ Item {
                                                 opacity: 0.6
                                             }
                                             Label {
-                                                text: isNaN(swCard.kp) ? "--" : swCard.kp.toFixed(1)
+                                                text: (isNaN(swCard.kp) ? "--" : swCard.kp.toFixed(1)) + " (" + i18n(SW.kpTextLevel(swCard.kp)) + ")"
                                                 font: weatherRoot ? weatherRoot.wf(13, true) : Qt.font({ bold: true })
                                                 color: swCard.kpColor
                                             }
                                         }
                                         Item { Layout.fillWidth: true }
-                                        // Kp bar (0–9)
-                                        Item {
-                                            Layout.preferredWidth: 80
-                                            implicitHeight: 6
-                                            Layout.alignment: Qt.AlignVCenter
-                                            // Track
-                                            Rectangle {
-                                                anchors.fill: parent; radius: 3
-                                                color: Kirigami.Theme.separatorColor; opacity: 0.4
-                                            }
-                                            // Fill
-                                            Rectangle {
-                                                width: isNaN(swCard.kp) ? 0 : Math.min(parent.width, parent.width * swCard.kp / 9)
-                                                height: parent.height; radius: 3
-                                                color: swCard.kpColorVivid; opacity: 0.85
-                                            }
-                                        }
                                     }
 
                                     // Row 3: Solar Wind Speed
-                                    Rectangle {
-                                        Layout.fillWidth: true; height: 1
-                                        color: Kirigami.Theme.separatorColor; opacity: 0.5
-                                    }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 40
+                                        Layout.preferredHeight: root._swItemVisible("solarwind") ? 40 : 0
+                                        visible: root._swItemVisible("solarwind")
                                         spacing: 10
 
                                         readonly property real windSpeed: swCard.sw && !isNaN(swCard.sw.solarWind) ? swCard.sw.solarWind : 0
@@ -1348,11 +1420,6 @@ Item {
                                             : (windSpeed < 500 ? Qt.color(root.isDark ? "#4CAF50" : "#1B5E20")
                                             : (windSpeed < 700 ? Qt.color(root.isDark ? "#FF9800" : "#7A3500")
                                             : Qt.color(root.isDark ? "#D32F2F" : "#7F0000")))
-                                        readonly property color windColorVivid: windSpeed < 500 ? Qt.color("#4CAF50")
-                                            : (windSpeed < 700 ? Qt.color("#FF9800") : Qt.color("#D32F2F"))
-                                        readonly property string windStatus: windSpeed < 500 ? i18n("Normal")
-                                            : (windSpeed < 700 ? i18n("Increased Activity")
-                                            : i18n("Storm"))
 
                                         Text {
                                             text: "\uF050"  // wi-wind
@@ -1371,48 +1438,21 @@ Item {
                                                 opacity: 0.6
                                             }
                                             Label {
-                                                text: (swCard.sw && !isNaN(swCard.sw.solarWind))
+                                                text: ((swCard.sw && !isNaN(swCard.sw.solarWind))
                                                     ? Math.round(swCard.sw.solarWind) + " km/s"
-                                                    : "--"
+                                                    : "--") + " (" + i18n(SW.solarWindTextLevel(parent.parent.windSpeed)) + ")"
                                                 font: weatherRoot ? weatherRoot.wf(13, true) : Qt.font({ bold: true })
                                                 color: parent.parent.windColor
                                             }
                                         }
                                         Item { Layout.fillWidth: true }
-                                        // Progress bar (0–1000 km/s)
-                                        Item {
-                                            Layout.preferredWidth: 80
-                                            implicitHeight: 6
-                                            Layout.alignment: Qt.AlignVCenter
-                                            // Track
-                                            Rectangle {
-                                                anchors.fill: parent; radius: 3
-                                                color: Kirigami.Theme.separatorColor; opacity: 0.4
-                                            }
-                                            // Fill
-                                            Rectangle {
-                                                width: isNaN(parent.parent.windSpeed) ? 0 : Math.min(parent.width, parent.width * parent.parent.windSpeed / 1000)
-                                                height: parent.height; radius: 3
-                                                color: parent.parent.windColorVivid; opacity: 0.85
-                                            }
-                                        }
-                                        Label {
-                                            visible: parent.windSpeed >= 500
-                                            text: parent.windStatus
-                                            color: parent.windColor
-                                            font: weatherRoot ? weatherRoot.wf(9, true) : Qt.font({ bold: true })
-                                            Layout.alignment: Qt.AlignVCenter
-                                        }
                                     }
 
                                     // Row 3.5: Aurora Probability
-                                    Rectangle {
-                                        Layout.fillWidth: true; height: 1
-                                        color: Kirigami.Theme.separatorColor; opacity: 0.5
-                                    }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 40
+                                        Layout.preferredHeight: root._swItemVisible("aurora") ? 40 : 0
+                                        visible: root._swItemVisible("aurora")
                                         spacing: 10
 
                                         readonly property real auroraPercent: swCard.sw && !isNaN(swCard.sw.auroraPercent) ? swCard.sw.auroraPercent : 0
@@ -1420,10 +1460,6 @@ Item {
                                             : (auroraPercent < 30 ? Qt.color(root.isDark ? "#FFEB3B" : "#5D4800")
                                             : (auroraPercent < 70 ? Qt.color(root.isDark ? "#FF9800" : "#7A3500")
                                             : Qt.color(root.isDark ? "#D32F2F" : "#7F0000")))
-                                        readonly property color auroraColorVivid: auroraPercent < 10 ? Qt.color("#4CAF50")
-                                            : (auroraPercent < 30 ? Qt.color("#FFEB3B")
-                                            : (auroraPercent < 70 ? Qt.color("#FF9800")
-                                            : Qt.color("#D32F2F")))
 
                                         Text {
                                             text: "\uF0C5"  // wi-moon-alt-full (represents night/aurora)
@@ -1442,39 +1478,19 @@ Item {
                                                 opacity: 0.6
                                             }
                                             Label {
-                                                text: Math.round(parent.parent.auroraPercent) + "%"
+                                                text: Math.round(parent.parent.auroraPercent) + "% (" + i18n(SW.auroraTextLevel(parent.parent.auroraPercent)) + ")"
                                                 font: weatherRoot ? weatherRoot.wf(13, true) : Qt.font({ bold: true })
                                                 color: parent.parent.auroraColor
                                             }
                                         }
                                         Item { Layout.fillWidth: true }
-                                        // Progress bar (0–100%)
-                                        Item {
-                                            Layout.preferredWidth: 80
-                                            implicitHeight: 6
-                                            Layout.alignment: Qt.AlignVCenter
-                                            // Track
-                                            Rectangle {
-                                                anchors.fill: parent; radius: 3
-                                                color: Kirigami.Theme.separatorColor; opacity: 0.4
-                                            }
-                                            // Fill
-                                            Rectangle {
-                                                width: parent.width * parent.parent.auroraPercent / 100
-                                                height: parent.height; radius: 3
-                                                color: parent.parent.auroraColorVivid; opacity: 0.85
-                                            }
-                                        }
                                     }
 
                                     // Row 5: Bz (Magnetic Field)
-                                    Rectangle {
-                                        Layout.fillWidth: true; height: 1
-                                        color: Kirigami.Theme.separatorColor; opacity: 0.5
-                                    }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 40
+                                        Layout.preferredHeight: root._swItemVisible("bz") ? 40 : 0
+                                        visible: root._swItemVisible("bz")
                                         spacing: 10
 
                                         readonly property bool activeBz: swCard.sw && !isNaN(swCard.sw.bz) && swCard.sw.bz < 0
@@ -1497,31 +1513,24 @@ Item {
                                                 opacity: 0.6
                                             }
                                             Label {
-                                                text: (swCard.sw && !isNaN(swCard.sw.bz))
-                                                    ? (swCard.sw.bz >= 0 ? "+" : "") + swCard.sw.bz.toFixed(1) + " nT"
-                                                    : "--"
+                                                text: {
+                                                    if (!swCard.sw || isNaN(swCard.sw.bz)) return "--";
+                                                    var val = (swCard.sw.bz >= 0 ? "+" : "") + swCard.sw.bz.toFixed(1) + " nT";
+                                                    if (parent.parent.activeBz) val += " (" + i18n("Active") + ")";
+                                                    return val;
+                                                }
                                                 font: weatherRoot ? weatherRoot.wf(13, true) : Qt.font({ bold: true })
                                                 color: parent.parent.activeBz ? Qt.color(root.isDark ? "#FF9800" : "#7A3500") : root.accentViolet
                                             }
                                         }
                                         Item { Layout.fillWidth: true }
-                                        Label {
-                                            visible: parent.activeBz
-                                            text: i18n("Active")
-                                            color: Qt.color(root.isDark ? "#FF9800" : "#7A3500")
-                                            font: weatherRoot ? weatherRoot.wf(9, true) : Qt.font({ bold: true })
-                                            Layout.alignment: Qt.AlignVCenter
-                                        }
                                     }
 
                                     // Row 6: X-ray Flare Class
-                                    Rectangle {
-                                        Layout.fillWidth: true; height: 1
-                                        color: Kirigami.Theme.separatorColor; opacity: 0.5
-                                    }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 40
+                                        Layout.preferredHeight: root._swItemVisible("xray") ? 40 : 0
+                                        visible: root._swItemVisible("xray")
                                         spacing: 10
 
                                         readonly property string xCls: swCard.sw ? (swCard.sw.xrayClass || "--") : "--"
@@ -1530,17 +1539,26 @@ Item {
                                         readonly property bool flareWarning: xCls === "M" || xCls === "X"
 
                                         Rectangle {
+                                            id: xrayBadge
                                             width: root.glyphIconSize; height: root.glyphIconSize
                                             radius: 3
                                             color: parent.xColorVivid
                                             Layout.alignment: Qt.AlignVCenter
                                             Label {
+                                                id: xrayText
                                                 anchors.centerIn: parent
                                                 text: parent.parent.xCls
                                                 font: weatherRoot ? weatherRoot.wf(8, true) : Qt.font({ bold: true })
                                                 color: "white"
-                                                style: Text.Outline
-                                                styleColor: Qt.rgba(0, 0, 0, 0.4)
+                                            }
+                                            DropShadow {
+                                                anchors.fill: xrayText
+                                                source: xrayText
+                                                radius: 3
+                                                samples: 16
+                                                spread: 0.8
+                                                color: Kirigami.Theme.backgroundColor
+                                                cached: true
                                             }
                                         }
                                         ColumnLayout {
@@ -1553,27 +1571,20 @@ Item {
                                                 opacity: 0.6
                                             }
                                             Label {
-                                                text: (swCard.sw && swCard.sw.xrayClassFull && swCard.sw.xrayClassFull !== "--")
-                                                    ? swCard.sw.xrayClassFull
-                                                    : "--"
+                                                text: {
+                                                    var val = (swCard.sw && swCard.sw.xrayClassFull && swCard.sw.xrayClassFull !== "--")
+                                                        ? swCard.sw.xrayClassFull
+                                                        : "--";
+                                                    if (parent.parent.flareWarning && val !== "--") val += " (" + i18n("Flare Warning") + ")";
+                                                    return val;
+                                                }
                                                 font: weatherRoot ? weatherRoot.wf(13, true) : Qt.font({ bold: true })
                                                 color: parent.parent.xColor
                                             }
                                         }
                                         Item { Layout.fillWidth: true }
-                                        Label {
-                                            visible: parent.flareWarning
-                                            text: i18n("Flare Warning")
-                                            color: parent.xColor
-                                            font: weatherRoot ? weatherRoot.wf(9, true) : Qt.font({ bold: true })
-                                            Layout.alignment: Qt.AlignVCenter
-                                        }
                                     }
 
-                                    Rectangle {
-                                        Layout.fillWidth: true; height: 1
-                                        color: Kirigami.Theme.separatorColor; opacity: 0.5
-                                    }
                                     Label {
                                         Layout.fillWidth: true
                                         horizontalAlignment: Text.AlignRight
@@ -1588,6 +1599,8 @@ Item {
                                     }
 
                                 } // ColumnLayout expanded
+                                    } // Component
+                                } // Loader
                             } // Item (swCard)
 
                             // ── Alerts display ──────────────────────────────────────
@@ -1712,6 +1725,26 @@ Item {
                                     if (c === "red")    return root.isDark ? "#ff4444" : "#cc0000";
                                     return Kirigami.Theme.textColor;
                                 }
+                                // Map alert source string to a clickable provider link
+                                function alertProviderLink(src) {
+                                    src = (src || "").trim();
+                                    if (src === "NWS")
+                                        return "<a href='https://www.weather.gov/'>NOAA NWS</a>";
+                                    if (src === "MET Norway")
+                                        return "<a href='https://www.met.no/'>MET Norway</a>";
+                                    if (src === "MeteoAlarm")
+                                        return "<a href='https://www.meteoalarm.org/'>EUMETNET MeteoAlarm</a>";
+                                    if (src === "PirateWeather")
+                                        return "<a href='https://pirateweather.net/'>Pirate Weather</a>";
+                                    if (src === "VisualCrossing")
+                                        return "<a href='https://www.visualcrossing.com/'>Visual Crossing</a>";
+                                    if (src === "WeatherAPI")
+                                        return "<a href='https://www.weatherapi.com/'>WeatherAPI.com</a>";
+                                    // Unknown source — show as plain text
+                                    if (src.length > 0)
+                                        return src;
+                                    return "<a href='https://www.meteoalarm.org/'>EUMETNET MeteoAlarm</a>";
+                                }
                                 function formatAlertDate(iso) {
                                     if (!iso) return "";
                                     var d = new Date(iso);
@@ -1743,22 +1776,42 @@ Item {
                                     if (!str) return "";
                                     return str.length > max ? str.substring(0, max).trimRight() + "…" : str;
                                 }
+                                function _formatNwsDescription(desc) {
+                                    if (!desc) return "";
+                                    var text = desc.replace(/\r?\n/g, "<br>");
+                                    text = text.replace(/\*\s+WHAT\s*\.{3}/gi, "<br><b>WHAT:</b> ");
+                                    text = text.replace(/\*\s+WHERE\s*\.{3}/gi, "<br><b>WHERE:</b> ");
+                                    text = text.replace(/\*\s+WHEN\s*\.{3}/gi, "<br><b>WHEN:</b> ");
+                                    text = text.replace(/\*\s+IMPACTS?\s*\.{3}/gi, "<br><b>IMPACTS:</b> ");
+                                    text = text.replace(/\*\s+ADDITIONAL\s+DETAILS\s*\.{3}/gi, "<br><b>ADDITIONAL DETAILS:</b> ");
+                                    text = text.replace(/\*\s+HAZARD\s*\.{3}/gi, "<br><b>HAZARD:</b> ");
+                                    text = text.replace(/\*\s+SOURCE\s*\.{3}/gi, "<br><b>SOURCE:</b> ");
+                                    text = text.replace(/\*\s+IMPACT\s*\.{3}/gi, "<br><b>IMPACT:</b> ");
+                                    text = text.replace(/\*\s+PRECAUTIONARY\/PREPAREDNESS\s+ACTIONS\s*\.{3}/gi, "<br><b>PRECAUTIONARY ACTIONS:</b> ");
+                                    text = text.replace(/(<br>\s*){3,}/g, "<br><br>");
+                                    text = text.replace(/^(<br>)+/, "");
+                                    return text;
+                                }
                                 function alertTooltipSub(a) {
                                     var lines = [];
                                     if (a.headline)
                                         lines.push("<b>" + i18n("Headline") + ":</b> " + a.headline);
-                                    if (a.description)
-                                        lines.push("<b>" + i18n("Description") + ":</b><br>" + a.description);
+                                    if (a.description) {
+                                        if (a.source === "NWS")
+                                            lines.push("<b>" + i18n("Description") + ":</b><br>" + _formatNwsDescription(a.description));
+                                        else
+                                            lines.push("<b>" + i18n("Description") + ":</b><br>" + a.description);
+                                    }
                                     if (a.effective)
                                         lines.push("<b>" + i18n("Effective") + ":</b> " + formatAlertDateTime(a.effective));
                                     if (a.expires)
                                         lines.push("<b>" + i18n("Expires") + ":</b> " + formatAlertDateTime(a.expires));
                                     if (a.instruction)
                                         lines.push("<b>" + i18n("Instruction") + ":</b><br>" + a.instruction);
-                                    if (a.senderName)
-                                        lines.push("<b>" + i18n("Provider") + ":</b> " + a.senderName);
+                                    if (a.source || a.senderName)
+                                        lines.push("<b>" + i18n("Provider") + ":</b> " + alertProviderLink(a.source));
                                     if (a.web)
-                                        lines.push("<b>" + i18n("Website") + ":</b> " + a.web);
+                                        lines.push("<b>" + i18n("Website") + ":</b> <a href='" + a.web + "'>" + a.web + "</a>");
                                     return lines.join("<br>");
                                 }
 
@@ -2206,7 +2259,20 @@ Item {
                                         Layout.fillWidth: true
                                         horizontalAlignment: Text.AlignRight
                                         textFormat: Text.RichText
-                                        text: i18n("Provider:") + " <a href='https://www.meteoalarm.org/'>EUMETNET</a>"
+                                        text: {
+                                            var sources = [];
+                                            var seen = {};
+                                            for (var i = 0; i < alertsCard.alerts.length; i++) {
+                                                var s = (alertsCard.alerts[i].source || "").trim();
+                                                if (s.length > 0 && !seen[s]) {
+                                                    seen[s] = true;
+                                                    sources.push(alertsCard.alertProviderLink(s));
+                                                }
+                                            }
+                                            if (sources.length === 0)
+                                                sources.push(alertsCard.alertProviderLink(""));
+                                            return i18n("Provider:") + " " + sources.join(" · ");
+                                        }
                                         color: Kirigami.Theme.disabledTextColor
                                         font: weatherRoot ? weatherRoot.wf(9, false) : Qt.font({})
                                         onLinkActivated: function(link) { Qt.openUrlExternally(link); }
@@ -2434,42 +2500,21 @@ Item {
 
                                 Connections {
                                     target: root.weatherRoot
-                                    function onSunriseTimeTextChanged() {
+                                    // weatherData changes once per provider response — covers
+                                    // sunrise, sunset, and all other weather field updates.
+                                    function onWeatherDataChanged() {
                                         suntimesCard._updateProg();
                                     }
-                                    function onSunsetTimeTextChanged() {
-                                        suntimesCard._updateProg();
-                                    }
-                                    // Repaint when is_day flag changes
+                                    // Repaint when is_day flag changes (separate signal path)
                                     function onIsDayChanged() {
                                         sunCanvas.requestPaint();
                                     }
-                                    // Re-evaluate time labels on every weather refresh.
-                                    // temperatureC changes on every provider response.
-                                    function onTemperatureCChanged() {
-                                        suntimesCard._updateProg();
-                                    }
                                 }
 
-                                // ── Glow-pulse: 0→1→0 over 3 s, looping ──────────────
-                                property real glowPulse: 0
-                                SequentialAnimation on glowPulse {
-                                    running: suntimesCard.visible
-                                    loops: Animation.Infinite
-                                    NumberAnimation {
-                                        from: 0
-                                        to: 1
-                                        duration: 1500
-                                        easing.type: Easing.InOutSine
-                                    }
-                                    NumberAnimation {
-                                        from: 1
-                                        to: 0
-                                        duration: 1500
-                                        easing.type: Easing.InOutSine
-                                    }
-                                }
-                                onGlowPulseChanged: sunCanvas.requestPaint()
+                                // Glow pulse disabled: infinite animation caused 60fps
+                                // Canvas repaints (see perf) which compounded layout/render
+                                // stalls on NVIDIA EGL during location changes.
+                                readonly property real glowPulse: 0
 
                                 // ── Arc canvas ────────────────────────────────────────
                                 Canvas {
@@ -2907,25 +2952,10 @@ Item {
                                     }
                                 }
 
-                                // ── Glow pulse: 0→1→0 over 3.5 s ─────────────────────
-                                property real glowPulse: 0
-                                SequentialAnimation on glowPulse {
-                                    running: moonCard.visible
-                                    loops: Animation.Infinite
-                                    NumberAnimation {
-                                        from: 0
-                                        to: 1
-                                        duration: 1750
-                                        easing.type: Easing.InOutSine
-                                    }
-                                    NumberAnimation {
-                                        from: 1
-                                        to: 0
-                                        duration: 1750
-                                        easing.type: Easing.InOutSine
-                                    }
-                                }
-                                onGlowPulseChanged: moonCanvas.requestPaint()
+                                // Glow pulse disabled: infinite animation caused 60fps
+                                // Canvas repaints (see perf) which compounded layout/render
+                                // stalls on NVIDIA EGL during location changes.
+                                readonly property real glowPulse: 0
 
                                 // ── Arc canvas ────────────────────────────────────────
                                 Canvas {
