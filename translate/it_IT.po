@@ -8,7 +8,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/pnedyalkov91/advanced-weather-widget/"
 "issues\n"
 "POT-Creation-Date: 2026-05-06 07:19+0300\n"
-"PO-Revision-Date: 2026-05-09 12:56+0200\n"
+"PO-Revision-Date: 2026-05-09 16:54+0200\n"
 "Last-Translator: Aldo Latino <aldolat@gmail.com>\n"
 "Language-Team: Italian <kde-i18n-it@kde.org>\n"
 "Language: it_IT\n"
@@ -1049,7 +1049,7 @@ msgstr "Trova"
 
 #: contents/ui/main.qml:1018
 msgid "First Quarter"
-msgstr "Primo Quarto"
+msgstr "Primo quarto"
 
 #: contents/ui/config/subpages/ConfigDetailsSubPage.qml:893
 msgid "First day of week:"
@@ -1147,7 +1147,7 @@ msgstr "Venerdì"
 
 #: contents/ui/main.qml:1022
 msgid "Full Moon"
-msgstr "Luna Piena"
+msgstr "Luna piena"
 
 #: contents/ui/DetailsView.qml:2204
 msgid "Future alerts"
@@ -1208,7 +1208,7 @@ msgstr "Rovesci forti"
 
 #: contents/ui/main.qml:877
 msgid "Heavy snow"
-msgstr "Neve forte"
+msgstr "Nevicata forte"
 
 #: contents/ui/config/subpages/ConfigMapSubPage.qml:712
 msgid "Heavy snow showers"
@@ -1478,7 +1478,7 @@ msgstr "Indice Kp"
 
 #: contents/ui/main.qml:1026
 msgid "Last Quarter"
-msgstr "Ultimo Quarto"
+msgstr "Ultimo quarto"
 
 #: contents/ui/config/subpages/ConfigMapSubPage.qml:595
 msgid "Lat:"
@@ -1594,7 +1594,7 @@ msgstr ""
 
 #: contents/ui/config/configAppearance.qml:1325
 msgid "Location Name"
-msgstr "Nome Posizione"
+msgstr "Nome posizione"
 
 #: contents/ui/config/configLocation.qml:745
 msgid "Location auto-detected."
@@ -1831,28 +1831,28 @@ msgstr "Sorgere della luna"
 #: contents/ui/config/subpages/ConfigPanelSubPage.qml:588
 #: contents/ui/config/subpages/ConfigTooltipSubPage.qml:582
 msgid "Moonrise & moonset only"
-msgstr "Solo sorge e tramonto della luna"
+msgstr "Levata e tramonto della luna"
 
 #: contents/ui/config/configAppearance.qml:929
 msgid "Moonrise icon:"
-msgstr "Icona sorgere della luna:"
+msgstr "Icona della levata della luna:"
 
 #: contents/ui/config/configAppearance.qml:886
 #: contents/ui/config/subpages/ConfigDetailsSubPage.qml:529
 #: contents/ui/config/subpages/ConfigPanelSubPage.qml:596
 #: contents/ui/config/subpages/ConfigTooltipSubPage.qml:590
 msgid "Moonrise only"
-msgstr "Solo sorgere della luna"
+msgstr "Solo levata della luna"
 
 #: contents/ui/DetailsView.qml:3119 contents/ui/DetailsView.qml:3438
 msgid "Moonrise/Moonset"
-msgstr "Sorge/Tramonto Luna"
+msgstr "Levata e tramonto della luna"
 
 #: contents/ui/TooltipContent.qml:499 contents/ui/TooltipContent.qml:521
 #: contents/ui/TooltipContent.qml:528 contents/ui/TooltipContent.qml:552
 #: contents/ui/TooltipContent.qml:561
 msgid "Moonrise:"
-msgstr "Sorgere della luna:"
+msgstr "Levata della luna:"
 
 #: contents/ui/DetailsView.qml:3123 contents/ui/DetailsView.qml:3126
 #: contents/ui/DetailsView.qml:3442 contents/ui/DetailsView.qml:3445
@@ -1861,7 +1861,7 @@ msgstr "Tramonto della luna"
 
 #: contents/ui/config/configAppearance.qml:972
 msgid "Moonset icon:"
-msgstr "Icona tramonto della luna:"
+msgstr "Icona del tramonto della luna:"
 
 #: contents/ui/config/configAppearance.qml:890
 #: contents/ui/config/subpages/ConfigDetailsSubPage.qml:533
@@ -2057,7 +2057,7 @@ msgstr "Pannello"
 
 #: contents/ui/config/subpages/ConfigPanelSubPage.qml:96
 msgid "Panel Items"
-msgstr "Elementi del Pannello"
+msgstr "Elementi del pannello"
 
 #: contents/ui/config/tabs/ConfigPanelTab.qml:41
 msgid "Panel display settings"
@@ -2077,11 +2077,11 @@ msgstr "Elementi pannello:"
 
 #: contents/ui/DetailsView.qml:849
 msgid "Particulate Matter (PM10)"
-msgstr "Materiale Particolato (PM10)"
+msgstr "Particolato (PM10)"
 
 #: contents/ui/DetailsView.qml:848
 msgid "Particulate Matter (PM2.5)"
-msgstr "Materiale Particolato (PM2.5)"
+msgstr "Particolato (PM2.5)"
 
 #: contents/ui/config/subpages/ConfigLocationSubPage.qml:50
 #: contents/ui/config/subpages/ConfigMapSubPage.qml:674
@@ -2537,11 +2537,11 @@ msgstr "Intensità ombra:"
 #: contents/ui/config/subpages/ConfigDetailsSubPage.qml:964
 #: contents/ui/config/subpages/ConfigTooltipSubPage.qml:817
 msgid "Show / hide the prefix icon"
-msgstr "Mostra / nascondi l'icona prefisso"
+msgstr "Mostra o nascondi l'icona prefisso"
 
 #: contents/ui/config/subpages/ConfigPanelSubPage.qml:833
 msgid "Show / hide the prefix icon on the panel"
-msgstr "Mostra / nascondi l'icona prefisso sul pannello"
+msgstr "Mostra o nascondi l'icona prefisso sul pannello"
 
 #: contents/ui/config/configGeneral.qml:651
 msgid "Show Radar tab in widget"
@@ -2619,7 +2619,7 @@ msgstr "Mostra solo °"
 
 #: contents/ui/config/tabs/ConfigMiscTab.qml:68
 msgid "Showing °C / °F after values"
-msgstr "Mostra °C / °F dopo i valori"
+msgstr "Mostra °C o °F dopo i valori"
 
 #: contents/ui/config/subpages/ConfigDetailsSubPage.qml:144
 msgid "Shown"
@@ -2682,7 +2682,7 @@ msgstr "Nevicata leggera"
 
 #: contents/ui/config/tabs/ConfigPanelTab.qml:679
 msgid "Small circle  ⚬"
-msgstr "Cerchiolino  ⚬"
+msgstr "Cerchietto  ⚬"
 
 #: contents/ui/config/subpages/ConfigLocationSubPage.qml:57
 #: contents/ui/main.qml:875
@@ -3205,11 +3205,11 @@ msgstr "Aggiornamento…"
 
 #: contents/ui/config/tabs/ConfigWidgetTab.qml:358
 msgid "Use 24-hour format:"
-msgstr "Usa formato 24 ore:"
+msgstr "Usa il formato 24 ore:"
 
 #: contents/ui/config/tabs/ConfigMiscTab.qml:161
 msgid "Use KDE locale settings"
-msgstr "Usa impostazioni locali KDE"
+msgstr "Usa impostazioni locali di KDE"
 
 #: contents/ui/config/configLocation.qml:1549
 msgid "Use manual location"
@@ -3230,7 +3230,7 @@ msgstr ""
 
 #: contents/ui/js/airQuality.js:51
 msgid "V.Poor"
-msgstr "M.Scarsa"
+msgstr "M. scarsa"
 
 #: contents/ui/config/tabs/ConfigMiscTab.qml:55
 msgid "Values are rounded to whole numbers"
@@ -3247,11 +3247,11 @@ msgstr "Verticale"
 #: contents/ui/js/pollen.js:45 contents/ui/main.qml:699
 #: contents/ui/main.qml:743
 msgid "Very High"
-msgstr "Molto Alto"
+msgstr "Molto alto"
 
 #: contents/ui/js/airQuality.js:51 contents/ui/main.qml:713
 msgid "Very Poor"
-msgstr "Molto Scarsa"
+msgstr "Molto scarsa"
 
 #: contents/ui/config/subpages/ConfigMapSubPage.qml:708
 msgid "Violent rain showers"
@@ -3288,15 +3288,15 @@ msgstr "Luna Calante"
 
 #: contents/ui/main.qml:1024
 msgid "Waning Gibbous"
-msgstr "Gibbosa Calante"
+msgstr "Gibbosa calante"
 
 #: contents/ui/main.qml:1016
 msgid "Waxing Crescent"
-msgstr "Luna Crescente"
+msgstr "Luna crescente"
 
 #: contents/ui/main.qml:1020
 msgid "Waxing Gibbous"
-msgstr "Gibbosa Crescente"
+msgstr "Gibbosa crescente"
 
 #: contents/ui/config/configLocation.qml:1148
 msgid "We detected your coordinates: <b>%1°, %2°</b>."
@@ -3308,11 +3308,11 @@ msgstr "Abbiamo rilevato la tua posizione come: <b>%1</b>."
 
 #: contents/ui/config/configGeneral.qml:338
 msgid "Weather Provider"
-msgstr "Fornitore Meteo"
+msgstr "Fornitore meteo"
 
 #: contents/ui/TooltipContent.qml:227
 msgid "Weather Widget"
-msgstr "Widget Meteo"
+msgstr "Widget meteo"
 
 #: contents/ui/config/configAppearance.qml:1382
 #: contents/ui/config/configAppearance.qml:1505
@@ -3412,7 +3412,7 @@ msgstr "Sì"
 
 #: contents/ui/config/configLocation.qml:1383
 msgid "Yes, remove it"
-msgstr "Sì, rimuovila"
+msgstr "Sì, rimuovilo"
 
 #: contents/ui/config/tabs/ConfigWidgetTab.qml:305
 #: contents/ui/config/tabs/ConfigWidgetTab.qml:396
