@@ -797,6 +797,23 @@ ColumnLayout {
                     opacity: 0.7
                 }
             }
+            RowLayout {
+                Kirigami.FormData.label: i18n("Expand all days:")
+                visible: widgetTab.configRoot.cfg_widgetLayoutMode !== "simple"
+                Switch {
+                    id: forecastExpandAllSwitch
+                    checked: widgetTab.configRoot.cfg_forecastExpandAll
+                    onToggled: widgetTab.configRoot.cfg_forecastExpandAll = checked
+                }
+                Label {
+                    text: forecastExpandAllSwitch.checked
+                        ? i18n("All days show hourly forecast when opening the tab")
+                        : i18n("Only the clicked day expands")
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                    opacity: 0.7
+                }
+            }
 
             // ═══════════════════════════════════════════════════════════════
             // SECTION: Hourly Forecast Settings

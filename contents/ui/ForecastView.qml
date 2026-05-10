@@ -36,16 +36,60 @@ Item {
 
     // ── Auto-open: expand the first available day's hourly forecast ────────
     readonly property bool autoOpen: Plasmoid.configuration.forecastAutoOpen !== false
-    // Reset whenever the forecast tab becomes visible so re-opening the popup
-    // always triggers auto-open again.
     property bool _autoOpenDone: false
+
+    // ── Expand-all: show hourly for every day simultaneously ───────────────
+    readonly property bool expandAll: Plasmoid.configuration.forecastExpandAll === true
+    // Per-day hourly cache: maps dateStr → hourly array; populated sequentially
+    property var _perDayHourlyData: ({})
+    property int _expandAllFetchIdx: -1      // which repeater index is being fetched (-1 = idle)
+    property string _expandAllFetchDate: ""  // dateStr currently being fetched
+    // Set of dateStr values the user has manually collapsed in expandAll mode
+    property var _collapsedDays: ({})
+
+    function _startExpandAll() {
+        if (!weatherRoot || weatherRoot.dailyData.length === 0) return;
+        _perDayHourlyData = {};
+        _expandAllFetchIdx = 0;
+        _fetchNextDayForExpandAll();
+    }
+
+    function _fetchNextDayForExpandAll() {
+        if (!expandAll) { _expandAllFetchIdx = -1; return; }
+        if (!weatherRoot) return;
+        var total = Math.min(Plasmoid.configuration.forecastDays, weatherRoot.dailyData.length);
+        var visCount = forecastRoot.showToday ? total : Math.max(0, total - 1);
+        if (_expandAllFetchIdx >= visCount) { _expandAllFetchIdx = -1; return; }
+        var di = forecastRoot.showToday ? _expandAllFetchIdx : _expandAllFetchIdx + 1;
+        if (di >= weatherRoot.dailyData.length) { _expandAllFetchIdx = -1; return; }
+        _expandAllFetchDate = weatherRoot.dailyData[di].dateStr || "";
+        weatherRoot.hourlyData = [];
+        weatherRoot.fetchHourlyForDate(_expandAllFetchDate);
+    }
+
+    onExpandAllChanged: {
+        if (expandAll) {
+            expandedIndex = -1;           // close any single-expand panel
+            _autoOpenDone = true;         // suppress autoOpen while expandAll is active
+            _collapsedDays = {};          // reset per-day collapse state
+            if (weatherRoot && weatherRoot.dailyData.length > 0)
+                _startExpandAll();
+        } else {
+            _perDayHourlyData = {};
+            _collapsedDays = {};
+            _expandAllFetchIdx = -1;
+            _autoOpenDone = false;        // re-arm autoOpen for single-expand mode
+        }
+    }
 
     function _doAutoOpen() {
         if (!autoOpen || _autoOpenDone) return;
         if (!weatherRoot || weatherRoot.dailyData.length === 0) return;
         _autoOpenDone = true;
-        // Repeater index 0 always refers to the first visible row (today if
-        // showToday is true, tomorrow otherwise). dataIndex maps it correctly.
+        if (expandAll) {
+            _startExpandAll();
+            return;
+        }
         var firstDataIndex = forecastRoot.showToday ? 0 : 1;
         if (firstDataIndex >= weatherRoot.dailyData.length) return;
         forecastRoot.expandedIndex = 0;
@@ -53,20 +97,36 @@ Item {
         weatherRoot.fetchHourlyForDate(weatherRoot.dailyData[firstDataIndex].dateStr || "");
     }
 
-    // Re-arm auto-open whenever the widget popup is re-opened
     onVisibleChanged: {
         if (visible) {
             _autoOpenDone = false;
-            _doAutoOpen();
+            _collapsedDays = {};
+            if (expandAll) {
+                _perDayHourlyData = {};
+                _startExpandAll();
+            } else {
+                _doAutoOpen();
+            }
         }
     }
 
-    // Fire once dailyData arrives (covers the case where data loads after the
-    // tab is already visible)
     Connections {
         target: weatherRoot
         function onDailyDataChanged() {
             forecastRoot._doAutoOpen();
+        }
+        function onHourlyDataChanged() {
+            // Store per-day data during expandAll sequential fetch
+            if (forecastRoot.expandAll && forecastRoot._expandAllFetchIdx >= 0
+                    && weatherRoot.hourlyData.length > 0
+                    && forecastRoot._expandAllFetchDate) {
+                var copy = weatherRoot.hourlyData.slice();
+                var upd = Object.assign({}, forecastRoot._perDayHourlyData);
+                upd[forecastRoot._expandAllFetchDate] = copy;
+                forecastRoot._perDayHourlyData = upd;   // full reassign triggers bindings
+                forecastRoot._expandAllFetchIdx++;
+                forecastRoot._fetchNextDayForExpandAll();
+            }
         }
     }
 
@@ -132,12 +192,27 @@ Item {
                     width: parent.width
                     spacing: 0
 
+                    // Per-delegate hourly data: in expandAll mode pulls from the
+                    // per-day cache; in single-expand mode uses weatherRoot.hourlyData
+                    // (only valid for the currently expanded day).
+                    property var _dayHourlyData: {
+                        var dateStr = (weatherRoot && weatherRoot.dailyData[dataIndex])
+                            ? (weatherRoot.dailyData[dataIndex].dateStr || "") : "";
+                        if (forecastRoot.expandAll && dateStr) {
+                            if (forecastRoot._collapsedDays[dateStr]) return [];
+                            return forecastRoot._perDayHourlyData[dateStr] || [];
+                        }
+                        if (!forecastRoot.expandAll && forecastRoot.expandedIndex === index)
+                            return weatherRoot ? weatherRoot.hourlyData : [];
+                        return [];
+                    }
+
                     // ── day row ─────────────────────────────────────────
                     Rectangle {
                         id: dayRow
                         width: parent.width
                         height: Math.max(52, rowLayoutInner.implicitHeight + 12)
-                        color: (rowMouse.containsMouse || forecastRoot.expandedIndex === index) ? Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.08) : "transparent"
+                        color: (rowMouse.containsMouse || (forecastRoot.expandAll && !forecastRoot._collapsedDays[weatherRoot.dailyData[dataIndex].dateStr || ""]) || forecastRoot.expandedIndex === index) ? Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.08) : "transparent"
                         Behavior on color {
                             ColorAnimation {
                                 duration: 120
@@ -154,7 +229,7 @@ Item {
                             spacing: 0
 
                             Kirigami.Icon {
-                                source: forecastRoot.expandedIndex === index ? "arrow-down" : "arrow-right"
+                                source: ((forecastRoot.expandAll && !forecastRoot._collapsedDays[weatherRoot.dailyData[dataIndex].dateStr || ""]) || forecastRoot.expandedIndex === index) ? "arrow-down" : "arrow-right"
                                 width: 14
                                 height: 14
                                 opacity: 0.45
@@ -251,14 +326,25 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                if (forecastRoot.expandedIndex === index) {
-                                    forecastRoot.expandedIndex = -1;
+                                var dateStr = weatherRoot.dailyData[dataIndex].dateStr || "";
+                                if (forecastRoot.expandAll) {
+                                    // Toggle this specific day's collapsed state
+                                    var col = Object.assign({}, forecastRoot._collapsedDays);
+                                    if (col[dateStr]) {
+                                        delete col[dateStr];
+                                    } else {
+                                        col[dateStr] = true;
+                                    }
+                                    forecastRoot._collapsedDays = col;
                                 } else {
-                                    forecastRoot.expandedIndex = index;
-                                    if (weatherRoot) {
-                                        weatherRoot.hourlyData = [];
-                                        // Use dataIndex so "Hide today" still maps correctly
-                                        weatherRoot.fetchHourlyForDate(weatherRoot.dailyData[dataIndex].dateStr || "");
+                                    if (forecastRoot.expandedIndex === index) {
+                                        forecastRoot.expandedIndex = -1;
+                                    } else {
+                                        forecastRoot.expandedIndex = index;
+                                        if (weatherRoot) {
+                                            weatherRoot.hourlyData = [];
+                                            weatherRoot.fetchHourlyForDate(dateStr);
+                                        }
                                     }
                                 }
                             }
@@ -269,7 +355,7 @@ Item {
                     Rectangle {
                         id: hourlyPanel
                         width: parent.width
-                        height: forecastRoot.expandedIndex === index ? (forecastRoot.hourlyLayout === "strip" ? 200 : 240) : 0
+                        height: ((forecastRoot.expandAll && !forecastRoot._collapsedDays[weatherRoot.dailyData[dataIndex].dateStr || ""]) || forecastRoot.expandedIndex === index) ? (forecastRoot.hourlyLayout === "strip" ? 200 : 240) : 0
                         visible: height > 0
                         clip: true
                         color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.04)
@@ -282,7 +368,7 @@ Item {
 
                         Label {
                             anchors.centerIn: parent
-                            visible: (forecastRoot.expandedIndex === index) && (!weatherRoot || weatherRoot.hourlyData.length === 0)
+                            visible: ((forecastRoot.expandAll && !forecastRoot._collapsedDays[weatherRoot.dailyData[dataIndex].dateStr || ""]) || forecastRoot.expandedIndex === index) && _dayHourlyData.length === 0
                             text: i18n("Loading hourly data…")
                             color: Kirigami.Theme.textColor
                             font: weatherRoot ? weatherRoot.wf(11, false) : Qt.font({})
@@ -291,7 +377,7 @@ Item {
                         // Only instantiate the heavy hourly UI for the expanded day.
                         Loader {
                             anchors.fill: parent
-                            active: forecastRoot.expandedIndex === index && weatherRoot && weatherRoot.hourlyData.length > 0
+                            active: ((forecastRoot.expandAll && !forecastRoot._collapsedDays[weatherRoot.dailyData[dataIndex].dateStr || ""]) || forecastRoot.expandedIndex === index) && weatherRoot && _dayHourlyData.length > 0
                             asynchronous: true
                             sourceComponent: forecastRoot.hourlyLayout === "strip" ? stripHourlyComponent : cardsHourlyComponent
                         }
@@ -326,7 +412,7 @@ Item {
 
                                     // Build combined model same as cards (with sun events)
                                     property var _hourlyWithSun: {
-                                        if (!weatherRoot || !weatherRoot.hourlyData.length) return [];
+                                        if (!_dayHourlyData || !_dayHourlyData.length) return [];
                                         function toMins(t) {
                                             if (!t || t === "--") return -1;
                                             var p = t.split(":"); return p.length < 2 ? -1 : parseInt(p[0],10)*60+parseInt(p[1],10);
@@ -338,8 +424,8 @@ Item {
                                             nowMins = _now.getHours() * 60 + _now.getMinutes() - 60;
                                         }
                                         var source = nowMins >= 0
-                                            ? weatherRoot.hourlyData.filter(function(h) { var m = toMins(h.hour); return m < 0 || m >= nowMins; })
-                                            : weatherRoot.hourlyData;
+                                            ? _dayHourlyData.filter(function(h) { var m = toMins(h.hour); return m < 0 || m >= nowMins; })
+                                            : _dayHourlyData;
                                         if (!forecastRoot.showSunEvents)
                                             return source;
                                         var rise = toMins(weatherRoot.sunriseTimeText);
@@ -671,14 +757,13 @@ Item {
                                         id: scrollTimer
                                         interval: 150
                                         onTriggered: {
-                                            if (index !== 0 || !weatherRoot.hourlyData.length) return;
+                                            if (index !== 0 || !_dayHourlyData.length) return;
                                             var now = new Date();
                                             var currentTotalMins = now.getHours() * 60 + now.getMinutes();
-                                            // Find the closest hour in the data
                                             var closestIdx = 0;
                                             var minDiff = 86400;
-                                            for (var i = 0; i < weatherRoot.hourlyData.length; i++) {
-                                                var h = weatherRoot.hourlyData[i].hour;
+                                            for (var i = 0; i < _dayHourlyData.length; i++) {
+                                                var h = _dayHourlyData[i].hour;
                                                 if (!h) continue;
                                                 var parts = h.split(":");
                                                 if (parts.length < 2) continue;
@@ -689,7 +774,6 @@ Item {
                                                     closestIdx = i;
                                                 }
                                             }
-                                            // Account for sunrise/sunset cards inserted before this index
                                             if (forecastRoot.showSunEvents && weatherRoot.sunriseTimeText && weatherRoot.sunsetTimeText) {
                                                 function toMins(t) {
                                                     if (!t || t === "--") return -1;
@@ -697,16 +781,14 @@ Item {
                                                 }
                                                 var rise = toMins(weatherRoot.sunriseTimeText);
                                                 var set_ = toMins(weatherRoot.sunsetTimeText);
-                                                var targetMins = closestIdx < weatherRoot.hourlyData.length ? toMins(weatherRoot.hourlyData[closestIdx].hour) : -1;
+                                                var targetMins = closestIdx < _dayHourlyData.length ? toMins(_dayHourlyData[closestIdx].hour) : -1;
                                                 if (rise >= 0 && targetMins >= 0 && rise < targetMins) closestIdx++;
                                                 if (set_ >= 0 && targetMins >= 0 && set_ < targetMins) closestIdx++;
                                             }
-                                            // Calculate scroll position using actual card widths
                                             var hourlyWidth = 100;
                                             var sunWidth = 70;
                                             var spacing = 6;
                                             var scrollPos = 0;
-                                            // Count cards before closestIdx (accounting for sun cards)
                                             if (forecastRoot.showSunEvents && weatherRoot.sunriseTimeText && weatherRoot.sunsetTimeText) {
                                                 function toMins2(t) {
                                                     if (!t || t === "--") return -1;
@@ -715,8 +797,7 @@ Item {
                                                 var rise2 = toMins2(weatherRoot.sunriseTimeText);
                                                 var set2 = toMins2(weatherRoot.sunsetTimeText);
                                                 for (var j = 0; j < closestIdx; j++) {
-                                                    var hm2 = toMins2(weatherRoot.hourlyData[j].hour);
-                                                    // Check if a sun card appears before this hour
+                                                    var hm2 = toMins2(_dayHourlyData[j].hour);
                                                     if (rise2 >= 0 && hm2 > rise2) { scrollPos += sunWidth + spacing; rise2 = -1; }
                                                     if (set2 >= 0 && hm2 > set2) { scrollPos += sunWidth + spacing; set2 = -1; }
                                                     scrollPos += hourlyWidth + spacing;
@@ -726,7 +807,7 @@ Item {
                                             }
                                             var bar = hourlyScrollView.ScrollBar.horizontal;
                                             if (!bar) return;
-                                            var contentW = hourlyRow.implicitWidth || hourlyRow.width || (weatherRoot.hourlyData.length * (hourlyWidth + spacing));
+                                            var contentW = hourlyRow.implicitWidth || hourlyRow.width || (_dayHourlyData.length * (hourlyWidth + spacing));
                                             var viewW = hourlyScrollView.width;
                                             if (contentW > viewW) {
                                                 var maxPos = Math.max(0, contentW - viewW);
@@ -738,7 +819,7 @@ Item {
                                     Connections {
                                         target: weatherRoot
                                         function onHourlyDataChanged() {
-                                            if (index !== 0 || !weatherRoot.hourlyData.length) return;
+                                            if (index !== 0 || !_dayHourlyData.length) return;
                                             scrollTimer.start();
                                         }
                                     }
@@ -751,7 +832,7 @@ Item {
                                         // Build combined model: hourly entries + sunrise/sunset marker cards
                                         // inserted between the hour that precedes each event.
                                         property var _hourlyWithSun: {
-                                            if (!weatherRoot || !weatherRoot.hourlyData.length) return [];
+                                            if (!_dayHourlyData || !_dayHourlyData.length) return [];
                                             function toMins(t) {
                                                 if (!t || t === "--") return -1;
                                                 var p = t.split(":"); return p.length < 2 ? -1 : parseInt(p[0],10)*60+parseInt(p[1],10);
@@ -763,8 +844,8 @@ Item {
                                                 nowMins = _now.getHours() * 60 + _now.getMinutes() - 60;
                                             }
                                             var source = nowMins >= 0
-                                                ? weatherRoot.hourlyData.filter(function(h) { var m = toMins(h.hour); return m < 0 || m >= nowMins; })
-                                                : weatherRoot.hourlyData;
+                                                ? _dayHourlyData.filter(function(h) { var m = toMins(h.hour); return m < 0 || m >= nowMins; })
+                                                : _dayHourlyData;
                                             if (!forecastRoot.showSunEvents)
                                                 return source;
                                             var rise = toMins(weatherRoot.sunriseTimeText);
