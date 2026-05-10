@@ -34,6 +34,42 @@ Item {
     property var weatherRoot
     property int expandedIndex: -1
 
+    // ── Auto-open: expand the first available day's hourly forecast ────────
+    readonly property bool autoOpen: Plasmoid.configuration.forecastAutoOpen !== false
+    // Reset whenever the forecast tab becomes visible so re-opening the popup
+    // always triggers auto-open again.
+    property bool _autoOpenDone: false
+
+    function _doAutoOpen() {
+        if (!autoOpen || _autoOpenDone) return;
+        if (!weatherRoot || weatherRoot.dailyData.length === 0) return;
+        _autoOpenDone = true;
+        // Repeater index 0 always refers to the first visible row (today if
+        // showToday is true, tomorrow otherwise). dataIndex maps it correctly.
+        var firstDataIndex = forecastRoot.showToday ? 0 : 1;
+        if (firstDataIndex >= weatherRoot.dailyData.length) return;
+        forecastRoot.expandedIndex = 0;
+        weatherRoot.hourlyData = [];
+        weatherRoot.fetchHourlyForDate(weatherRoot.dailyData[firstDataIndex].dateStr || "");
+    }
+
+    // Re-arm auto-open whenever the widget popup is re-opened
+    onVisibleChanged: {
+        if (visible) {
+            _autoOpenDone = false;
+            _doAutoOpen();
+        }
+    }
+
+    // Fire once dailyData arrives (covers the case where data loads after the
+    // tab is already visible)
+    Connections {
+        target: weatherRoot
+        function onDailyDataChanged() {
+            forecastRoot._doAutoOpen();
+        }
+    }
+
     // Set implicit height based on content
     implicitHeight: (weatherRoot && weatherRoot.dailyData.length > 0) ? forecastColumn.height : (emptyLabel.implicitHeight + 40)
 

@@ -206,6 +206,7 @@ Thank you to everyone who contributed translations to this project ❤️
 - **Chinese (Simplified)** - [Guokangz](https://github.com/Guokangz)
 - **Czech** - [Zero-MF](https://github.com/Zero-MF)
 
+
 ---
 
 ## 🐛 Bug Reports & Feedback

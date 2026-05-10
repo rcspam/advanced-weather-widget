@@ -227,6 +227,7 @@
     <entry name="forecastShowSunEvents" type="Bool"><default>true</default></entry>
     <entry name="forecastShowToday"    type="Bool"><default>true</default></entry>
     <entry name="forecastHourlyLayout" type="String"><default>cards</default></entry>
+    <entry name="forecastAutoOpen"     type="Bool"><default>true</default></entry>
     <entry name="animateTransitions"  type="Bool"><default>true</default></entry>
 
     <!-- ── Tooltip ────────────────────────────────────────────────────── -->
