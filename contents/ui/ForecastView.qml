@@ -360,16 +360,16 @@ Item {
                             }
 
                             Item {
-                                Layout.preferredWidth: 8
+                                Layout.preferredWidth: 5
                             }
 
                             RowLayout {
                                 visible: !isNaN(weatherRoot.dailyData[dataIndex].windKmh)
                                 Layout.alignment: Qt.AlignVCenter
-                                Layout.preferredWidth: 92
-                                Layout.minimumWidth: 92
-                                Layout.maximumWidth: 92
-                                spacing: 3
+                                Layout.preferredWidth: 100
+                                Layout.minimumWidth: 100
+                                Layout.maximumWidth: 100
+                                spacing: 1
 
                                 Item {
                                     visible: !isNaN(weatherRoot.dailyData[dataIndex].windDir)
