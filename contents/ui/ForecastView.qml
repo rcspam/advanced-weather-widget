@@ -32,6 +32,7 @@ import "components"
 Item {
     id: forecastRoot
     property var weatherRoot
+    property var verticalScrollView
     property int expandedIndex: -1
 
     // ── Auto-open: expand the first available day's hourly forecast ────────
@@ -199,6 +200,47 @@ Item {
     readonly property bool showSunEvents:   Plasmoid.configuration.forecastShowSunEvents !== false
     readonly property bool showToday:       Plasmoid.configuration.forecastShowToday !== false
     readonly property string hourlyLayout:  Plasmoid.configuration.forecastHourlyLayout || "cards"
+
+    function _wheelDeltaX(wheel) {
+        return wheel.pixelDelta.x !== 0 ? wheel.pixelDelta.x : wheel.angleDelta.x;
+    }
+
+    function _wheelDeltaY(wheel) {
+        return wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y : wheel.angleDelta.y;
+    }
+
+    function _wheelWantsHorizontal(wheel) {
+        if (wheel.modifiers & Qt.ShiftModifier)
+            return true;
+        var dx = Math.abs(_wheelDeltaX(wheel));
+        var dy = Math.abs(_wheelDeltaY(wheel));
+        return dx > 0 && dx >= dy;
+    }
+
+    function _scrollParentVertically(wheel) {
+        if (!verticalScrollView)
+            return false;
+        var delta = _wheelDeltaY(wheel);
+        if (delta === 0)
+            return false;
+        var scale = wheel.pixelDelta.y !== 0 ? 1 : 0.5;
+        var amount = delta * scale;
+
+        var flick = verticalScrollView.flickableItem || verticalScrollView.contentItem || verticalScrollView;
+        if (flick && flick.contentHeight !== undefined && flick.contentY !== undefined) {
+            var maxY = Math.max(0, flick.contentHeight - flick.height);
+            flick.contentY = Math.max(0, Math.min(maxY, flick.contentY - amount));
+            return true;
+        }
+
+        var bar = verticalScrollView.ScrollBar ? verticalScrollView.ScrollBar.vertical : null;
+        if (bar) {
+            var maxPos = Math.max(0, 1.0 - bar.size);
+            bar.position = Math.max(0, Math.min(maxPos, bar.position - amount / 1200));
+            return true;
+        }
+        return false;
+    }
 
     /** Resolve a condition icon, handling the "custom" theme with per-condition overrides.
      *  Delegates to ConfigUtils.resolveCustomConditionIcon() — single source of truth. */
@@ -817,15 +859,22 @@ Item {
                                     anchors.fill: stripScrollView
                                     acceptedButtons: Qt.NoButton
                                     onWheel: function(wheel) {
-                                        if (wheel.angleDelta.x !== 0 || (wheel.modifiers & Qt.ShiftModifier)) {
-                                            var delta = wheel.angleDelta.x !== 0 ? wheel.angleDelta.x : wheel.angleDelta.y;
+                                        if (forecastRoot._wheelWantsHorizontal(wheel)) {
+                                            var delta = wheel.angleDelta.x !== 0 ? wheel.angleDelta.x : forecastRoot._wheelDeltaX(wheel);
+                                            var pixelDelta = wheel.angleDelta.x === 0 && wheel.pixelDelta.x !== 0;
+                                            if (delta === 0) {
+                                                delta = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : forecastRoot._wheelDeltaY(wheel);
+                                                pixelDelta = wheel.angleDelta.y === 0 && wheel.pixelDelta.y !== 0;
+                                            }
                                             var maxX = Math.max(0, stripScrollView.contentWidth - stripScrollView.width);
-                                            var targetX = Math.max(0, Math.min(maxX, stripScrollView.contentX - (delta / 120) * stripScrollView.colW * 2));
+                                            var targetX = pixelDelta
+                                                ? Math.max(0, Math.min(maxX, stripScrollView.contentX - delta))
+                                                : Math.max(0, Math.min(maxX, stripScrollView.contentX - (delta / 120) * stripScrollView.colW * 2));
                                             stripWheelAnimation.to = targetX;
                                             stripWheelAnimation.restart();
                                             wheel.accepted = true;
                                         } else {
-                                            wheel.accepted = false;
+                                            wheel.accepted = forecastRoot._scrollParentVertically(wheel);
                                         }
                                     }
                                 }
@@ -1155,15 +1204,22 @@ Item {
                                         var bar = hourlyScrollView.ScrollBar.horizontal;
                                         if (!bar)
                                             return;
-                                        if (wheel.angleDelta.x !== 0 || (wheel.modifiers & Qt.ShiftModifier)) {
-                                            var delta = wheel.angleDelta.x !== 0 ? wheel.angleDelta.x : wheel.angleDelta.y;
+                                        if (forecastRoot._wheelWantsHorizontal(wheel)) {
+                                            var delta = wheel.angleDelta.x !== 0 ? wheel.angleDelta.x : forecastRoot._wheelDeltaX(wheel);
+                                            var pixelDelta = wheel.angleDelta.x === 0 && wheel.pixelDelta.x !== 0;
+                                            if (delta === 0) {
+                                                delta = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : forecastRoot._wheelDeltaY(wheel);
+                                                pixelDelta = wheel.angleDelta.y === 0 && wheel.pixelDelta.y !== 0;
+                                            }
                                             var maxPos = Math.max(0, 1.0 - bar.size);
-                                            var targetPos = Math.max(0, Math.min(maxPos, bar.position - (delta / 120) * 0.15));
+                                            var targetPos = pixelDelta
+                                                ? Math.max(0, Math.min(maxPos, bar.position - delta / Math.max(1, hourlyRow.implicitWidth)))
+                                                : Math.max(0, Math.min(maxPos, bar.position - (delta / 120) * 0.15));
                                             hourlyWheelAnimation.to = targetPos;
                                             hourlyWheelAnimation.restart();
                                             wheel.accepted = true;
                                         } else {
-                                            wheel.accepted = false;
+                                            wheel.accepted = forecastRoot._scrollParentVertically(wheel);
                                         }
                                     }
                                 }
