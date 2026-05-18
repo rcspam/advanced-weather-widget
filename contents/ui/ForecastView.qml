@@ -111,6 +111,20 @@ Item {
         onTriggered: forecastRoot._pumpExpandAllQueue()
     }
 
+    function activateForecast() {
+        _autoOpenDone = false;
+        _collapsedDays = {};
+        _loadingDays = {};
+        if (expandAll) {
+            _autoOpenDone = true;
+            _perDayHourlyData = {};
+            _startExpandAll();
+        } else {
+            _cancelExpandAllFetch(true);
+            _doAutoOpen();
+        }
+    }
+
     onExpandAllChanged: {
         if (expandAll) {
             expandedIndex = -1;
@@ -123,7 +137,15 @@ Item {
             _cancelExpandAllFetch(true);
             _collapsedDays = {};
             _autoOpenDone = false;
+            if (visible)
+                _doAutoOpen();
         }
+    }
+
+    onAutoOpenChanged: {
+        _autoOpenDone = false;
+        if (visible && !expandAll)
+            _doAutoOpen();
     }
 
     function _doAutoOpen() {
@@ -144,15 +166,7 @@ Item {
 
     onVisibleChanged: {
         if (visible) {
-            _autoOpenDone = false;
-            _collapsedDays = {};
-            _loadingDays   = {};
-            if (expandAll) {
-                _perDayHourlyData = {};
-                _startExpandAll();
-            } else {
-                _doAutoOpen();
-            }
+            activateForecast();
         } else {
             _cancelExpandAllFetch(false);
         }
