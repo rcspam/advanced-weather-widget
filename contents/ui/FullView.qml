@@ -116,8 +116,13 @@ Rectangle {
     Connections {
         target: weatherRoot
         function onExpandedChanged() {
-            if (weatherRoot.expanded)
+            if (weatherRoot.expanded) {
                 fullView.activeTab = fullView._resolvedDefaultTab();
+                Qt.callLater(function() {
+                    if (fullView.activeTab === 1 && forecastView && !forecastView._autoOpenDone)
+                        forecastView.activateForecast();
+                });
+            }
         }
     }
 
@@ -587,6 +592,8 @@ Rectangle {
             // Explicitly follow the current child's implicitHeight
             implicitHeight: (children && children[currentIndex]) ? children[currentIndex].implicitHeight : 0
             onCurrentIndexChanged: {
+                if (currentIndex === 1 && forecastView && !forecastView._autoOpenDone)
+                    forecastView.activateForecast();
                 if (currentIndex === 2 && radarView.visible)
                     radarView.reload();
             }
