@@ -35,7 +35,8 @@ function fetchCurrent(service, chain, idx) {
         + "weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,"
         + "dew_point_2m,visibility,is_day,precipitation,uv_index,snow_depth"
         + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,"
-        + "precipitation_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant";
+        + "precipitation_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,"
+        + "uv_index_max";
 
     var req = new XMLHttpRequest();
     req.open("GET", url);
@@ -67,7 +68,8 @@ function fetchCurrent(service, chain, idx) {
                     snowCm: d.daily.snowfall_sum ? d.daily.snowfall_sum[i] : NaN,
                     precipProb: d.daily.precipitation_probability_max ? d.daily.precipitation_probability_max[i] : NaN,
                     windKmh: d.daily.wind_speed_10m_max ? d.daily.wind_speed_10m_max[i] : NaN,
-                    windDir: d.daily.wind_direction_10m_dominant ? d.daily.wind_direction_10m_dominant[i] : NaN
+                    windDir: d.daily.wind_direction_10m_dominant ? d.daily.wind_direction_10m_dominant[i] : NaN,
+                    uvMax: d.daily.uv_index_max ? d.daily.uv_index_max[i] : NaN
                 });
         }
         r.weatherDataStaged = {
