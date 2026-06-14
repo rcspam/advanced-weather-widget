@@ -168,6 +168,17 @@ Rectangle {
 
     Component.onCompleted: _startupRestoreTimer.start()
 
+    // ── Catch-all background ────────────────────────────────────────────
+    // Swallows clicks (including right-clicks) on any gap not covered by an
+    // interactive child, so they don't bubble up to Plasma's applet-level
+    // context menu (Configure/Add Widgets/...), which shouldn't appear
+    // inside the widget's full representation.
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: {}
+    }
+
     // ── No-location placeholder ───────────────────────────────────────────
     Item {
         anchors.fill: parent
