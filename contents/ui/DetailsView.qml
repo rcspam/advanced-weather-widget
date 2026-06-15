@@ -390,12 +390,12 @@ Item {
     property int _dateTimeTick: 0
     Timer {
         interval: 60000
-        running: detailsView.detailIds.indexOf("datetime") >= 0
+        running: root.detailIds.indexOf("datetime") >= 0
         repeat: true
-        onTriggered: detailsView._dateTimeTick++
+        onTriggered: root._dateTimeTick++
     }
     readonly property string _dvDatetime: {
-        var _ = detailsView._dateTimeTick;
+        var _ = root._dateTimeTick;
         if (!weatherRoot)
             return "--";
         return weatherRoot._formatItemDateTime(Plasmoid.configuration.detailsDateTimeFormat, Plasmoid.configuration.detailsTimeFormat);
