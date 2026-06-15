@@ -71,6 +71,19 @@ KCM.SimpleKCM {
         return hh + ":" + mm;
     }
 
+    // True when the locale (incl. KDE's 12/24-hour toggle) uses a 12-hour clock.
+    // The AM/PM designator ("AP"/"ap") only appears in 12-hour format strings.
+    readonly property bool use12HourClock: {
+        var f = Qt.locale().timeFormat(Locale.ShortFormat);
+        return /a/i.test(f);
+    }
+    // Convert between 24-hour storage (HH:mm) and 12-hour display.
+    function hour24To12(h) { var x = h % 12; return x === 0 ? 12 : x; }
+    function hour12To24(h12, isPm) {
+        if (isPm) return (h12 === 12) ? 12 : h12 + 12;
+        return (h12 === 12) ? 0 : h12;
+    }
+
     component SectionHeader: RowLayout {
         required property string title
         Layout.fillWidth: true
@@ -99,25 +112,50 @@ KCM.SimpleKCM {
         enabled: active
         opacity: enabled ? 1.0 : 0.5
 
+        // Storage is always 24-hour "HH:mm"; display follows the locale clock.
+        readonly property bool use12h: root.use12HourClock
+        readonly property int hour24: root.timeHour(time)
+        readonly property int minute: root.timeMinute(time)
+
         Label { text: i18n("Time:") }
         SpinBox {
-            from: 0
-            to: 23
+            id: hourSpin
+            from: singleTimeEditor.use12h ? 1 : 0
+            to: singleTimeEditor.use12h ? 12 : 23
             editable: true
-            value: root.timeHour(singleTimeEditor.time)
-            textFromValue: function(v) { return ("0" + v).slice(-2); }
-            valueFromText: function(t) { return Math.max(0, Math.min(23, parseInt(t, 10) || 0)); }
-            onValueModified: singleTimeEditor.timeEdited(root.timeFromParts(value, root.timeMinute(singleTimeEditor.time)))
+            value: singleTimeEditor.use12h ? root.hour24To12(singleTimeEditor.hour24) : singleTimeEditor.hour24
+            textFromValue: function(v) { return singleTimeEditor.use12h ? ("" + v) : ("0" + v).slice(-2); }
+            valueFromText: function(t) {
+                var n = parseInt(t, 10) || 0;
+                return singleTimeEditor.use12h ? Math.max(1, Math.min(12, n)) : Math.max(0, Math.min(23, n));
+            }
+            onValueModified: {
+                var h24 = singleTimeEditor.use12h
+                    ? root.hour12To24(value, ampmCombo.currentIndex === 1)
+                    : value;
+                singleTimeEditor.timeEdited(root.timeFromParts(h24, singleTimeEditor.minute));
+            }
         }
         Label { text: ":" }
         SpinBox {
             from: 0
             to: 59
             editable: true
-            value: root.timeMinute(singleTimeEditor.time)
+            value: singleTimeEditor.minute
             textFromValue: function(v) { return ("0" + v).slice(-2); }
             valueFromText: function(t) { return Math.max(0, Math.min(59, parseInt(t, 10) || 0)); }
-            onValueModified: singleTimeEditor.timeEdited(root.timeFromParts(root.timeHour(singleTimeEditor.time), value))
+            onValueModified: singleTimeEditor.timeEdited(root.timeFromParts(singleTimeEditor.hour24, value))
+        }
+        ComboBox {
+            id: ampmCombo
+            visible: singleTimeEditor.use12h
+            Layout.preferredWidth: implicitWidth
+            model: [Qt.locale().amText, Qt.locale().pmText]
+            currentIndex: singleTimeEditor.hour24 < 12 ? 0 : 1
+            onActivated: {
+                var h24 = root.hour12To24(root.hour24To12(singleTimeEditor.hour24), currentIndex === 1);
+                singleTimeEditor.timeEdited(root.timeFromParts(h24, singleTimeEditor.minute));
+            }
         }
     }
 
