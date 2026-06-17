@@ -1079,8 +1079,8 @@ Item {
                                                         visible: !parent._isSun
                                                         text: {
                                                             if (parent._isSun) return "";
-                                                            var pp = modelData.precipProb;
-                                                            if (pp !== undefined && !isNaN(pp)) return Math.round(pp) + "%";
+                                                            var ppText = W.hourlyPrecipProbText(modelData.precipProb, modelData.code);
+                                                            if (ppText !== null) return ppText;
                                                             var h = modelData.humidity;
                                                             return (!isNaN(h) && h !== undefined) ? Math.round(h) + "%" : "--";
                                                         }
@@ -1718,9 +1718,8 @@ Item {
                                                         }
                                                         Label {
                                                             text: {
-                                                                var pp = modelData.precipProb;
-                                                                if (pp !== undefined && pp !== null && !isNaN(pp))
-                                                                    return Math.round(pp) + "%";
+                                                                var ppText = W.hourlyPrecipProbText(modelData.precipProb, modelData.code);
+                                                                if (ppText !== null) return ppText;
                                                                 var h = modelData.humidity;
                                                                 return (!isNaN(h) && h !== undefined) ? Math.round(h) + "%" : "--";
                                                             }

@@ -304,6 +304,10 @@
     <entry name="notificationSpaceWeatherLastDate"    type="String"><default></default></entry>
     <entry name="notificationSpaceWeatherLastKp"      type="Double"><default>-1</default></entry>
 
+    <!-- Internal: JSON map of "already sent" once-per-day notification keys → timestamp.
+         Persisted so the once-per-day dedup survives a plasmashell restart. -->
+    <entry name="notificationSentKeys"               type="String"><default>{}</default></entry>
+
     <entry name="singlePanelRow"         type="Bool"><default>true</default></entry>
     <entry name="showScrollbox"          type="Bool"><default>true</default></entry>
     <entry name="scrollboxLines"         type="Int"><default>2</default><min>1</min><max>6</max></entry>

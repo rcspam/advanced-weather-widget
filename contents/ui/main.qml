@@ -155,6 +155,10 @@ PlasmoidItem {
     // currently active alert(s). 0 = due immediately.
     property real _alertNotificationNextDueMs: 0
     property var _notificationSentKeys: ({})
+    // Keys older than this are pruned when persisting, so the stored map can't
+    // grow without bound (e.g. time-based rain keys). 3 days covers "today" +
+    // a buffer across DST / timezone shifts.
+    readonly property int _notificationSentKeyMaxAgeMs: 3 * 24 * 60 * 60 * 1000
     property var _notificationHourlyWindow: []
     property int _notificationHourlyReqId: 0
     property real _notificationHourlyLastFetchMs: 0
@@ -898,6 +902,7 @@ PlasmoidItem {
     function _resetAllNotificationState() {
         _resetAlertNotificationState();
         _notificationSentKeys = ({});
+        Plasmoid.configuration.notificationSentKeys = "{}";
     }
 
     function _alertNotificationLocationSignature() {
@@ -1107,8 +1112,31 @@ PlasmoidItem {
         if (_notificationSentKeys[key])
             return false;
         _notificationSentKeys[key] = Date.now();
+        _persistNotificationSentKeys();
         _sendNotification(title, text, urgency, iconName);
         return true;
+    }
+
+    /** Load the persisted once-per-day keys so dedup survives a plasmashell restart. */
+    function _loadNotificationSentKeys() {
+        try {
+            var o = JSON.parse(Plasmoid.configuration.notificationSentKeys || "{}");
+            _notificationSentKeys = (o && typeof o === "object") ? o : ({});
+        } catch (e) {
+            _notificationSentKeys = ({});
+        }
+    }
+
+    /** Prune stale keys, then write the map back to config. */
+    function _persistNotificationSentKeys() {
+        var cutoff = Date.now() - _notificationSentKeyMaxAgeMs;
+        var pruned = {};
+        for (var k in _notificationSentKeys) {
+            if (_notificationSentKeys.hasOwnProperty(k) && _notificationSentKeys[k] >= cutoff)
+                pruned[k] = _notificationSentKeys[k];
+        }
+        _notificationSentKeys = pruned;
+        Plasmoid.configuration.notificationSentKeys = JSON.stringify(pruned);
     }
 
     /**
@@ -2313,6 +2341,10 @@ PlasmoidItem {
         } catch(e) {}
         _updateHasSelectedTown();
         refreshDebounce.restart();
+        // Restore the once-per-day "already sent" keys BEFORE the first evaluation
+        // so a plasmashell restart doesn't re-fire daily notifications already
+        // shown today (e.g. the geomagnetic-activity summary).
+        _loadNotificationSentKeys();
         _refreshNotificationRainWindowIfNeeded(true);
         _evaluateNotifications();
         if (Plasmoid.configuration.autoDetectLocation)
