@@ -32,7 +32,7 @@ function fetchCurrent(service, chain, idx) {
         + "&timezone=" + encodeURIComponent(tz.length > 0 ? tz : "auto")
         + "&forecast_days=" + Math.min(service.forecastDays, 16)
         + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
-        + "weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,"
+        + "weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,"
         + "dew_point_2m,visibility,is_day,precipitation,uv_index,snow_depth"
         + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,"
         + "precipitation_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,"
@@ -80,7 +80,7 @@ function fetchCurrent(service, chain, idx) {
             humidityPercent:     c.relative_humidity_2m,
             windKmh:             c.wind_speed_10m,
             windDirection:       isNaN(c.wind_direction_10m) ? NaN : c.wind_direction_10m,
-            pressureHpa:         c.surface_pressure,
+            pressureHpa:         c.pressure_msl,   // sea-level pressure (matches Foreca et al.)
             dewPointC:           c.dew_point_2m,
             visibilityKm:        c.visibility / 1000.0,
             weatherCode:         c.weather_code,
@@ -171,7 +171,7 @@ function fetchHourly(service, dateStr) {
         + service.latitude
         + "&longitude=" + service.longitude
         + "&timezone=" + encodeURIComponent(tz.length > 0 ? tz : "auto")
-        + "&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m,precipitation_probability,precipitation,surface_pressure,visibility,uv_index"
+        + "&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m,precipitation_probability,precipitation,pressure_msl,visibility,uv_index"
         + "&start_date=" + dateStr + "&end_date=" + dateStr;
     var req = new XMLHttpRequest();
     req.open("GET", url);
@@ -196,7 +196,7 @@ function fetchHourly(service, dateStr) {
                     humidity: d.hourly.relative_humidity_2m[i],
                     precipProb: d.hourly.precipitation_probability ? d.hourly.precipitation_probability[i] : NaN,
                     precipMm: d.hourly.precipitation ? d.hourly.precipitation[i] : NaN,
-                    pressureHpa: d.hourly.surface_pressure ? d.hourly.surface_pressure[i] : NaN,
+                    pressureHpa: d.hourly.pressure_msl ? d.hourly.pressure_msl[i] : NaN,
                     visibilityKm: d.hourly.visibility ? d.hourly.visibility[i] / 1000.0 : NaN,
                     uvIndex: d.hourly.uv_index ? d.hourly.uv_index[i] : NaN
                 });
