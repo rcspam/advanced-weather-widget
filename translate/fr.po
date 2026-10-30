@@ -65,6 +65,10 @@ msgstr "%1, le temps sera %2 avec un minimum de %3 et un maximum de %4."
 msgid "%1. Right-click to copy or paste it, drag it onto another level."
 msgstr "%1. Clic droit pour la copier ou la coller, glissez-la sur un autre niveau."
 
+#: contents/ui/config/tabs/TempPaletteDialog.qml:159
+msgid "%1. Right-click to copy or paste it."
+msgstr "%1. Clic droit pour la copier ou la coller."
+
 #: contents/ui/DetailsView.qml:4261
 msgid "%1h"
 msgstr "%1h"
@@ -189,6 +193,10 @@ msgstr "<b>Début :</b> %1"
 msgid "<b>Why OWM layers may not match RainViewer radar</b><br/><br/>OWM precipitation/cloud layers are <b>static model tiles</b> - they show a smoothed NWP (Numerical Weather Prediction) output, not actual radar returns. They represent where the model <i>thinks</i> it is raining based on interpolation between weather stations and model runs.<br/><br/>RainViewer uses <b>real weather radar composites</b> from radar stations - actual measured reflectivity updated every 2-10 minutes. This discrepancy is expected and known."
 msgstr "<b>Pourquoi les couches OWM peuvent ne pas correspondre au radar RainViewer</b><br/><br/>Les couches de précipitations/nuages d'OWM sont des <b>tuiles de modèle statiques</b> - elles montrent une sortie lissée de prévision numérique (NWP), pas de véritables retours radar. Elles représentent les zones où le modèle <i>pense</i> qu'il pleut, en se basant sur l'interpolation entre stations météo et exécutions du modèle.<br/><br/>RainViewer utilise de <b>véritables composites radar météo</b> issus de stations radar - réflectivité réellement mesurée et mise à jour toutes les 2 à 10 minutes. Cette divergence est attendue et connue."
 
+#: contents/ui/config/tabs/TempPaletteDialog.qml:75
+msgid "A palette has 2 to 12 colors."
+msgstr "Une palette a de 2 à 12 couleurs."
+
 #: contents/ui/config/configGeneral.qml:603
 msgid "AEMET - Spain only (Key Required)"
 msgstr "AEMET - Espagne uniquement (clé requise)"
@@ -265,6 +273,10 @@ msgstr "Adaptatif (repli automatique sur le premier fournisseur fonctionnel)"
 #: contents/ui/config/subpages/ConfigLocationManualSubPage.qml:495
 msgid "Add Location Manually"
 msgstr "Ajouter une localisation manuellement"
+
+#: contents/ui/config/tabs/TempPaletteDialog.qml:223
+msgid "Add a color"
+msgstr "Ajouter une couleur"
 
 #: contents/ui/CompactView.qml:930 contents/ui/CompactView.qml:1275
 msgid "Add a location"
@@ -622,6 +634,10 @@ msgstr "Bouleau"
 msgid "Black and White"
 msgstr "Noir et blanc"
 
+#: contents/ui/config/tabs/ConfigRadarTab.qml:86
+msgid "Blue-red"
+msgstr "Bleu-blanc-rouge"
+
 #: contents/ui/config/configAppearance.qml:1189
 #: contents/ui/config/subpages/ConfigPanelSubPage.qml:536
 #: contents/ui/config/subpages/ConfigTooltipSubPage.qml:526
@@ -817,6 +833,10 @@ msgstr "Phénomène côtier"
 #: contents/ui/config/tabs/ConfigPanelTab.qml:669
 msgid "Color by temperature:"
 msgstr "Colorer selon la température :"
+
+#: contents/ui/components/RadarWebEngineViewLibreWXR.qml:641
+msgid "Color the map by the air temperature (Open-Meteo)"
+msgstr "Colorer la carte selon la température de l'air (Open-Meteo)"
 
 #: contents/ui/config/tabs/ConfigPanelTab.qml:684
 msgid "Color the panel temperature with the same cold to hot scale as the forecast curve, instead of a fixed color."
@@ -1197,6 +1217,10 @@ msgstr "Chaque niveau doit aller plus haut que le précédent."
 msgid "Each notification type can be enabled independently, with its own daily time where applicable."
 msgstr "Chaque type de notification peut être activé indépendamment, avec sa propre heure quotidienne le cas échéant."
 
+#: contents/ui/config/tabs/TempPaletteDialog.qml:75
+msgid "Each temperature must be higher than the one before."
+msgstr "Chaque température doit être plus haute que la précédente."
+
 #: contents/ui/config/tabs/ConfigRadarTab.qml:467
 msgid "Economy (8 to 10 fps)"
 msgstr "Économique (8 à 10 images/s)"
@@ -1208,6 +1232,10 @@ msgstr "Modifier la localisation enregistrée"
 #: contents/ui/config/configLocation.qml:2018
 msgid "Edit location details"
 msgstr "Modifier les détails de la localisation"
+
+#: contents/ui/config/tabs/TempPaletteDialog.qml:84
+msgid "Edit temperature palette"
+msgstr "Modifier la palette de températures"
 
 #: contents/ui/config/tabs/ConfigRadarTab.qml:696
 msgid "Edit wind palette"
@@ -2442,6 +2470,10 @@ msgstr "Armoise"
 msgid "Multiple lines (tall panel)"
 msgstr "Lignes multiples (grand panneau)"
 
+#: contents/ui/config/tabs/ConfigRadarTab.qml:86
+msgid "Muted"
+msgstr "Sobre"
+
 #: contents/ui/ForecastView.qml:1451 contents/ui/ForecastView.qml:2056
 #: contents/ui/main.qml:998 contents/ui/main.qml:1031 contents/ui/main.qml:1046
 #: contents/ui/main.qml:1056 contents/ui/main.qml:1066
@@ -2474,6 +2506,10 @@ msgstr "Erreur réseau"
 #: contents/ui/main.qml:2798
 msgid "New Moon"
 msgstr "Nouvelle lune"
+
+#: contents/ui/config/tabs/TempPaletteDialog.qml:84
+msgid "New temperature palette"
+msgstr "Nouvelle palette de températures"
 
 #: contents/ui/config/tabs/ConfigRadarTab.qml:696
 msgid "New wind palette"
@@ -3179,6 +3215,10 @@ msgstr "Humidité relative %"
 msgid "Relative humidity percentage"
 msgstr "Pourcentage d'humidité relative"
 
+#: contents/ui/config/tabs/TempPaletteDialog.qml:209
+msgid "Remove"
+msgstr "Retirer"
+
 #: contents/ui/config/configLocation.qml:1473
 msgid "Remove last location?"
 msgstr "Supprimer la dernière localisation ?"
@@ -3535,6 +3575,10 @@ msgstr "Chutes de neige légères"
 msgid "Small circle  ⚬"
 msgstr "Petit cercle  ⚬"
 
+#: contents/ui/config/tabs/ConfigRadarTab.qml:722
+msgid "Smooth"
+msgstr "Dégradé"
+
 #: contents/ui/config/tabs/ConfigRadarTab.qml:475
 msgid "Smooth (20 to 30 fps)"
 msgstr "Fluide (20 à 30 ips)"
@@ -3834,6 +3878,15 @@ msgstr "Couleur de la température"
 msgid "Temperature badge"
 msgstr "Badge de température"
 
+#: contents/ui/config/tabs/ConfigRadarTab.qml:711
+msgid "Temperature bands:"
+msgstr "Paliers de température :"
+
+#: contents/ui/config/tabs/TempPaletteDialog.qml:140
+#: contents/ui/config/tabs/TempPaletteDialog.qml:149
+msgid "Temperature color"
+msgstr "Couleur de la température"
+
 #: contents/ui/config/tabs/ConfigPanelTab.qml:616
 msgid "Temperature color:"
 msgstr "Couleur de la température :"
@@ -3845,6 +3898,14 @@ msgstr "Température en premier"
 #: contents/ui/config/tabs/ConfigPanelTab.qml:269
 msgid "Temperature only"
 msgstr "Température uniquement"
+
+#: contents/ui/config/tabs/ConfigRadarTab.qml:685
+msgid "Temperature opacity:"
+msgstr "Opacité de la température :"
+
+#: contents/ui/config/tabs/ConfigRadarTab.qml:615
+msgid "Temperature palette:"
+msgstr "Palette de températures :"
 
 #: contents/ui/config/tabs/ConfigPanelTab.qml:694
 msgid "Temperature shadow:"
@@ -4330,6 +4391,10 @@ msgstr "Visual Crossing (clé requise)"
 msgid "Visual Crossing API Key:"
 msgstr "Clé API Visual Crossing :"
 
+#: contents/ui/config/tabs/ConfigRadarTab.qml:86
+msgid "Vivid"
+msgstr "Vive"
+
 #: contents/ui/main.qml:2812
 msgid "Waning Crescent"
 msgstr "Dernier croissant"
@@ -4577,6 +4642,10 @@ msgstr "déjà défini"
 #: contents/ui/main.qml:2373
 msgid "an increase from yesterday"
 msgstr "une hausse par rapport à hier"
+
+#: contents/ui/config/tabs/TempPaletteDialog.qml:192
+msgid "at"
+msgstr "à"
 
 #: contents/ui/main.qml:2104
 msgid "clear skies"
