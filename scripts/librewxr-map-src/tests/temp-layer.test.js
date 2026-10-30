@@ -240,3 +240,45 @@ test('remove clears the layer and the legend', async () => {
   assert.equal(legend.removed, true);
   assert.equal(adapter.images.length, count);
 });
+
+test('the API held back: tries again once it allows, then draws the view grid', async () => {
+  const bounds = { west: 6.80, south: 45.80, east: 6.95, north: 45.87 };
+  const fine = apiEntry(bounds);
+  let calls = 0;
+  const source = {
+    blockedUntil: NOW - 1000, ttlMs: 3600e3,
+    best: () => null,
+    ensure() { calls++; return Promise.resolve(calls === 1 ? null : fine); },   // held back first, then the grid
+    now: () => NOW,
+  };
+  const adapter = fakeAdapter(bounds);
+  new T.TempLayer(adapter, source, fakeOpen(), fakeDem(1000), Object.assign({}, OPTS, { retryMinMs: 0 })).addTo(fakeMap(10));
+  for (let i = 0; i < 5; i++) { await new Promise((r) => setTimeout(r, 5)); await settle(); }
+  assert.equal(calls, 2);
+  assert.deepEqual(colors(adapter.images[adapter.images.length - 1].image), [colorOf(11)]);
+});
+
+test('world view: a move that keeps the whole world in view draws nothing new', async () => {
+  const adapter = fakeAdapter({ west: -170, south: -60, east: 170, north: 70 });
+  const map = fakeMap(2);
+  new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(0), OPTS).addTo(map);
+  await settle();
+  const count = adapter.images.length;
+  assert.ok(count > 0);
+  adapter.bounds = { west: -120, south: -50, east: 150, north: 75 };
+  map.fire('moveend');
+  await settle();
+  assert.equal(adapter.images.length, count);
+});
+
+test('world view: a move while the world is being drawn lets that drawing finish', async () => {
+  const adapter = fakeAdapter({ west: -170, south: -60, east: 170, north: 70 });
+  const map = fakeMap(2);
+  new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(0), OPTS).addTo(map);
+  for (let i = 0; i < 10; i++) await tick();        // data in, the world drawing queued
+  rafQueue.shift()();                                 // one slice of it
+  adapter.bounds = { west: -120, south: -50, east: 150, north: 75 };
+  map.fire('moveend');
+  await settle();
+  assert.equal(adapter.images.length, 1);
+});

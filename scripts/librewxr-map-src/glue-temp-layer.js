@@ -53,7 +53,8 @@ WidgetTemp.TempLayer = (function () {
       step: WidgetTemp.normStep(options.step),
       unit: WidgetTemp.normUnit(options.unit),
       opacity: WidgetTemp.normOpacity(options.opacity),
-      fetchDelayMs: options.fetchDelayMs == null ? 600 : options.fetchDelayMs
+      fetchDelayMs: options.fetchDelayMs == null ? 600 : options.fetchDelayMs,
+      retryMinMs: options.retryMinMs == null ? 1000 : options.retryMinMs
     };
     this._now = options.now || function () { return Date.now(); };
     this._map = null;
@@ -66,6 +67,7 @@ WidgetTemp.TempLayer = (function () {
     this._surface = null;
     this._lut = null;
     this._legend = null;
+    this._worldKey = null;    // what the whole-world picture on the map was drawn from
   }
 
   TempLayer.prototype = {
@@ -202,15 +204,34 @@ WidgetTemp.TempLayer = (function () {
       // Draw at once with the best grid at hand, then make sure the data
       // cover the view: one request serves the wind and the temperature.
       var best = this._source.best(view);
-      if (best && best.grid && best.grid.temp) this._draw(view, this._apiField(best.grid), false);
+      var drawn = best && best.grid && best.grid.temp ? best : null;
+      if (drawn) this._draw(view, this._apiField(drawn.grid), false);
       this._fetchTimer = setTimeout(function () {
         self._fetchTimer = null;
-        self._source.ensure(view).then(function (entry) {
-          if (token !== self._token || !self._map) return;
-          if (!entry || entry === best || !entry.grid || !entry.grid.temp) return;
+        self._ensureFor(view, token, drawn);
+      }, drawn ? this.options.fetchDelayMs : 0);
+    },
+
+    /** Get an API grid for the view of reset `token` and draw it unless it
+        is the one on the map; when the source holds back (the interval
+        between requests, a failure), ask again once it allows, as the wind
+        does. */
+    _ensureFor: function (view, token, drawn) {
+      var self = this;
+      this._source.ensure(view).then(function (entry) {
+        if (token !== self._token || !self._map) return;
+        var now = self._source.now(), next = WindField.afterEnsure(view, entry, now, self._source.ttlMs);
+        if (next.draw && entry !== drawn && entry.grid.temp) {
+          drawn = entry;
           self._draw(view, self._apiField(entry.grid), false);
-        });
-      }, best ? this.options.fetchDelayMs : 0);
+        }
+        if (!next.retry) return;
+        var wait = Math.max(self.options.retryMinMs, (self._source.blockedUntil || 0) - now + 200);
+        self._fetchTimer = setTimeout(function () {
+          self._fetchTimer = null;
+          if (token === self._token && self._map) self._ensureFor(view, token, drawn);
+        }, wait);
+      });
     },
 
     /** The file's temperature, with the model's ground height when it matches. */
@@ -233,11 +254,17 @@ WidgetTemp.TempLayer = (function () {
         elevation tile is not in yet are left uncorrected, and once the tiles
         are in, the view is drawn once more (afterDem). */
     _draw: function (view, field, afterDem) {
-      var self = this, job = ++this._job, map = this._map, dem = this._dem, lut = this._lut;
+      var self = this, map = this._map, dem = this._dem, lut = this._lut;
       var box = drawBox(view.bounds, map.getZoom()), c = map.getContainer();
       var W = box.world ? WORLD_PX : Math.max(1, Math.min(WORLD_PX, Math.round(c.clientWidth * (1 + 2 * MARGIN))));
       var H = box.world ? WORLD_PX : Math.max(1, Math.min(WORLD_PX, Math.round(c.clientHeight * (1 + 2 * MARGIN))));
       var z = demZoom(map.getZoom(), box.world), size = 256 * Math.pow(2, z);
+      // The whole-world picture does not depend on the view: a move that
+      // keeps it draws nothing new (the globe turning, a pan far out).
+      var w = this._worldKey;
+      if (box.world && !afterDem && w && w.values === field.values && w.elev === field.elev && w.lut === lut && w.z === z) return;
+      this._worldKey = box.world ? { values: field.values, elev: field.elev, lut: lut, z: z } : null;
+      var job = ++this._job;
       var demReady = field.elev && dem ? dem.ensure({ west: box.w, south: box.s, east: box.e, north: box.n }, z) : null;
       var img = this._ctx.createImageData(W, H), px = img.data;
       var yN = mercY(box.n), yS = mercY(box.s);
