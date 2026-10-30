@@ -30,6 +30,11 @@
  *   window.setDayNight(true | false)      // night and twilights (the map's button reports "night:")
  *   window.setWindPalette("max:rrggbb,...") // wind palette from the settings; "" = the default one
  *   window.setWindDensity(factor)         // particle density from the settings (1 = default)
+ *   window.setTemp(true | false)          // air temperature under the radar (MapLibre page only)
+ *   window.setTempPalette("t:rrggbb,...")  // temperature palette from the settings, t in °C
+ *   window.setTempOpacity(percent)        // opacity of the temperature layer (10-100)
+ *   window.setTempStep(0 | 2 | 5 | 10)    // width of the temperature bands; 0 = smooth gradient
+ *   window.setTempUnit("C" | "F")         // unit of the temperature bands and legend
  *   window.setCells("light" | "dark" | "")   // storm-cell overlay theme; "" = off
  *   window.setAlerts(true | false)        // WMO alerts overlay
  *   window.setSmooth(true | false)        // radar tile edge smoothing
@@ -64,6 +69,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.plasmoid
 import "../js/iconResolver.js" as IconResolver
+import "../js/configUtils.js" as ConfigUtils
 
 Item {
     id: radarRoot
@@ -126,6 +132,18 @@ Item {
         }
         return "";
     }
+    // Air temperature under the radar (MapLibre page), switched from the bar.
+    readonly property bool tempOn: Plasmoid.configuration.librewxrTemp === true
+    // The temperature palette in use, in the page's form: "t:rrggbb" points,
+    // t in °C; the vivid palette for an entry that does not read.
+    readonly property string tempPalette: ConfigUtils.formatTempPalette(ConfigUtils.tempPaletteStops(Plasmoid.configuration.librewxrTempPalette || "", Plasmoid.configuration.librewxrTempPalettes || "[]"))
+    readonly property int tempOpacity: Plasmoid.configuration.librewxrTempOpacity > 0 ? Plasmoid.configuration.librewxrTempOpacity : 45
+    readonly property int tempStep: Plasmoid.configuration.librewxrTempStep
+    // The widget's temperature unit, which the bands and the legend follow.
+    readonly property string tempUnit: ConfigUtils.effectiveTempUnit(Plasmoid.configuration.unitsMode, Plasmoid.configuration.temperatureUnit, Qt.locale().measurementSystem)
+    // Set from the page once loaded: the Leaflet page (no WebGL) has no
+    // temperature layer, and its button goes away.
+    property bool tempAvailable: true
     readonly property string activeCells: Plasmoid.configuration.librewxrCells || ""
     readonly property bool alertsOn: Plasmoid.configuration.librewxrAlerts === true
     readonly property bool smoothOn: Plasmoid.configuration.librewxrSmooth !== false
@@ -451,7 +469,7 @@ Item {
             "globe": i18n("Globe"),
             "dayNight": i18n("Day and night")
         };
-        return Qt.resolvedUrl("librewxr-map.html") + "?lat=" + radarRoot.lat + "&lon=" + radarRoot.lon + "&zoom=" + radarRoot.initialZoom + "&layer=" + encodeURIComponent(radarRoot.activeLayer) + "&color=" + radarRoot.colorScheme + "&arrows=" + (radarRoot.arrowsOn ? "1" : "0") + "&wind=" + (radarRoot.windOn ? "1" : "0") + "&windlevel=" + radarRoot.windLevel + "&windfps=" + radarRoot.windRate[0] + "&windmaxfps=" + radarRoot.windRate[1] + "&windwidth=" + radarRoot.windLineWidth + "&proj=" + radarRoot.projection + "&night=" + (radarRoot.dayNight ? "1" : "0") + "&glow=" + radarRoot.glow + "&nightdepth=" + radarRoot.nightDepth + "&prepare=" + radarRoot.prepareMode + "&windpalette=" + encodeURIComponent(radarRoot.windPalette) + "&winddensity=" + radarRoot.windDensity + "&cells=" + encodeURIComponent(radarRoot.activeCells) + "&alerts=" + (radarRoot.alertsOn ? "1" : "0") + "&smooth=" + (radarRoot.smoothOn ? "1" : "0") + "&snow=" + (radarRoot.snowOn ? "1" : "0") + "&format=" + encodeURIComponent(radarRoot.tileFormat) + "&tilesize=" + encodeURIComponent(radarRoot.tileSizeChoice) + "&theme=" + radarRoot.mapTheme + "&server=" + encodeURIComponent(radarRoot.serverUrl) + "&hour12=" + (radarRoot.is24h ? "0" : "1") + "&dtfmt=" + encodeURIComponent(weatherRoot ? weatherRoot.dateTimeSpec : "") + "&locale=" + encodeURIComponent(Qt.locale().name.replace("_", "-")) + "&strings=" + encodeURIComponent(JSON.stringify(strings)) + "&bg=" + encodeURIComponent(radarRoot.mapBackground) + "&bglist=" + encodeURIComponent(radarRoot.backgroundChoices.toJson()) + "&font=" + encodeURIComponent(Kirigami.Theme.defaultFont.family || "");
+        return Qt.resolvedUrl("librewxr-map.html") + "?lat=" + radarRoot.lat + "&lon=" + radarRoot.lon + "&zoom=" + radarRoot.initialZoom + "&layer=" + encodeURIComponent(radarRoot.activeLayer) + "&color=" + radarRoot.colorScheme + "&arrows=" + (radarRoot.arrowsOn ? "1" : "0") + "&wind=" + (radarRoot.windOn ? "1" : "0") + "&windlevel=" + radarRoot.windLevel + "&windfps=" + radarRoot.windRate[0] + "&windmaxfps=" + radarRoot.windRate[1] + "&windwidth=" + radarRoot.windLineWidth + "&proj=" + radarRoot.projection + "&night=" + (radarRoot.dayNight ? "1" : "0") + "&glow=" + radarRoot.glow + "&nightdepth=" + radarRoot.nightDepth + "&prepare=" + radarRoot.prepareMode + "&windpalette=" + encodeURIComponent(radarRoot.windPalette) + "&winddensity=" + radarRoot.windDensity + "&temp=" + (radarRoot.tempOn ? "1" : "0") + "&temppalette=" + encodeURIComponent(radarRoot.tempPalette) + "&tempopacity=" + radarRoot.tempOpacity + "&tempstep=" + radarRoot.tempStep + "&tempunit=" + radarRoot.tempUnit + "&cells=" + encodeURIComponent(radarRoot.activeCells) + "&alerts=" + (radarRoot.alertsOn ? "1" : "0") + "&smooth=" + (radarRoot.smoothOn ? "1" : "0") + "&snow=" + (radarRoot.snowOn ? "1" : "0") + "&format=" + encodeURIComponent(radarRoot.tileFormat) + "&tilesize=" + encodeURIComponent(radarRoot.tileSizeChoice) + "&theme=" + radarRoot.mapTheme + "&server=" + encodeURIComponent(radarRoot.serverUrl) + "&hour12=" + (radarRoot.is24h ? "0" : "1") + "&dtfmt=" + encodeURIComponent(weatherRoot ? weatherRoot.dateTimeSpec : "") + "&locale=" + encodeURIComponent(Qt.locale().name.replace("_", "-")) + "&strings=" + encodeURIComponent(JSON.stringify(strings)) + "&bg=" + encodeURIComponent(radarRoot.mapBackground) + "&bglist=" + encodeURIComponent(radarRoot.backgroundChoices.toJson()) + "&font=" + encodeURIComponent(Kirigami.Theme.defaultFont.family || "");
     }
 
     // Last url handed to the view; compared as built here, since webView.url
@@ -614,6 +632,18 @@ Item {
                 onToggled: {
                     Plasmoid.configuration.librewxrWind = checked;
                     webView.runJavaScript("if (window.setWind) window.setWind(" + (checked ? "true" : "false") + ");");
+                }
+            }
+
+            MapToggle {
+                iconInfo: radarRoot.barIcon("thermometer")
+                title: i18n("Temperature")
+                tip: i18n("Color the map by the air temperature (Open-Meteo)")
+                checked: radarRoot.tempOn
+                visible: radarRoot.tempAvailable
+                onToggled: {
+                    Plasmoid.configuration.librewxrTemp = checked;
+                    webView.runJavaScript("if (window.setTemp) window.setTemp(" + (checked ? "true" : "false") + ");");
                 }
             }
 
@@ -803,6 +833,9 @@ Item {
                     // here so the switch, the page and the "auto" background agree.
                     // No-op when they already match.
                     webView.runJavaScript("window.setTheme(" + JSON.stringify(radarRoot.mapTheme) + ");");
+                    webView.runJavaScript("!!window.tempAvailable", function (ok) {
+                        radarRoot.tempAvailable = ok === true;
+                    });
                 }
             }
 
@@ -902,6 +935,18 @@ Item {
                 }
                 function onWindPaletteChanged() {
                     webView.runJavaScript("if (window.setWindPalette) window.setWindPalette(" + JSON.stringify(radarRoot.windPalette) + ");");
+                }
+                function onTempPaletteChanged() {
+                    webView.runJavaScript("if (window.setTempPalette) window.setTempPalette(" + JSON.stringify(radarRoot.tempPalette) + ");");
+                }
+                function onTempOpacityChanged() {
+                    webView.runJavaScript("if (window.setTempOpacity) window.setTempOpacity(" + radarRoot.tempOpacity + ");");
+                }
+                function onTempStepChanged() {
+                    webView.runJavaScript("if (window.setTempStep) window.setTempStep(" + radarRoot.tempStep + ");");
+                }
+                function onTempUnitChanged() {
+                    webView.runJavaScript("if (window.setTempUnit) window.setTempUnit(" + JSON.stringify(radarRoot.tempUnit) + ");");
                 }
                 function onProjectionChanged() {
                     webView.runJavaScript("if (window.setProjection) window.setProjection(" + JSON.stringify(radarRoot.projection) + ");");
