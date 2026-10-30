@@ -222,6 +222,16 @@
     <entry name="librewxrWindPalettes"  type="String"><default>[]</default></entry>
     <!-- Name of the wind palette in use; empty for the default one -->
     <entry name="librewxrWindPalette"   type="String"><default></default></entry>
+    <!-- Temperature layer under the radar (MapLibre page), switched from the map's bar -->
+    <entry name="librewxrTemp"          type="Bool"><default>false</default></entry>
+    <!-- Temperature palette in use: empty for the vivid one, "builtin:muted",
+         "builtin:bluered", or the name of a palette made in the settings -->
+    <entry name="librewxrTempPalette"   type="String"><default></default></entry>
+    <!-- Temperature palettes made in the settings: JSON [{ "name", "stops": [{ "t" (°C), "color" }] }] -->
+    <entry name="librewxrTempPalettes"  type="String"><default>[]</default></entry>
+    <entry name="librewxrTempOpacity"   type="Int"><default>45</default><min>10</min><max>100</max></entry>
+    <!-- Width of the temperature bands in the widget's unit: 0 (smooth), 2, 5 or 10 -->
+    <entry name="librewxrTempStep"      type="Int"><default>5</default></entry>
     <entry name="librewxrTheme"         type="String"><default>auto</default></entry>
     <entry name="librewxrUrl"           type="String"><default>https://api.librewxr.net</default></entry>
     <entry name="librewxrCells"         type="String"><default></default></entry>

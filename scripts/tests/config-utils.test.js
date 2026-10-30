@@ -28,3 +28,45 @@ test('colorFromText: anything else is no color', () => {
   assert.equal(U.colorFromText('wind 38 km/h'), '');
   assert.equal(U.colorFromText('#ff000080'), '');
 });
+
+const MUTED = [[-40, '#1d2a5c'], [-20, '#3d5a99'], [-10, '#7f9cc4'], [0, '#e6e6e6'], [10, '#d9c49a'], [20, '#b88a55'], [30, '#8c5a2b'], [40, '#5a3115']];
+const plain = (v) => JSON.parse(JSON.stringify(v));   // out of the vm's realm, for deepEqual
+
+test('tempPaletteStops: empty, builtin, custom, broken', () => {
+  assert.deepEqual(plain(U.tempPaletteStops('', '[]')), plain(U.TEMP_BUILTINS[0].stops));
+  assert.deepEqual(plain(U.tempPaletteStops('builtin:muted', '[]')), MUTED.map(([t, color]) => ({ t, color })));
+  assert.deepEqual(plain(U.tempPaletteStops('builtin:bluered', '[]')).length, 8);
+  const mine = '[{"name":"Mine","stops":[{"t":0,"color":"#000000"},{"t":10,"color":"#ffffff"}]}]';
+  assert.deepEqual(plain(U.tempPaletteStops('Mine', mine)), [{ t: 0, color: '#000000' }, { t: 10, color: '#ffffff' }]);
+  assert.deepEqual(plain(U.tempPaletteStops('Mine', 'nimp')), plain(U.TEMP_BUILTINS[0].stops));
+  const down = '[{"name":"Mine","stops":[{"t":10,"color":"#000000"},{"t":0,"color":"#ffffff"}]}]';
+  assert.deepEqual(plain(U.tempPaletteStops('Mine', down)), plain(U.TEMP_BUILTINS[0].stops));
+  assert.deepEqual(plain(U.tempPaletteStops('Other', mine)), plain(U.TEMP_BUILTINS[0].stops));
+});
+
+test('TEMP_BUILTINS: vivid first with an empty id, then muted and blue-red', () => {
+  assert.deepEqual(plain(U.TEMP_BUILTINS.map((b) => b.id)), ['', 'builtin:muted', 'builtin:bluered']);
+  assert.deepEqual(plain(U.TEMP_BUILTINS.map((b) => b.key)), ['vivid', 'muted', 'bluered']);
+});
+
+test('formatTempPalette: the page form of the vivid palette', () => {
+  assert.equal(U.formatTempPalette(U.TEMP_BUILTINS[0].stops),
+    '-40:3b3050,-30:4b3a9c,-20:3f63c4,-10:2aa3a8,0:7ccf5a,5:d6d63a,10:f2c230,20:e8862a,30:d23a22,40:7a0f12');
+});
+
+test('tempToUnit / tempFromUnit: Celsius and Fahrenheit, to 0.1', () => {
+  assert.equal(U.tempToUnit(0, 'F'), 32);
+  assert.equal(U.tempToUnit(-40, 'F'), -40);
+  assert.equal(U.tempToUnit(12.5, 'C'), 12.5);
+  assert.equal(U.tempFromUnit(32, 'F'), 0);
+  assert.equal(U.tempFromUnit(50, 'F'), 10);
+  assert.equal(U.tempFromUnit(51, 'F'), 10.6);
+  assert.equal(U.tempFromUnit(12.34, 'C'), 12.3);
+});
+
+test('effectiveTempUnit: the KDE locale or the widget setting', () => {
+  assert.equal(U.effectiveTempUnit('kde', 'C', 1), 'F');
+  assert.equal(U.effectiveTempUnit('metric', 'F', 0), 'F');
+  assert.equal(U.effectiveTempUnit('kde', 'F', 0), 'C');
+  assert.equal(U.effectiveTempUnit('metric', '', 0), 'C');
+});

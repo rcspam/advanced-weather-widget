@@ -79,3 +79,11 @@ test('paletteFromParam: a param that does not parse gives the vivid palette', ()
   assert.deepEqual(T.paletteFromParam(null), T.DEFAULT_STOPS);
   assert.deepEqual(T.paletteFromParam('0:000000,10:ffffff'), [{ t: 0, color: '#000000' }, { t: 10, color: '#ffffff' }]);
 });
+
+test('the vivid palette is the same in the page and in the settings', () => {
+  const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+  const src = fs.readFileSync(path.join(__dirname, '../../../contents/ui/js/configUtils.js'), 'utf8').replace(/^\.pragma library$/m, '');
+  const U = {};
+  vm.runInNewContext(src, U);
+  assert.deepEqual(JSON.parse(JSON.stringify(U.TEMP_BUILTINS[0].stops)), T.DEFAULT_STOPS);
+});
