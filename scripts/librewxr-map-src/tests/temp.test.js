@@ -53,3 +53,22 @@ test('normStep, normOpacity, normUnit', () => {
   assert.equal(T.normOpacity('5'), 10); assert.equal(T.normOpacity('x'), 45); assert.equal(T.normOpacity(100), 100);
   assert.equal(T.normUnit('F'), 'F'); assert.equal(T.normUnit('K'), 'C');
 });
+
+test('correct: the Mont Blanc case measured on 2026-10-30', () => {
+  assert.ok(Math.abs(T.correct(6.3, 2076, 4792) - -11.354) < 1e-3);
+  assert.ok(Math.abs(T.correct(6.3, 2076, 1034) - 13.073) < 1e-3);
+});
+
+test('correct: sea depths count as sea level, missing heights change nothing', () => {
+  assert.equal(T.correct(10, 0, -3000), 10);
+  assert.equal(T.correct(10, 500, NaN), 10);
+  assert.equal(T.correct(10, NaN, 300), 10);
+});
+
+test('sampleScalar: bilinear, wrapped across the antimeridian, NaN outside', () => {
+  const g = { lats: [10, 0], lons: [-180, 0, 180] };
+  const v = Float32Array.from([0, 10, 0, 20, 30, 20]);
+  assert.equal(T.sampleScalar(g, v, 5, -90), 15);
+  assert.equal(T.sampleScalar(g, v, 5, 270), 15);      // same meridian, next world copy
+  assert.ok(Number.isNaN(T.sampleScalar(g, v, 20, 0)));
+});

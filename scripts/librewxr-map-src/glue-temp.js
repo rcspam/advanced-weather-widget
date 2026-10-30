@@ -125,7 +125,38 @@ var WidgetTemp = (function () {
 
   function normUnit(u) { return u === 'F' ? 'F' : 'C'; }
 
+  /* A model gives the temperature of its own ground, one height per cell;
+     Open-Meteo brings it to the real height of a place at 6.5 °C per km,
+     and so do we, pixel by pixel. */
+  var LAPSE = 0.0065;   // °C per m
+
+  /** tSrc (°C), valid at height zSrc (m), brought to the pixel's height zPix.
+      Depths at sea count as sea level; a missing height changes nothing. */
+  function correct(tSrc, zSrc, zPix) {
+    if (!isFinite(zSrc) || !isFinite(zPix)) return tSrc;
+    return tSrc + LAPSE * (zSrc - Math.max(0, zPix));
+  }
+
+  /** Value at lat/lon of a grid of lats (north to south) and lons (west to
+      east), values row by row: bilinear, on whichever copy of the world the
+      longitude is. NaN outside the grid or next to a missing value. */
+  function sampleScalar(grid, values, lat, lon) {
+    var lats = grid.lats, lons = grid.lons, rows = lats.length, cols = lons.length;
+    var north = lats[0], south = lats[rows - 1], west = lons[0], east = lons[cols - 1];
+    if (lon < west) lon += 360 * Math.ceil((west - lon) / 360);
+    else if (lon > east) lon -= 360 * Math.ceil((lon - east) / 360);
+    if (lat > north || lat < south || lon < west || lon > east) return NaN;
+    var r = (north - lat) / (north - south) * (rows - 1);
+    var c = (lon - west) / (east - west) * (cols - 1);
+    var i0 = Math.min(rows - 2, Math.floor(r)), j0 = Math.min(cols - 2, Math.floor(c));
+    var fr = r - i0, fc = c - j0, k = i0 * cols + j0;
+    var top = values[k] * (1 - fc) + values[k + 1] * fc;
+    var bottom = values[k + cols] * (1 - fc) + values[k + cols + 1] * fc;
+    return top * (1 - fr) + bottom * fr;
+  }
+
   return {
+    LAPSE: LAPSE, correct: correct, sampleScalar: sampleScalar,
     DEFAULT_STOPS: DEFAULT_STOPS, LUT_MIN: LUT_MIN, LUT_STEP: LUT_STEP, LUT_SIZE: LUT_SIZE,
     parsePalette: parsePalette, formatPalette: formatPalette, colorAt: colorAt,
     bandCenterC: bandCenterC, lutIndex: lutIndex, buildLut: buildLut, legendTicks: legendTicks,
