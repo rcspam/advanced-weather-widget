@@ -20,20 +20,35 @@ class FakeMap {
   once(e, f) { const g = (x) => { this.off(e, g); f(x); }; this.on(e, g); }
   off(e, f) { this.handlers[e] = (this.handlers[e] || []).filter((h) => h !== f); }
   fire(e, data) { (this.handlers[e] || []).slice().forEach((f) => f(data || {})); }
-  addControl() {}
+  addControl(c) { (this.controls = this.controls || []).push(c); }
+  removeControl(c) { this.controls = (this.controls || []).filter((x) => x !== c); }
   getSource(id) { return this.sources[id]; }
   addSource(id, s) {
     this.sources[id] = Object.assign({
-      uploads: 0,
+      uploads: 0, plays: 0, pauses: 0,
       setData(d) { this.data = d; },
-      setTiles(t) { this.tiles = t; }
+      setTiles(t) { this.tiles = t; },
+      setCoordinates(c) { this.coordinates = c; },
+      play() { this.plays++; },
+      pause() { this.pauses++; }
     }, s);
   }
   removeSource(id) { delete this.sources[id]; }
   getLayer(id) { return this.layers.find((l) => l.id === id); }
-  addLayer(l) { this.layers.push(Object.assign({ layout: {} }, l, { layout: Object.assign({}, l.layout) })); }
+  // Layers in drawing order: a layer added or moved before another goes right under it.
+  addLayer(l, before) {
+    const layer = Object.assign({ layout: {}, paint: {} }, l, { layout: Object.assign({}, l.layout), paint: Object.assign({}, l.paint) });
+    const i = before ? this.layers.findIndex((x) => x.id === before) : -1;
+    if (i >= 0) this.layers.splice(i, 0, layer); else this.layers.push(layer);
+  }
   removeLayer(id) { this.layers = this.layers.filter((l) => l.id !== id); }
-  moveLayer() {}
+  moveLayer(id, before) {
+    const l = this.getLayer(id);
+    if (!l) return;
+    this.removeLayer(id);
+    const i = before ? this.layers.findIndex((x) => x.id === before) : -1;
+    if (i >= 0) this.layers.splice(i, 0, l); else this.layers.push(l);
+  }
   getStyle() { return { layers: this.layers, sources: this.sources }; }
   isSourceLoaded(id) {
     if (!this.sources[id]) throw new Error('There is no source with ID ' + id);
@@ -84,6 +99,7 @@ function loadAdapter(globals) {
     Map: function () { map = new FakeMap(); return map; },
     addProtocol: (name, handler) => { protocols[name] = handler; },
     NavigationControl: function () {},
+    AttributionControl: function (opts) { this.opts = opts || {}; },
     Marker: function () { this.setLngLat = () => this; this.addTo = () => this; },
   };
   const adapter = ctx.WidgetMapLibreAdapter(maplibregl);
@@ -363,4 +379,92 @@ test('no preparation asked: map moves reach the viewer as before', () => {
   assert.equal(moves, 1);
   page.adapter.createFrameLayer('https://radar/1/{z}/{x}/{y}.webp', 'radar');
   page.map.fire('render');
+});
+
+// === Temperature layer ===
+const ids = (map) => map.layers.map((l) => l.id);
+const fakeCanvas = { width: 4, height: 4 };
+const box = [[0, 50], [10, 50], [10, 40], [0, 40]];
+
+test('the temperature goes right over the base map and the night, under the frames', () => {
+  const { adapter, map } = loadAdapter({ DAYNIGHT_INIT: true });
+  adapter.createFrameLayer('https://radar/a/{z}/{x}/{y}.webp', 'radar');
+  adapter.createFrameLayer('https://radar/b/{z}/{x}/{y}.webp', 'radar');
+  adapter.setTempImage(fakeCanvas, box, 0.45);
+  // The fake map only holds the layers added at run time: lv-base is in the style.
+  const order = ids(map).filter((id) => id.indexOf('lv-') === 0);
+  assert.deepEqual(order.slice(0, 2), ['lv-night', 'lv-temp']);
+  assert.ok(order[2].indexOf('lv-layer-radar-') === 0);
+  assert.equal(map.getLayer('lv-temp').paint['raster-opacity'], 0.45);
+  assert.equal(map.getSource('lv-temp-src').type, 'canvas');
+});
+
+test('the night switched on later still goes under the temperature', () => {
+  const { adapter, map } = loadAdapter();
+  adapter.setTempImage(fakeCanvas, box, 0.45);
+  adapter.setDayNight(true);
+  const order = ids(map).filter((id) => id.indexOf('lv-') === 0);
+  assert.ok(order.indexOf('lv-night') < order.indexOf('lv-temp'));
+});
+
+test('a satellite frame added later still goes over the temperature', () => {
+  const { adapter, map } = loadAdapter();
+  adapter.setTempImage(fakeCanvas, box, 0.45);
+  const sat = adapter.createFrameLayer('https://sat/{z}/{x}/{y}.webp', 'satellite');
+  assert.ok(ids(map).indexOf('lv-temp') < ids(map).indexOf(sat.layerId));
+});
+
+test('a base map change puts the temperature back, at the same place', () => {
+  const { adapter, map, ctx } = loadAdapter();
+  const radar = adapter.createFrameLayer('https://radar/{z}/{x}/{y}.webp', 'radar');
+  adapter.setTempImage(fakeCanvas, box, 0.3);
+  ctx.BG_CURRENT = 'cyclosm';
+  adapter.setBasemap('light');
+  // What MapLibre does with a new style: only its own layers and sources are left.
+  map.layers = []; map.sources = {};
+  for (const l of map.loadedStyle.layers) map.addLayer(l);
+  for (const id in map.loadedStyle.sources) map.addSource(id, map.loadedStyle.sources[id]);
+  map.fire('style.load');
+  const order = ids(map);
+  assert.ok(order.indexOf('lv-temp') > order.indexOf('lv-base'));
+  assert.ok(order.indexOf('lv-temp') < order.indexOf(radar.layerId));
+  assert.equal(map.getLayer('lv-temp').paint['raster-opacity'], 0.3);
+  assert.deepEqual(map.getSource('lv-temp-src').coordinates, box);
+});
+
+test('setTempImage twice: one source, coordinates updated, the image pushed', () => {
+  const { adapter, map } = loadAdapter();
+  adapter.setTempImage(fakeCanvas, box, 0.45);
+  const other = [[1, 51], [11, 51], [11, 41], [1, 41]];
+  adapter.setTempImage(fakeCanvas, other, 0.45);
+  const src = map.getSource('lv-temp-src');
+  assert.deepEqual(src.coordinates, other);
+  assert.equal(src.plays, 1);
+  assert.equal(src.pauses, 0);
+  map.fire('render');
+  assert.equal(src.pauses, 1, 'paused once the new image is drawn');
+  assert.equal(ids(map).filter((id) => id === 'lv-temp').length, 1);
+});
+
+test('setTempOpacity changes the layer only; clearTemp removes layer and source', () => {
+  const { adapter, map } = loadAdapter();
+  adapter.setTempImage(fakeCanvas, box, 0.45);
+  adapter.setTempOpacity(0.8);
+  assert.equal(map.getLayer('lv-temp').paint['raster-opacity'], 0.8);
+  adapter.clearTemp();
+  assert.equal(map.getLayer('lv-temp'), undefined);
+  assert.equal(map.getSource('lv-temp-src'), undefined);
+});
+
+test('setDataAttribution adds the Open-Meteo line once, and takes it away', () => {
+  const { adapter, map } = loadAdapter();
+  const lines = () => map.controls.filter((c) => c.opts && c.opts.customAttribution).map((c) => c.opts.customAttribution);
+  assert.deepEqual(lines(), []);
+  adapter.setDataAttribution(true);
+  adapter.setDataAttribution(true);
+  assert.equal(lines().length, 1);
+  assert.ok(/open-meteo\.com/.test(lines()[0]));
+  adapter.setDataAttribution(false);
+  assert.deepEqual(lines(), []);
+  assert.equal(map.controls.filter((c) => c instanceof Object && 'opts' in c).length, 1, 'one attribution control at a time');
 });

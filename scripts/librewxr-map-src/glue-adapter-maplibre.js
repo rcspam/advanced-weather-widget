@@ -12,6 +12,9 @@ var WidgetMapLibreAdapter = function (maplibregl) {
   var frameRegistry = [];      // runtime frame entries, creation order
   var pendingReady = {};       // source id -> finishers of onLayerReady still waiting
   var alertsEntry = null;      // { geojson } while the alerts overlay is on
+  var tempEntry = null;        // { canvas, coords, opacity } while the temperature shows
+  var attribution = null;      // the attribution control, remade when its lines change
+  var dataAttribution = false; // Open-Meteo credited (wind or temperature on)
   var popupHandler = null;
   var alertClickCb = null;
   var appliedKey = null;       // base map now drawn
@@ -70,7 +73,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     var layers = map.getStyle().layers;
     for (var i = 0; i < layers.length; i++) {
       var id = layers[i].id;
-      if (id.indexOf('lv-') === 0 && id !== 'lv-base' && id !== 'lv-night') return id;
+      if (id.indexOf('lv-') === 0 && id !== 'lv-base' && id !== 'lv-night' && id !== TEMP_LAYER) return id;
     }
     return undefined;
   }
@@ -130,8 +133,31 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     }
     if (!map.getLayer('lv-night')) {
       map.addLayer({ id: 'lv-night', type: 'raster', source: 'lv-night', paint: { 'raster-fade-duration': 0 } },
-        firstRuntimeLayerId());
+        map.getLayer(TEMP_LAYER) ? TEMP_LAYER : firstRuntimeLayerId());
     }
+  }
+
+  // The temperature (glue-temp-layer.js) is a canvas the page draws, shown
+  // right over the base map and its night, under every frame and overlay.
+  var TEMP_LAYER = 'lv-temp', TEMP_SOURCE = 'lv-temp-src';
+  function addTempLayer() {
+    if (!tempEntry) return;
+    if (!map.getSource(TEMP_SOURCE)) {
+      map.addSource(TEMP_SOURCE, { type: 'canvas', canvas: tempEntry.canvas, coordinates: tempEntry.coords, animate: false });
+    }
+    if (!map.getLayer(TEMP_LAYER)) {
+      map.addLayer({
+        id: TEMP_LAYER, type: 'raster', source: TEMP_SOURCE,
+        paint: { 'raster-opacity': tempEntry.opacity, 'raster-fade-duration': 0, 'raster-resampling': 'linear' }
+      }, firstRuntimeLayerId());
+    }
+  }
+
+  var OPEN_METEO = 'Weather data: <a href="https://open-meteo.com/">Open-Meteo</a>';
+  function makeAttribution() {
+    if (attribution) map.removeControl(attribution);
+    attribution = new maplibregl.AttributionControl(dataAttribution ? { compact: true, customAttribution: OPEN_METEO } : { compact: true });
+    map.addControl(attribution);
   }
   function moveSun() {
     var sun = WidgetEarth.subsolarPoint(new Date());
@@ -325,6 +351,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     appliedKey = key;
     var i;
     addSunLayers();
+    addTempLayer();
     for (i = 0; i < frameRegistry.length; i++) if (frameRegistry[i].kind === 'satellite') addFrameEntry(frameRegistry[i]);
     if (alertsEntry) { addAlertsLayers(); registerAlertsPopup(); }
     for (i = 0; i < frameRegistry.length; i++) if (frameRegistry[i].kind !== 'satellite') addFrameEntry(frameRegistry[i]);
@@ -352,12 +379,14 @@ var WidgetMapLibreAdapter = function (maplibregl) {
         center: [view.lon, view.lat],
         zoom: toGl(view.zoom),
         maxZoom: toGl(view.maxZoom),
-        attributionControl: { compact: true },
+        // Made by makeAttribution(), which adds a line for Open-Meteo's data.
+        attributionControl: false,
         // Tile fetches from a file:// page (CORS with a null origin)
         transformRequest: function (url) { return { url: url, credentials: 'omit' }; }
       });
       // Zoom buttons and compass, where the Leaflet page has them.
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-left');
+      makeAttribution();
       new maplibregl.Marker().setLngLat([view.lon, view.lat]).addTo(map);
       map.once('load', function () { styleReady = true; applyProjection(); applyDayNight(); fitMinZoom(); });
       map.on('movestart', function () { holdHiddenFrames(true); });
@@ -560,6 +589,43 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     },
 
     getNightDepth: function () { return nightDepth; },
+
+    /** Show the temperature canvas over coords ([[w, n], [e, n], [e, s],
+        [w, s]]) at opacity 0..1; again with a redrawn canvas to push it. */
+    setTempImage: function (canvas, coords, opacity) {
+      tempEntry = { canvas: canvas, coords: coords, opacity: opacity };
+      if (!styleReady || swapInProgress) return;   // restoreRuntimeStyle() adds it afterwards
+      var src = map.getSource(TEMP_SOURCE);
+      if (!src || !map.getLayer(TEMP_LAYER)) { addTempLayer(); return; }
+      src.setCoordinates(coords);
+      // A still canvas source uploads its pixels while playing: one frame.
+      src.play();
+      map.once('render', function () {
+        var s = map.getSource(TEMP_SOURCE);
+        if (s) s.pause();
+      });
+      map.setPaintProperty(TEMP_LAYER, 'raster-opacity', opacity);
+    },
+
+    setTempOpacity: function (opacity) {
+      if (!tempEntry) return;
+      tempEntry.opacity = opacity;
+      if (map.getLayer(TEMP_LAYER)) map.setPaintProperty(TEMP_LAYER, 'raster-opacity', opacity);
+    },
+
+    clearTemp: function () {
+      tempEntry = null;
+      if (map.getLayer(TEMP_LAYER)) map.removeLayer(TEMP_LAYER);
+      if (map.getSource(TEMP_SOURCE)) map.removeSource(TEMP_SOURCE);
+    },
+
+    /** Credit Open-Meteo while the wind or the temperature shows. */
+    setDataAttribution: function (on) {
+      on = !!on;
+      if (on === dataAttribution) return;
+      dataAttribution = on;
+      makeAttribution();
+    },
 
     // The table-based wind layer (glue-wind-table.js), when the page has it.
     createWindLayer: function (source, openData, dem, options) {
