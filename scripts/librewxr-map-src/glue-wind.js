@@ -700,27 +700,34 @@ var WidgetWind = (function () {
     var self = this;
     var r = this._range(spec, z);
     if ((r.x1 - r.x0 + 1) * (r.y1 - r.y0 + 1) > this.maxTiles) return Promise.resolve();
-    var keys = this.tileKeysFor(spec, z);
-    var waits = [];
-    keys.forEach(function (key) {
-      self._touch(key);
-      if (self.tiles[key]) return;
-      if (!self.pending[key]) {
-        var parts = key.split('/');
-        var url = self.template.replace('{z}', parts[0]).replace('{x}', parts[1]).replace('{y}', parts[2]);
-        self.pending[key] = self.loadTile(url).then(function (data) {
-          self.tiles[key] = data;
-          delete self.pending[key];
-          self._evict();
-        }).catch(function (err) {
-          delete self.pending[key];
-          if (typeof console !== 'undefined') console.warn('[wind] ' + err);
-        });
-      }
-      waits.push(self.pending[key]);
-    });
-    return Promise.all(waits);
+    return Promise.all(this.tileKeysFor(spec, z).map(function (key) { return self._load(key); }));
   };
+
+  /** Load one tile, once; resolves when it is in, or failed (a warning). */
+  DemTiles.prototype._load = function (key) {
+    var self = this;
+    this._touch(key);
+    if (this.tiles[key]) return Promise.resolve();
+    if (!this.pending[key]) {
+      var parts = key.split('/');
+      var url = this.template.replace('{z}', parts[0]).replace('{x}', parts[1]).replace('{y}', parts[2]);
+      this.pending[key] = this.loadTile(url).then(function (data) {
+        self.tiles[key] = data;
+        delete self.pending[key];
+        self._evict();
+      }).catch(function (err) {
+        delete self.pending[key];
+        if (typeof console !== 'undefined') console.warn('[wind] ' + err);
+      });
+    }
+    return this.pending[key];
+  };
+
+  /** Load the tile z/x/y itself (the temperature draws tile by tile). */
+  DemTiles.prototype.ensureTile = function (z, x, y) { return this._load(z + '/' + x + '/' + y); };
+
+  /** Elevations of the tile z/x/y, 256 rows of 256 from the north-west; null while missing. */
+  DemTiles.prototype.tileData = function (z, x, y) { return this.tiles[z + '/' + x + '/' + y] || null; };
 
   /** Elevation (m) at a world pixel of zoom z, NaN while the tile is missing. */
   DemTiles.prototype.elevationAtWorld = function (x, y, z) {

@@ -12,7 +12,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
   var frameRegistry = [];      // runtime frame entries, creation order
   var pendingReady = {};       // source id -> finishers of onLayerReady still waiting
   var alertsEntry = null;      // { geojson } while the alerts overlay is on
-  var tempEntry = null;        // { canvas, coords, opacity } while the temperature shows
+  var tempEntry = null;        // { provider, version, opacity } while the temperature shows
   var attribution = null;      // the attribution control, remade when its lines change
   var dataAttribution = false; // Open-Meteo credited (wind or temperature on)
   var popupHandler = null;
@@ -137,13 +137,31 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     }
   }
 
-  // The temperature (glue-temp-layer.js) is a canvas the page draws, shown
-  // right over the base map and its night, under every frame and overlay.
-  var TEMP_LAYER = 'lv-temp', TEMP_SOURCE = 'lv-temp-src';
+  // The temperature (glue-temp-layer.js): raster tiles the layer draws,
+  // through a tile protocol of its own as the night, right over the base
+  // map and its night, under every frame and overlay. Each new set of tiles
+  // (new data, new colors) has its own address; the shown ones stay until
+  // the new ones arrive. A tile of 256 px is shown on 512, as a vector
+  // map's: the data are coarse, and the elevation keeps 2 screen px; a
+  // quarter of the tiles to draw and of the elevation tiles to fetch. Past
+  // zoom 12 the map stretches the tiles.
+  var TEMP_LAYER = 'lv-temp', TEMP_SOURCE = 'lv-temp-src', TEMP_TILE = 256, TEMP_MAXZOOM = 12;
+  maplibregl.addProtocol('lvtemp', function (params, abortController) {
+    var m = /^lvtemp:\/\/\d+\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
+    var signal = abortController && abortController.signal;
+    var drawn = tempEntry ? tempEntry.provider(+m[1], +m[2], +m[3], signal)
+      : Promise.resolve(new Uint8ClampedArray(TEMP_TILE * TEMP_TILE * 4));
+    return drawn.then(function (px) {
+      return createImageBitmap(new ImageData(px, TEMP_TILE, TEMP_TILE));
+    }).then(function (bitmap) {
+      return { data: bitmap };
+    });
+  });
+  function tempTiles() { return ['lvtemp://' + tempEntry.version + '/{z}/{x}/{y}']; }
   function addTempLayer() {
     if (!tempEntry) return;
     if (!map.getSource(TEMP_SOURCE)) {
-      map.addSource(TEMP_SOURCE, { type: 'canvas', canvas: tempEntry.canvas, coordinates: tempEntry.coords, animate: false });
+      map.addSource(TEMP_SOURCE, { type: 'raster', tiles: tempTiles(), tileSize: 2 * TEMP_TILE, maxzoom: TEMP_MAXZOOM });
     }
     if (!map.getLayer(TEMP_LAYER)) {
       map.addLayer({
@@ -590,20 +608,16 @@ var WidgetMapLibreAdapter = function (maplibregl) {
 
     getNightDepth: function () { return nightDepth; },
 
-    /** Show the temperature canvas over coords ([[w, n], [e, n], [e, s],
-        [w, s]]) at opacity 0..1; again with a redrawn canvas to push it. */
-    setTempImage: function (canvas, coords, opacity) {
-      tempEntry = { canvas: canvas, coords: coords, opacity: opacity };
+    /** Show the temperature tiles drawn by provider(z, x, y, signal) ->
+        Promise of 256 x 256 RGBA pixels, at opacity 0..1; again with a new
+        version when the data or the colors change. */
+    setTempTiles: function (provider, version, opacity) {
+      var same = tempEntry && tempEntry.version === version;
+      tempEntry = { provider: provider, version: version, opacity: opacity };
       if (!styleReady || swapInProgress) return;   // restoreRuntimeStyle() adds it afterwards
       var src = map.getSource(TEMP_SOURCE);
       if (!src || !map.getLayer(TEMP_LAYER)) { addTempLayer(); return; }
-      src.setCoordinates(coords);
-      // A still canvas source uploads its pixels while playing: one frame.
-      src.play();
-      map.once('render', function () {
-        var s = map.getSource(TEMP_SOURCE);
-        if (s) s.pause();
-      });
+      if (!same) src.setTiles(tempTiles());
       map.setPaintProperty(TEMP_LAYER, 'raster-opacity', opacity);
     },
 

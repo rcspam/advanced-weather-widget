@@ -12,7 +12,7 @@ require('../glue-temp-layer.js');
 const T = global.WidgetTemp;
 const { WindField, WindSource } = global.WidgetWind;
 
-// Each performance.now() call is 1 ms later: a 4 ms slice draws a few rows.
+// Each performance.now() call is 1 ms later: a slice of a few ms draws a few rows.
 let clock = 0;
 Object.defineProperty(globalThis, 'performance', { value: { now: () => (clock += 1) }, configurable: true });
 let rafQueue = [];
@@ -54,11 +54,12 @@ function fakeMap(zoom) {
   };
 }
 
+/** The adapter: every setTempTiles() kept, its provider called by tile(). */
 function fakeAdapter(bounds) {
   return {
-    bounds, images: [], opacities: [], cleared: 0,
+    bounds, tiles: [], opacities: [], cleared: 0,
     getBounds() { return this.bounds; },
-    setTempImage(canvas, coords, opacity) { this.images.push({ image: canvas.image, coords, opacity }); },
+    setTempTiles(provider, version, opacity) { this.tiles.push({ provider, version, opacity }); },
     setTempOpacity(o) { this.opacities.push(o); },
     clearTemp() { this.cleared++; },
   };
@@ -76,11 +77,16 @@ function fakeOpen(opts = {}) {
   };
 }
 
-/** Elevation tiles: `height` everywhere once ensure() has resolved, if lazy. */
-function fakeDem(height, lazy) {
-  const d = { loaded: !lazy, resolve: null };
-  d.ensure = () => (d.loaded ? Promise.resolve() : new Promise((r) => { d.resolve = () => { d.loaded = true; r(); }; }));
-  d.elevationAtWorld = () => (d.loaded ? height : NaN);
+/** Elevation tiles: `height` everywhere once ensureTile() has resolved
+    (at once, or when resolve() is called if lazy); none at all if failing. */
+function fakeDem(height, opts = {}) {
+  const d = { loaded: !opts.lazy, asked: [], waiting: [] };
+  d.ensureTile = (z, x, y) => {
+    d.asked.push(z + '/' + x + '/' + y);
+    return d.loaded ? Promise.resolve() : new Promise((r) => d.waiting.push(r));
+  };
+  d.resolve = () => { d.loaded = true; d.waiting.splice(0).forEach((r) => r()); };
+  d.tileData = () => (d.loaded && !opts.fail ? new Float32Array(65536).fill(height) : null);
   return d;
 }
 
@@ -110,14 +116,30 @@ function colorOf(tC, step = 5, unit = 'C') {
   return [lut[i], lut[i + 1], lut[i + 2], 255].join(',');
 }
 
-test('wide view: drawn from the file, corrected with the model height', async () => {
+/** Tile z/x/y holding lat/lon. */
+function tileOf(lat, lon, z) {
+  const p = WindField.worldPx(lat, lon, z);
+  return [z, Math.floor(p.x / 256), Math.floor(p.y / 256)];
+}
+
+/** The pixels of a tile, once every slice of it is drawn. */
+async function drawTile(layer, z, x, y, signal) {
+  const p = layer.tile(z, x, y, signal);
+  await settle();
+  return { data: await p };
+}
+
+const MONT_BLANC = tileOf(45.83, 6.87, 5);
+
+test('wide view: tiles drawn from the file, corrected with the model height', async () => {
   const adapter = fakeAdapter(EUROPE);
   const layer = new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(4792), OPTS);
   layer.addTo(fakeMap(4));
   await settle();
-  const last = adapter.images[adapter.images.length - 1];
-  assert.deepEqual(colors(last.image), [colorOf(T.correct(6.3, 2076, 4792))]);
-  assert.equal(last.opacity, 0.45);
+  // Uncorrected tiles first if the file comes before the model's heights, then corrected ones.
+  assert.ok(adapter.tiles.length >= 1);
+  assert.equal(adapter.tiles[adapter.tiles.length - 1].opacity, 0.45);
+  assert.deepEqual(colors(await drawTile(layer, ...MONT_BLANC)), [colorOf(T.correct(6.3, 2076, 4792))]);
   assert.equal(layer.isDrawing(), true);
 });
 
@@ -139,109 +161,160 @@ test('zoomed in: drawn from the API grid, no second request when the wind alread
   await source.ensure({ bounds, zoom: map.zoom + 1 });          // the wind layer's request
   const before = log.length;
   const adapter = fakeAdapter(bounds);
-  new T.TempLayer(adapter, source, fakeOpen(), fakeDem(1000), OPTS).addTo(map);
+  const layer = new T.TempLayer(adapter, source, fakeOpen(), fakeDem(1000), OPTS);
+  layer.addTo(map);
   await settle();
   assert.equal(log.length, before, 'no request of its own');
-  assert.deepEqual(colors(adapter.images[adapter.images.length - 1].image), [colorOf(11)]);
+  assert.deepEqual(colors(await drawTile(layer, ...tileOf(45.83, 6.87, 15))), [colorOf(11)]);
 });
 
 test('no open data: the API grid draws every zoom', async () => {
   const adapter = fakeAdapter(EUROPE);
-  new T.TempLayer(adapter, stubSource(apiEntry(EUROPE)), fakeOpen({ fail: true }), fakeDem(1000), OPTS).addTo(fakeMap(4));
+  const layer = new T.TempLayer(adapter, stubSource(apiEntry(EUROPE)), fakeOpen({ fail: true }), fakeDem(1000), OPTS);
+  layer.addTo(fakeMap(4));
   await settle();
-  assert.ok(adapter.images.length > 0);
-  assert.deepEqual(colors(adapter.images[adapter.images.length - 1].image), [colorOf(11)]);
+  assert.deepEqual(colors(await drawTile(layer, ...MONT_BLANC)), [colorOf(11)]);
 });
 
-test('drawing is sliced and a new move cancels it', async () => {
+test('past the edge of the API grid, the file fills the tile', async () => {
+  const bounds = { west: 6.80, south: 45.80, east: 6.95, north: 45.87 };
+  const adapter = fakeAdapter(bounds);
+  const layer = new T.TempLayer(adapter, stubSource(apiEntry(bounds)), fakeOpen(), fakeDem(1000), Object.assign({}, OPTS, { step: 2 }));
+  layer.addTo(fakeMap(10));
+  await settle();
+  // 11 °C from the grid, 13.3 °C from the file: two bands of 2 °C.
+  assert.deepEqual(colors(await drawTile(layer, ...tileOf(45.83, 6.87, 9))).sort(),
+    [colorOf(11, 2), colorOf(T.correct(6.3, 2076, 1000), 2)].sort());
+});
+
+test('a tile waits for its elevation tile, then draws corrected', async () => {
   const adapter = fakeAdapter(EUROPE);
-  const map = fakeMap(4);
-  new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(4792), OPTS).addTo(map);
-  for (let i = 0; i < 10; i++) await tick();        // data in, drawing queued
-  assert.ok(rafQueue.length > 0, 'a drawing waits for the next frame');
-  rafQueue.shift()();                                 // one slice only
-  assert.equal(adapter.images.length, 0, 'nothing pushed before the last row');
-  adapter.bounds = { west: 0, south: 40, east: 40, north: 65 };
-  map.fire('moveend');
+  const dem = fakeDem(4792, { lazy: true });
+  const layer = new T.TempLayer(adapter, stubSource(null), fakeOpen(), dem, OPTS);
+  layer.addTo(fakeMap(4));
   await settle();
-  assert.equal(adapter.images.length, 1, 'only the new view is pushed');
-  assert.equal(adapter.images[0].coords[0][0], -4);   // west 0 minus 10 % of 40
-});
-
-test('a view across the antimeridian draws without holes', async () => {
-  const adapter = fakeAdapter({ west: 170, south: -30, east: 190, north: -10 });
-  new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(0), OPTS).addTo(fakeMap(5));
+  let done = false;
+  const p = layer.tile(...MONT_BLANC).then((d) => { done = true; return d; });
   await settle();
-  const img = adapter.images[adapter.images.length - 1].image;
-  assert.deepEqual(colors(img), [colorOf(T.correct(6.3, 2076, 0))]);
-});
-
-test('the DEM arrives later: one more draw, corrected', async () => {
-  const adapter = fakeAdapter(EUROPE);
-  const dem = fakeDem(4792, true);
-  new T.TempLayer(adapter, stubSource(null), fakeOpen(), dem, OPTS).addTo(fakeMap(4));
-  await settle();
-  assert.deepEqual(colors(adapter.images[adapter.images.length - 1].image), [colorOf(6.3)]);
-  const count = adapter.images.length;
+  assert.equal(done, false);
+  assert.deepEqual(dem.asked, [MONT_BLANC.join('/')]);
   dem.resolve();
   await settle();
-  assert.equal(adapter.images.length, count + 1);
-  assert.deepEqual(colors(adapter.images[adapter.images.length - 1].image), [colorOf(T.correct(6.3, 2076, 4792))]);
+  assert.deepEqual(colors({ data: await p }), [colorOf(T.correct(6.3, 2076, 4792))]);
 });
 
-test('setOpacity changes the layer only, no redraw', async () => {
+test('no elevation tile (failed): the tile draws uncorrected', async () => {
+  const adapter = fakeAdapter(EUROPE);
+  const layer = new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(4792, { fail: true }), OPTS);
+  layer.addTo(fakeMap(4));
+  await settle();
+  assert.deepEqual(colors(await drawTile(layer, ...MONT_BLANC)), [colorOf(6.3)]);
+});
+
+test('past zoom 12, a tile reads the elevation tile it lies in', async () => {
+  const dem = fakeDem(0);
+  const layer = new T.TempLayer(fakeAdapter(EUROPE), stubSource(null), fakeOpen(), dem, OPTS);
+  layer.addTo(fakeMap(4));
+  await settle();
+  const [z, x, y] = tileOf(45.83, 6.87, 14);
+  await drawTile(layer, z, x, y);
+  assert.deepEqual(dem.asked, ['12/' + (x >> 2) + '/' + (y >> 2)]);
+});
+
+test('a tile is drawn a few rows per frame, and given up once its request is aborted', async () => {
+  const layer = new T.TempLayer(fakeAdapter(EUROPE), stubSource(null), fakeOpen(), fakeDem(0), OPTS);
+  layer.addTo(fakeMap(4));
+  await settle();
+  const ctl = new AbortController();
+  let done = false;
+  const p = layer.tile(...MONT_BLANC, ctl.signal).then((d) => { done = true; return d; });
+  for (let i = 0; i < 5; i++) await tick();
+  assert.ok(rafQueue.length > 0, 'the drawing waits for a frame');
+  rafQueue.shift()();
+  await tick();
+  assert.equal(done, false, 'one frame draws part of the tile');
+  ctl.abort();
+  await settle();
+  assert.equal(done, true);
+  assert.deepEqual(colors({ data: await p }), ['0,0,0,0']);
+});
+
+test('tiles on both sides of the antimeridian are filled', async () => {
+  const layer = new T.TempLayer(fakeAdapter({ west: 170, south: -30, east: 190, north: -10 }), stubSource(null), fakeOpen(), fakeDem(0), OPTS);
+  layer.addTo(fakeMap(5));
+  await settle();
+  const want = [colorOf(T.correct(6.3, 2076, 0))];
+  assert.deepEqual(colors(await drawTile(layer, 3, 0, 4)), want);
+  assert.deepEqual(colors(await drawTile(layer, 3, 7, 4)), want);
+});
+
+test('a move over the same data keeps the tiles', async () => {
+  const adapter = fakeAdapter(EUROPE);
+  const map = fakeMap(4);
+  new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(0), OPTS).addTo(map);
+  await settle();
+  const count = adapter.tiles.length;
+  adapter.bounds = { west: 0, south: 40, east: 40, north: 65 };
+  map.zoom = 5;
+  map.fire('moveend');
+  await settle();
+  assert.equal(adapter.tiles.length, count);
+});
+
+test('setOpacity changes the layer only, the tiles stay', async () => {
   const adapter = fakeAdapter(EUROPE);
   const layer = new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(0), OPTS);
   layer.addTo(fakeMap(4));
   await settle();
-  const count = adapter.images.length;
+  const count = adapter.tiles.length;
   layer.setOpacity(80);
   await settle();
   assert.deepEqual(adapter.opacities, [0.8]);
-  assert.equal(adapter.images.length, count);
+  assert.equal(adapter.tiles.length, count);
 });
 
-test('setPalette, setStep and setUnit redraw and remake the legend', async () => {
+test('setPalette, setStep and setUnit make new tiles and remake the legend', async () => {
   const adapter = fakeAdapter(EUROPE);
-  const layer = new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(0), OPTS);
+  const layer = new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(2076), OPTS);
   layer.addTo(fakeMap(4));
   await settle();
   const legend = container.children[container.children.length - 1];
   assert.equal(legend.id, 'lv-temp-legend');
   assert.ok(legend.innerHTML.includes('°C'));
+  const v = adapter.tiles[adapter.tiles.length - 1].version;
   layer.setUnit('F');
   await settle();
   assert.ok(legend.innerHTML.includes('°F'));
   assert.ok(legend.innerHTML.includes('>100<'), 'Fahrenheit ticks');
-  let count = adapter.images.length;
   layer.setStep(0);
   await settle();
-  assert.equal(adapter.images.length, count + 1);
-  count = adapter.images.length;
   layer.setPalette([{ t: 0, color: '#000000' }, { t: 10, color: '#ffffff' }]);
   await settle();
-  assert.equal(adapter.images.length, count + 1);
+  assert.deepEqual(adapter.tiles.slice(-3).map((t) => t.version), [v + 1, v + 2, v + 3]);
   // Still in Fahrenheit: 0 to 10 °C is 32 to 50 °F, one tick at 40.
   assert.ok(legend.innerHTML.includes('>40<') && !legend.innerHTML.includes('>100<'), 'ticks follow the palette');
+  // 6.3 °C (ground at the model's height) on a black to white ramp, smooth: a gray.
+  assert.deepEqual(colors(await drawTile(layer, ...MONT_BLANC)), ['161,161,161,255']);
 });
 
-test('remove clears the layer and the legend', async () => {
+test('remove clears the layer and the legend; tiles asked later stay empty', async () => {
   const adapter = fakeAdapter(EUROPE);
   const map = fakeMap(4);
   const layer = new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(0), OPTS);
   layer.addTo(map);
   await settle();
   const legend = container.children[container.children.length - 1];
-  const count = adapter.images.length;
+  const count = adapter.tiles.length;
   layer.remove();
   map.fire('moveend');
   await settle();
   assert.equal(adapter.cleared, 1);
   assert.equal(legend.removed, true);
-  assert.equal(adapter.images.length, count);
+  assert.equal(adapter.tiles.length, count);
+  assert.deepEqual(colors(await drawTile(layer, ...MONT_BLANC)), ['0,0,0,0']);
 });
 
-test('the API held back: tries again once it allows, then draws the view grid', async () => {
+test('the API held back: tries again once it allows, then new tiles from the view grid', async () => {
   const bounds = { west: 6.80, south: 45.80, east: 6.95, north: 45.87 };
   const fine = apiEntry(bounds);
   let calls = 0;
@@ -252,33 +325,10 @@ test('the API held back: tries again once it allows, then draws the view grid', 
     now: () => NOW,
   };
   const adapter = fakeAdapter(bounds);
-  new T.TempLayer(adapter, source, fakeOpen(), fakeDem(1000), Object.assign({}, OPTS, { retryMinMs: 0 })).addTo(fakeMap(10));
+  const layer = new T.TempLayer(adapter, source, fakeOpen({ fail: true }), fakeDem(1000), Object.assign({}, OPTS, { retryMinMs: 0 }));
+  layer.addTo(fakeMap(10));
   for (let i = 0; i < 5; i++) { await new Promise((r) => setTimeout(r, 5)); await settle(); }
   assert.equal(calls, 2);
-  assert.deepEqual(colors(adapter.images[adapter.images.length - 1].image), [colorOf(11)]);
-});
-
-test('world view: a move that keeps the whole world in view draws nothing new', async () => {
-  const adapter = fakeAdapter({ west: -170, south: -60, east: 170, north: 70 });
-  const map = fakeMap(2);
-  new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(0), OPTS).addTo(map);
-  await settle();
-  const count = adapter.images.length;
-  assert.ok(count > 0);
-  adapter.bounds = { west: -120, south: -50, east: 150, north: 75 };
-  map.fire('moveend');
-  await settle();
-  assert.equal(adapter.images.length, count);
-});
-
-test('world view: a move while the world is being drawn lets that drawing finish', async () => {
-  const adapter = fakeAdapter({ west: -170, south: -60, east: 170, north: 70 });
-  const map = fakeMap(2);
-  new T.TempLayer(adapter, stubSource(null), fakeOpen(), fakeDem(0), OPTS).addTo(map);
-  for (let i = 0; i < 10; i++) await tick();        // data in, the world drawing queued
-  rafQueue.shift()();                                 // one slice of it
-  adapter.bounds = { west: -120, south: -50, east: 150, north: 75 };
-  map.fire('moveend');
-  await settle();
-  assert.equal(adapter.images.length, 1);
+  assert.equal(adapter.tiles.length, 1);
+  assert.deepEqual(colors(await drawTile(layer, ...tileOf(45.83, 6.87, 15))), [colorOf(11)]);
 });

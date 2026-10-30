@@ -212,9 +212,9 @@ if (WIND_ON) window.setWind(true);
 // both) and its own elevation tiles, kept apart from the wind's: it asks
 // for tiles at every zoom.
 window.tempAvailable = typeof WidgetTemp !== 'undefined' && !!WidgetTemp.TempLayer &&
-  typeof _widgetAdapter.setTempImage === 'function';
+  typeof _widgetAdapter.setTempTiles === 'function';
 var tempLayer = null;
-var _tempDem = window.tempAvailable ? new WidgetWind.DemTiles({ maxTiles: 24, maxKept: 64 }) : null;
+var _tempDem = window.tempAvailable ? new WidgetWind.DemTiles({ maxKept: 96 }) : null;
 var tempPalette = window.tempAvailable ? WidgetTemp.paletteFromParam(TEMP_PALETTE_PARAM) : null;
 var tempOpacity = window.tempAvailable ? WidgetTemp.normOpacity(TEMP_OPACITY) : 45;
 var tempStep = window.tempAvailable ? WidgetTemp.normStep(TEMP_STEP) : 5;

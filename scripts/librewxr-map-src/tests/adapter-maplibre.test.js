@@ -383,25 +383,50 @@ test('no preparation asked: map moves reach the viewer as before', () => {
 
 // === Temperature layer ===
 const ids = (map) => map.layers.map((l) => l.id);
-const fakeCanvas = { width: 4, height: 4 };
-const box = [[0, 50], [10, 50], [10, 40], [0, 40]];
+const provider = () => Promise.resolve(new Uint8ClampedArray(256 * 256 * 4));
 
 test('the temperature goes right over the base map and the night, under the frames', () => {
   const { adapter, map } = loadAdapter({ DAYNIGHT_INIT: true });
   adapter.createFrameLayer('https://radar/a/{z}/{x}/{y}.webp', 'radar');
   adapter.createFrameLayer('https://radar/b/{z}/{x}/{y}.webp', 'radar');
-  adapter.setTempImage(fakeCanvas, box, 0.45);
+  adapter.setTempTiles(provider, 1, 0.45);
   // The fake map only holds the layers added at run time: lv-base is in the style.
   const order = ids(map).filter((id) => id.indexOf('lv-') === 0);
   assert.deepEqual(order.slice(0, 2), ['lv-night', 'lv-temp']);
   assert.ok(order[2].indexOf('lv-layer-radar-') === 0);
   assert.equal(map.getLayer('lv-temp').paint['raster-opacity'], 0.45);
-  assert.equal(map.getSource('lv-temp-src').type, 'canvas');
+  const src = map.getSource('lv-temp-src');
+  assert.equal(src.type, 'raster');
+  assert.deepEqual([...src.tiles], ['lvtemp://1/{z}/{x}/{y}']);
+  // Drawn on 256 px, shown on 512: a quarter of the tiles to draw and of the elevation to fetch.
+  assert.equal(src.tileSize, 512);
+});
+
+test('the temperature tiles come from the layer, z/x/y and the abort signal passed on', async () => {
+  const { adapter, protocols } = loadAdapter();
+  const asked = [];
+  const ctl = new AbortController();
+  adapter.setTempTiles((z, x, y, signal) => {
+    asked.push([z, x, y, signal]);
+    return Promise.resolve(new Uint8ClampedArray(256 * 256 * 4).fill(9));
+  }, 3, 0.45);
+  const res = await protocols.lvtemp({ url: 'lvtemp://3/5/16/11' }, ctl);
+  assert.deepEqual(asked, [[5, 16, 11, ctl.signal]]);
+  assert.equal(res.data.width, 256);
+  assert.equal(res.data.data[0], 9);
+});
+
+test('new temperature tiles: same source, new tile address', () => {
+  const { adapter, map } = loadAdapter();
+  adapter.setTempTiles(provider, 1, 0.45);
+  adapter.setTempTiles(provider, 2, 0.45);
+  assert.deepEqual([...map.getSource('lv-temp-src').tiles], ['lvtemp://2/{z}/{x}/{y}']);
+  assert.equal(ids(map).filter((id) => id === 'lv-temp').length, 1);
 });
 
 test('the night switched on later still goes under the temperature', () => {
   const { adapter, map } = loadAdapter();
-  adapter.setTempImage(fakeCanvas, box, 0.45);
+  adapter.setTempTiles(provider, 1, 0.45);
   adapter.setDayNight(true);
   const order = ids(map).filter((id) => id.indexOf('lv-') === 0);
   assert.ok(order.indexOf('lv-night') < order.indexOf('lv-temp'));
@@ -409,7 +434,7 @@ test('the night switched on later still goes under the temperature', () => {
 
 test('a satellite frame added later still goes over the temperature', () => {
   const { adapter, map } = loadAdapter();
-  adapter.setTempImage(fakeCanvas, box, 0.45);
+  adapter.setTempTiles(provider, 1, 0.45);
   const sat = adapter.createFrameLayer('https://sat/{z}/{x}/{y}.webp', 'satellite');
   assert.ok(ids(map).indexOf('lv-temp') < ids(map).indexOf(sat.layerId));
 });
@@ -417,7 +442,7 @@ test('a satellite frame added later still goes over the temperature', () => {
 test('a base map change puts the temperature back, at the same place', () => {
   const { adapter, map, ctx } = loadAdapter();
   const radar = adapter.createFrameLayer('https://radar/{z}/{x}/{y}.webp', 'radar');
-  adapter.setTempImage(fakeCanvas, box, 0.3);
+  adapter.setTempTiles(provider, 4, 0.3);
   ctx.BG_CURRENT = 'cyclosm';
   adapter.setBasemap('light');
   // What MapLibre does with a new style: only its own layers and sources are left.
@@ -429,31 +454,20 @@ test('a base map change puts the temperature back, at the same place', () => {
   assert.ok(order.indexOf('lv-temp') > order.indexOf('lv-base'));
   assert.ok(order.indexOf('lv-temp') < order.indexOf(radar.layerId));
   assert.equal(map.getLayer('lv-temp').paint['raster-opacity'], 0.3);
-  assert.deepEqual(map.getSource('lv-temp-src').coordinates, box);
+  assert.deepEqual([...map.getSource('lv-temp-src').tiles], ['lvtemp://4/{z}/{x}/{y}']);
 });
 
-test('setTempImage twice: one source, coordinates updated, the image pushed', () => {
-  const { adapter, map } = loadAdapter();
-  adapter.setTempImage(fakeCanvas, box, 0.45);
-  const other = [[1, 51], [11, 51], [11, 41], [1, 41]];
-  adapter.setTempImage(fakeCanvas, other, 0.45);
-  const src = map.getSource('lv-temp-src');
-  assert.deepEqual(src.coordinates, other);
-  assert.equal(src.plays, 1);
-  assert.equal(src.pauses, 0);
-  map.fire('render');
-  assert.equal(src.pauses, 1, 'paused once the new image is drawn');
-  assert.equal(ids(map).filter((id) => id === 'lv-temp').length, 1);
-});
-
-test('setTempOpacity changes the layer only; clearTemp removes layer and source', () => {
-  const { adapter, map } = loadAdapter();
-  adapter.setTempImage(fakeCanvas, box, 0.45);
+test('setTempOpacity changes the layer only; clearTemp removes layer and source', async () => {
+  const { adapter, map, protocols } = loadAdapter();
+  adapter.setTempTiles(provider, 1, 0.45);
   adapter.setTempOpacity(0.8);
   assert.equal(map.getLayer('lv-temp').paint['raster-opacity'], 0.8);
   adapter.clearTemp();
   assert.equal(map.getLayer('lv-temp'), undefined);
   assert.equal(map.getSource('lv-temp-src'), undefined);
+  // A tile asked for just before: empty.
+  const res = await protocols.lvtemp({ url: 'lvtemp://1/0/0/0' }, new AbortController());
+  assert.equal(res.data.data.every((v) => v === 0), true);
 });
 
 test('setDataAttribution adds the Open-Meteo line once, and takes it away', () => {
@@ -469,11 +483,11 @@ test('setDataAttribution adds the Open-Meteo line once, and takes it away', () =
   assert.equal(map.controls.filter((c) => c instanceof Object && 'opts' in c).length, 1, 'one attribution control at a time');
 });
 
-test('a temperature picture given before the style loads shows once it has', () => {
+test('temperature tiles given before the style loads show once it has', () => {
   const { adapter, map } = loadAdapter({}, { load: false });
-  adapter.setTempImage(fakeCanvas, box, 0.45);
+  adapter.setTempTiles(provider, 2, 0.45);
   assert.equal(map.getLayer('lv-temp'), undefined);
   map.fire('load');
   assert.ok(map.getLayer('lv-temp'));
-  assert.deepEqual(map.getSource('lv-temp-src').coordinates, box);
+  assert.deepEqual([...map.getSource('lv-temp-src').tiles], ['lvtemp://2/{z}/{x}/{y}']);
 });

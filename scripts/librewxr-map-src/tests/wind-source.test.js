@@ -311,3 +311,21 @@ test('DemTiles maxKept: the oldest tiles go first', async () => {
   await dem.ensure(tile(532), 10);
   assert.deepEqual(Object.keys(dem.tiles).sort(), ['10/531/355', '10/532/355']);
 });
+
+test('DemTiles ensureTile: one tile by its own key, loaded once, then read whole', async () => {
+  const loaded = [];
+  const dem = new DemTiles({ loadTile: (url) => { loaded.push(url); return Promise.resolve(new Float32Array(65536).fill(7)); } });
+  assert.equal(dem.tileData(2, 3, 1), null);
+  await dem.ensureTile(2, 3, 1);
+  await dem.ensureTile(2, 3, 1);
+  assert.deepEqual(loaded.map((u) => u.split('terrarium/')[1]), ['2/3/1.png']);
+  assert.equal(dem.tileData(2, 3, 1)[123], 7);
+});
+
+test('DemTiles ensureTile: a tile that fails resolves all the same, and stays missing', async () => {
+  const dem = new DemTiles({ loadTile: () => Promise.reject(new Error('404')) });
+  const warn = console.warn;
+  console.warn = () => {};
+  try { await dem.ensureTile(2, 4, 1); } finally { console.warn = warn; }
+  assert.equal(dem.tileData(2, 4, 1), null);
+});
