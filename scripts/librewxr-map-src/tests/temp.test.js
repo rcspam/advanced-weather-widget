@@ -72,3 +72,10 @@ test('sampleScalar: bilinear, wrapped across the antimeridian, NaN outside', () 
   assert.equal(T.sampleScalar(g, v, 5, 270), 15);      // same meridian, next world copy
   assert.ok(Number.isNaN(T.sampleScalar(g, v, 20, 0)));
 });
+
+test('paletteFromParam: a param that does not parse gives the vivid palette', () => {
+  assert.deepEqual(T.paletteFromParam('nimp'), T.DEFAULT_STOPS);
+  assert.deepEqual(T.paletteFromParam(''), T.DEFAULT_STOPS);
+  assert.deepEqual(T.paletteFromParam(null), T.DEFAULT_STOPS);
+  assert.deepEqual(T.paletteFromParam('0:000000,10:ffffff'), [{ t: 0, color: '#000000' }, { t: 10, color: '#ffffff' }]);
+});

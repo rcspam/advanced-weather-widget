@@ -46,6 +46,10 @@ var WidgetTemp = (function () {
     return out;
   }
 
+  /** The palette of the page's parameter: the vivid one when it is empty or
+      does not read (a broken settings entry). */
+  function paletteFromParam(s) { return parsePalette(s) || DEFAULT_STOPS; }
+
   /** The URL form of a palette (see parsePalette), temperatures to 0.1 °C. */
   function formatPalette(stops) {
     return stops.map(function (s) {
@@ -158,7 +162,7 @@ var WidgetTemp = (function () {
   return {
     LAPSE: LAPSE, correct: correct, sampleScalar: sampleScalar,
     DEFAULT_STOPS: DEFAULT_STOPS, LUT_MIN: LUT_MIN, LUT_STEP: LUT_STEP, LUT_SIZE: LUT_SIZE,
-    parsePalette: parsePalette, formatPalette: formatPalette, colorAt: colorAt,
+    parsePalette: parsePalette, paletteFromParam: paletteFromParam, formatPalette: formatPalette, colorAt: colorAt,
     bandCenterC: bandCenterC, lutIndex: lutIndex, buildLut: buildLut, legendTicks: legendTicks,
     normStep: normStep, normOpacity: normOpacity, normUnit: normUnit
   };

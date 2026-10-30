@@ -71,7 +71,7 @@ class FakeMap {
   getZoom() { return 5; }
 }
 
-function loadAdapter(globals) {
+function loadAdapter(globals, opts = {}) {
   const src = fs.readFileSync(path.join(__dirname, '../glue-adapter-maplibre.js'), 'utf8');
   let map = null;
   const ctx = {
@@ -104,7 +104,7 @@ function loadAdapter(globals) {
   };
   const adapter = ctx.WidgetMapLibreAdapter(maplibregl);
   adapter.createMap('lv-map', { lat: 48, lon: 6, zoom: 6, maxZoom: 12 });
-  map.fire('load');
+  if (opts.load !== false) map.fire('load');
   return { adapter, map, ctx, protocols };
 }
 
@@ -467,4 +467,13 @@ test('setDataAttribution adds the Open-Meteo line once, and takes it away', () =
   adapter.setDataAttribution(false);
   assert.deepEqual(lines(), []);
   assert.equal(map.controls.filter((c) => c instanceof Object && 'opts' in c).length, 1, 'one attribution control at a time');
+});
+
+test('a temperature picture given before the style loads shows once it has', () => {
+  const { adapter, map } = loadAdapter({}, { load: false });
+  adapter.setTempImage(fakeCanvas, box, 0.45);
+  assert.equal(map.getLayer('lv-temp'), undefined);
+  map.fire('load');
+  assert.ok(map.getLayer('lv-temp'));
+  assert.deepEqual(map.getSource('lv-temp-src').coordinates, box);
 });

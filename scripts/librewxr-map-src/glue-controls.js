@@ -118,6 +118,8 @@ window.signalWhenLoaded = function (token) {
     var loading = _widgetAdapter.tilesBusy();
     // The wind draws once its grid is in, from memory or from Open-Meteo.
     if (windLayer && !windLayer.isDrawing()) loading = true;
+    // The temperature once its first picture is on the map.
+    if (tempLayer && !tempLayer.isDrawing()) loading = true;
     return loading;
   };
   var check = function () {
@@ -165,6 +167,7 @@ window.setWind = function (on) {
     windLayer.remove();
     windLayer = null;
   }
+  creditOpenMeteo();
 };
 
 // Frame-rate budget chosen in the widget settings (economy / balanced / smooth).
@@ -204,6 +207,69 @@ window.setWindActive = function (active) {
 
 if (WIND_ON) window.setWind(true);
 
+// === TEMPERATURE LAYER (glue-temp.js, glue-temp-layer.js; MapLibre page) ===
+// It reads the wind's API grids and open-data files (one request serves
+// both) and its own elevation tiles, kept apart from the wind's: it asks
+// for tiles at every zoom.
+window.tempAvailable = typeof WidgetTemp !== 'undefined' && !!WidgetTemp.TempLayer &&
+  typeof _widgetAdapter.setTempImage === 'function';
+var tempLayer = null;
+var _tempDem = window.tempAvailable ? new WidgetWind.DemTiles({ maxTiles: 24, maxKept: 64 }) : null;
+var tempPalette = window.tempAvailable ? WidgetTemp.paletteFromParam(TEMP_PALETTE_PARAM) : null;
+var tempOpacity = window.tempAvailable ? WidgetTemp.normOpacity(TEMP_OPACITY) : 45;
+var tempStep = window.tempAvailable ? WidgetTemp.normStep(TEMP_STEP) : 5;
+var tempUnit = TEMP_UNIT;
+
+// Open-Meteo credited while its data show.
+function creditOpenMeteo() {
+  if (_widgetAdapter.setDataAttribution) _widgetAdapter.setDataAttribution(!!(windLayer || tempLayer));
+}
+
+window.setTemp = function (on) {
+  var m = _widgetAdapter.getMap();
+  if (!m || !window.tempAvailable) return;
+  if (on && !tempLayer) {
+    tempLayer = new WidgetTemp.TempLayer(_widgetAdapter, _windSource, _windOpen, _tempDem, {
+      stops: tempPalette, step: tempStep, unit: tempUnit, opacity: tempOpacity
+    });
+    tempLayer.addTo(m);
+  } else if (!on && tempLayer) {
+    tempLayer.remove();
+    tempLayer = null;
+  }
+  creditOpenMeteo();
+};
+
+// Palette chosen in the widget settings, "t:rrggbb,..." with t in °C.
+window.setTempPalette = function (s) {
+  if (!window.tempAvailable) return;
+  tempPalette = WidgetTemp.paletteFromParam(s);
+  if (tempLayer) tempLayer.setPalette(tempPalette);
+};
+
+// Opacity of the layer in percent, from the widget settings.
+window.setTempOpacity = function (n) {
+  if (!window.tempAvailable) return;
+  tempOpacity = WidgetTemp.normOpacity(n);
+  if (tempLayer) tempLayer.setOpacity(tempOpacity);
+};
+
+// Width of the bands (0: smooth gradient), in the unit below.
+window.setTempStep = function (n) {
+  if (!window.tempAvailable) return;
+  tempStep = WidgetTemp.normStep(n);
+  if (tempLayer) tempLayer.setStep(tempStep);
+};
+
+// The widget's temperature unit, 'C' or 'F': the bands and the legend follow it.
+window.setTempUnit = function (u) {
+  if (!window.tempAvailable) return;
+  tempUnit = WidgetTemp.normUnit(u);
+  if (tempLayer) tempLayer.setUnit(tempUnit);
+};
+
+if (TEMP_ON) window.setTemp(true);
+
 // Fade-in fallback when nothing calls fixViewport (the page opened on its own).
 setTimeout(function () { document.body.classList.add('lv-ready'); }, 1500);
 
@@ -222,6 +288,7 @@ window.setProjection = function (p) {
   renderProjBtn();
   // The new projection is in place on the next frames: rebuild the wind table then.
   if (windLayer && windLayer.refresh) setTimeout(function () { if (windLayer) windLayer.refresh(); }, 300);
+  if (tempLayer) setTimeout(function () { if (tempLayer) tempLayer.refresh(); }, 300);
 };
 if (projBtn) {
   projBtn.title = tr('globe', 'Globe');

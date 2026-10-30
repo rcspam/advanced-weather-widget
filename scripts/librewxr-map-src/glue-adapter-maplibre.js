@@ -388,7 +388,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-left');
       makeAttribution();
       new maplibregl.Marker().setLngLat([view.lon, view.lat]).addTo(map);
-      map.once('load', function () { styleReady = true; applyProjection(); applyDayNight(); fitMinZoom(); });
+      map.once('load', function () { styleReady = true; applyProjection(); applyDayNight(); addTempLayer(); fitMinZoom(); });
       map.on('movestart', function () { holdHiddenFrames(true); });
       map.on('moveend', function () { holdHiddenFrames(false); });
       map.on('resize', fitMinZoom);

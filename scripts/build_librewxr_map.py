@@ -35,6 +35,8 @@ GLUE_WIND_TOKEN = "/*@__WIDGET_GLUE_WIND__*/"
 GLUE_CONTROLS_TOKEN = "/*@__WIDGET_GLUE_CONTROLS__*/"
 GLUE_WIND_OPEN_TOKEN = "/*@__WIDGET_GLUE_WIND_OPEN__*/"
 GLUE_WIND_TABLE_TOKEN = "/*@__WIDGET_GLUE_WIND_TABLE__*/"
+GLUE_TEMP_TOKEN = "/*@__WIDGET_GLUE_TEMP__*/"
+GLUE_TEMP_LAYER_TOKEN = "/*@__WIDGET_GLUE_TEMP_LAYER__*/"
 GLUE_EARTH_TOKEN = "/*@__WIDGET_GLUE_EARTH__*/"
 GLUE_PREPARE_TOKEN = "/*@__WIDGET_GLUE_PREPARE__*/"
 
@@ -61,6 +63,8 @@ PAGES = [
         ("glue-wind.js", GLUE_WIND_TOKEN),
         ("glue-wind-open.js", GLUE_WIND_OPEN_TOKEN),
         ("glue-wind-table.js", GLUE_WIND_TABLE_TOKEN),
+        ("glue-temp.js", GLUE_TEMP_TOKEN),
+        ("glue-temp-layer.js", GLUE_TEMP_LAYER_TOKEN),
         ("glue-earth.js", GLUE_EARTH_TOKEN),
         ("glue-controls.js", GLUE_CONTROLS_TOKEN),
     ]),

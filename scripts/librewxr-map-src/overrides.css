@@ -295,3 +295,20 @@
          come up together instead of popping in one after the other. */
       body { opacity: 0; transition: opacity 400ms ease-out; }
       body.lv-ready { opacity: 1; }
+
+      /* Temperature legend (glue-temp-layer.js): the palette's colors with
+         their ticks, top center over the map, the unit at the right end. */
+      #lv-temp-legend {
+        position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+        z-index: 5; pointer-events: none;
+        display: grid; grid-template-columns: 240px auto; column-gap: 6px;
+        padding: 3px 8px 5px; border-radius: 6px;
+        font: 11px var(--font-ui, sans-serif);
+        background: rgba(20, 22, 28, 0.72); color: #eee;
+      }
+      body[data-theme="light"] #lv-temp-legend { background: rgba(255, 255, 255, 0.82); color: #222; }
+      #lv-temp-legend .lv-temp-ticks { grid-column: 1; grid-row: 1; position: relative; height: 14px; }
+      #lv-temp-legend .lv-temp-ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+      #lv-temp-legend .lv-temp-bar { grid-column: 1; grid-row: 2; width: 240px; height: 8px; border-radius: 2px; }
+      #lv-temp-legend .lv-temp-unit { grid-column: 2; grid-row: 2; align-self: center; }
+      @media (max-width: 320px) { #lv-temp-legend { display: none; } }
