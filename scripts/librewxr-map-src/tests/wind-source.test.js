@@ -283,3 +283,31 @@ test('DemTiles: a grid reaching the poles is clamped to Mercator, and skipped wh
   await dem.ensure(WindField.gridSpec(WindField.WORLD), 9);
   assert.equal(loaded.length, 0);
 });
+
+test('url: one request for the wind and the temperature', () => {
+  const url = new WindSource({ fetch: () => {}, storage: null }).url(WindField.gridSpec(view.bounds));
+  const hourly = url.split('hourly=')[1].split('&')[0].split(',');
+  assert.equal(hourly.filter((v) => v === 'temperature_2m').length, 1);
+  for (const v of ['wind_speed_10m', 'wind_direction_10m', 'wind_speed_700hPa', 'wind_direction_700hPa']) assert.ok(hourly.includes(v), v);
+});
+
+test('restore: drops the grids kept before the temperature', async () => {
+  const storage = fakeStorage();
+  const a = new WindSource({ fetch: fakeFetch([]), storage, now: () => 1000, minIntervalMs: 0 });
+  await a.ensure(view);
+  const kept = storage.getItem(WindSource.STORAGE_KEY);
+  storage.map.clear();
+  storage.setItem('awwWind:grids', kept);   // where the grids were kept before the temperature
+  const b = new WindSource({ fetch: fakeFetch([]), storage, now: () => 2000 });
+  assert.equal(b.best(view), null);
+  assert.equal(storage.getItem('awwWind:grids'), null);
+});
+
+test('DemTiles maxKept: the oldest tiles go first', async () => {
+  const dem = new DemTiles({ maxKept: 2, loadTile: () => Promise.resolve(new Float32Array(65536)) });
+  const tile = (x) => ({ west: -180 + (x + 0.2) * 360 / 1024, east: -180 + (x + 0.8) * 360 / 1024, south: 48.01, north: 48.03 });
+  await dem.ensure(tile(530), 10);
+  await dem.ensure(tile(531), 10);
+  await dem.ensure(tile(532), 10);
+  assert.deepEqual(Object.keys(dem.tiles).sort(), ['10/531/355', '10/532/355']);
+});

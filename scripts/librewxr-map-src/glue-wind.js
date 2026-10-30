@@ -30,6 +30,9 @@ var WidgetWind = (function () {
     '700hPa': ['wind_speed_700hPa', 'wind_direction_700hPa']
   };
   var DEFAULT_LEVEL = '10m';
+  // The 2 m temperature rides along in the same request, for the temperature
+  // layer (glue-temp-layer.js): one more variable, no other call.
+  var TEMP_VAR = 'temperature_2m';
 
   /* === WindField: pure math, no DOM === */
   var WindField = {
@@ -193,8 +196,20 @@ var WidgetWind = (function () {
         }
         levels[name] = { u: u, v: v };
       }
+      var temp = null;
+      if (points[0].hourly[TEMP_VAR]) {
+        temp = [];
+        for (var th = 0; th < hours; th++) {
+          var row = new Float32Array(count);
+          for (var tq = 0; tq < count; tq++) {
+            var tv = (points[tq].hourly[TEMP_VAR] || [])[th];
+            row[tq] = tv == null ? NaN : tv;
+          }
+          temp.push(row);
+        }
+      }
       var base = levels[DEFAULT_LEVEL] || { u: [], v: [] };
-      return { lats: spec.lats, lons: spec.lons, elev: elev, times: times, u: base.u, v: base.v, levels: levels };
+      return { lats: spec.lats, lons: spec.lons, elev: elev, times: times, u: base.u, v: base.v, levels: levels, temp: temp };
     },
 
     /** Hour index containing nowSec and the fraction toward the next hour. */
@@ -453,13 +468,15 @@ var WidgetWind = (function () {
     this.blockedUntil = 0;
     this.inflight = null;
   }
-  WindSource.STORAGE_KEY = 'awwWind:grids';
+  WindSource.STORAGE_KEY = 'awwWind:grids2';
+  WindSource.PREV_STORAGE_KEY = 'awwWind:grids';   // grids kept without the temperature
   WindSource.OLD_STORAGE_KEY = 'awwWind:last';   // a single grid, before the lattice
 
   WindSource.prototype.url = function (spec) {
     var pl = WindField.pointLists(spec);
     var vars = [];
     for (var name in LEVELS) vars = vars.concat(LEVELS[name]);
+    vars.push(TEMP_VAR);
     return this.apiBase + '?latitude=' + pl.latitude + '&longitude=' + pl.longitude +
       '&hourly=' + vars.join(',') + '&wind_speed_unit=ms&timeformat=unixtime' +
       '&past_hours=2&forecast_hours=4';
@@ -477,7 +494,10 @@ var WidgetWind = (function () {
       return e;
     };
     try {
-      if (this.storage.removeItem) this.storage.removeItem(WindSource.OLD_STORAGE_KEY);
+      if (this.storage.removeItem) {
+        this.storage.removeItem(WindSource.OLD_STORAGE_KEY);
+        this.storage.removeItem(WindSource.PREV_STORAGE_KEY);
+      }
       var raw = this.storage.getItem(WindSource.STORAGE_KEY);
       if (!raw) return;
       var saved = JSON.parse(raw);
@@ -637,9 +657,27 @@ var WidgetWind = (function () {
     this.template = opts.template || 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
     this.loadTile = opts.loadTile || defaultLoadTile;
     this.maxTiles = opts.maxTiles || 16;
+    // Tiles kept at most, the least recently asked for dropped first: the
+    // temperature layer asks for tiles at every zoom.
+    this.maxKept = opts.maxKept || Infinity;
     this.tiles = {};     // 'z/x/y' -> Float32Array(65536)
     this.pending = {};   // 'z/x/y' -> Promise
+    this.used = [];      // keys, least recently asked for first
   }
+
+  DemTiles.prototype._touch = function (key) {
+    var i = this.used.indexOf(key);
+    if (i >= 0) this.used.splice(i, 1);
+    this.used.push(key);
+  };
+
+  DemTiles.prototype._evict = function () {
+    var count = Object.keys(this.tiles).length;
+    while (count > this.maxKept && this.used.length) {
+      var key = this.used.shift();
+      if (this.tiles[key]) { delete this.tiles[key]; count--; }
+    }
+  };
 
   /** Tile index range covering a spec at zoom z. Latitudes are kept inside
       Web Mercator: a grid reaching a pole (the world grid) has no finite y. */
@@ -665,6 +703,7 @@ var WidgetWind = (function () {
     var keys = this.tileKeysFor(spec, z);
     var waits = [];
     keys.forEach(function (key) {
+      self._touch(key);
       if (self.tiles[key]) return;
       if (!self.pending[key]) {
         var parts = key.split('/');
@@ -672,6 +711,7 @@ var WidgetWind = (function () {
         self.pending[key] = self.loadTile(url).then(function (data) {
           self.tiles[key] = data;
           delete self.pending[key];
+          self._evict();
         }).catch(function (err) {
           delete self.pending[key];
           if (typeof console !== 'undefined') console.warn('[wind] ' + err);

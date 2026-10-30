@@ -586,3 +586,14 @@ test('afterEnsure: draw a grid covering most of the view, ask again while it doe
   assert.deepEqual(WindField.afterEnsure(view, far, now, ttl), { draw: false, retry: true });
   assert.deepEqual(WindField.afterEnsure(view, null, now, ttl), { draw: false, retry: true });
 });
+
+test('buildGrid: temperature per hour when the points have it, null otherwise', () => {
+  const spec = { n: 2, lats: [48.1, 48.0], lons: [6.5, 6.6] };
+  const mk = (t) => ({ elevation: 0, hourly: { time: [1000, 4600], wind_speed_10m: [1, 1], wind_direction_10m: [270, 270], temperature_2m: t } });
+  const g = WindField.buildGrid(spec, [mk([1, 2]), mk([3, 4]), mk([5, null]), mk([7, 8])]);
+  assert.equal(g.temp.length, 2);
+  assert.deepEqual(Array.from(g.temp[0]), [1, 3, 5, 7]);
+  assert.ok(Number.isNaN(g.temp[1][2]));
+  const old = WindField.buildGrid(spec, [1, 2, 3, 4].map(() => ({ elevation: 0, hourly: { time: [1000], wind_speed_10m: [1], wind_direction_10m: [270] } })));
+  assert.equal(old.temp, null);
+});
