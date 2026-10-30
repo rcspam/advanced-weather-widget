@@ -73,6 +73,22 @@ GridLayout {
         var perKmh = radarTab.windUnit === "mph" ? 0.621371 : (radarTab.windUnit === "ms" ? 1 / 3.6 : (radarTab.windUnit === "kn" ? 0.539957 : 1));
         return value / perKmh / 3.6;
     }
+    /** The temperature palettes made here: [{ name, stops: [{ t (°C), color }] }]. */
+    readonly property var tempPalettes: {
+        try {
+            var list = JSON.parse(radarTab.configRoot.cfg_librewxrTempPalettes || "[]");
+            return Array.isArray(list) ? list : [];
+        } catch (e) {
+            return [];
+        }
+    }
+    /** Names of the temperature palettes that come with the widget, in TEMP_BUILTINS order. */
+    readonly property var tempBuiltinNames: [i18n("Vivid"), i18n("Muted"), i18n("Blue-red")]
+    readonly property string tempUnit: ConfigUtils.effectiveTempUnit(Plasmoid.configuration.unitsMode, Plasmoid.configuration.temperatureUnit, Qt.locale().measurementSystem)
+    function saveTempPalettes(list, selected) {
+        radarTab.configRoot.cfg_librewxrTempPalettes = JSON.stringify(list);
+        radarTab.configRoot.cfg_librewxrTempPalette = selected;
+    }
     function saveWindPalettes(list, selected) {
         radarTab.configRoot.cfg_librewxrWindPalettes = JSON.stringify(list);
         radarTab.configRoot.cfg_librewxrWindPalette = selected;
@@ -590,6 +606,135 @@ GridLayout {
                 list.splice(windPaletteCombo.currentIndex - 1, 1);
                 radarTab.saveWindPalettes(list, "");
             }
+        }
+    }
+
+    // Temperature palettes: the three that come with the widget, and the ones
+    // made here, kept by name.
+    Label {
+        text: i18n("Temperature palette:")
+        visible: radarTab.configRoot.cfg_radarEnabled && radarTab.configRoot.cfg_radarProvider === "librewxr"
+        wrapMode: Text.Wrap
+        Layout.maximumWidth: Kirigami.Units.gridUnit * 14
+        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+    }
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: Kirigami.Units.smallSpacing
+        visible: radarTab.configRoot.cfg_radarEnabled && radarTab.configRoot.cfg_radarProvider === "librewxr"
+
+        ComboBox {
+            id: tempPaletteCombo
+            readonly property int builtins: ConfigUtils.TEMP_BUILTINS.length
+            Layout.preferredWidth: 200
+            model: radarTab.tempBuiltinNames.concat(radarTab.tempPalettes.map(function (p) {
+                return p.name;
+            }))
+            currentIndex: {
+                var sel = radarTab.configRoot.cfg_librewxrTempPalette || "";
+                for (var i = 0; i < builtins; i++) {
+                    if (ConfigUtils.TEMP_BUILTINS[i].id === sel)
+                        return i;
+                }
+                for (var k = 0; k < radarTab.tempPalettes.length; k++) {
+                    if (radarTab.tempPalettes[k].name === sel)
+                        return builtins + k;
+                }
+                return 0;
+            }
+            onActivated: radarTab.configRoot.cfg_librewxrTempPalette = currentIndex < builtins ? ConfigUtils.TEMP_BUILTINS[currentIndex].id : radarTab.tempPalettes[currentIndex - builtins].name
+        }
+        Button {
+            icon.name: "list-add"
+            text: i18n("New…")
+            onClicked: {
+                tempPaletteDialog.takenNames = radarTab.tempBuiltinNames.concat(radarTab.tempPalettes.map(function (p) {
+                    return p.name;
+                }));
+                tempPaletteDialog.openFor(-1, "", ConfigUtils.tempPaletteStops(radarTab.configRoot.cfg_librewxrTempPalette, radarTab.configRoot.cfg_librewxrTempPalettes));
+            }
+        }
+        Button {
+            icon.name: "document-edit"
+            text: i18n("Edit…")
+            enabled: tempPaletteCombo.currentIndex >= tempPaletteCombo.builtins
+            onClicked: {
+                var k = tempPaletteCombo.currentIndex - tempPaletteCombo.builtins;
+                tempPaletteDialog.takenNames = radarTab.tempBuiltinNames.concat(radarTab.tempPalettes.filter(function (p, j) {
+                    return j !== k;
+                }).map(function (p) {
+                    return p.name;
+                }));
+                tempPaletteDialog.openFor(k, radarTab.tempPalettes[k].name, ConfigUtils.tempPaletteStops(radarTab.tempPalettes[k].name, radarTab.configRoot.cfg_librewxrTempPalettes));
+            }
+        }
+        Button {
+            icon.name: "edit-delete"
+            text: i18n("Delete")
+            enabled: tempPaletteCombo.currentIndex >= tempPaletteCombo.builtins
+            onClicked: {
+                var list = radarTab.tempPalettes.slice();
+                list.splice(tempPaletteCombo.currentIndex - tempPaletteCombo.builtins, 1);
+                radarTab.saveTempPalettes(list, "");
+            }
+        }
+    }
+
+    // A see-through layer leaves the base map and its names readable.
+    Label {
+        text: i18n("Temperature opacity:")
+        visible: radarTab.configRoot.cfg_radarEnabled && radarTab.configRoot.cfg_radarProvider === "librewxr"
+        wrapMode: Text.Wrap
+        Layout.maximumWidth: Kirigami.Units.gridUnit * 14
+        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+    }
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: Kirigami.Units.smallSpacing
+        visible: radarTab.configRoot.cfg_radarEnabled && radarTab.configRoot.cfg_radarProvider === "librewxr"
+
+        Slider {
+            Layout.preferredWidth: 220
+            from: 10
+            to: 100
+            stepSize: 5
+            value: radarTab.configRoot.cfg_librewxrTempOpacity
+            onMoved: radarTab.configRoot.cfg_librewxrTempOpacity = Math.round(value)
+        }
+        Label {
+            text: i18n("%1 %", radarTab.configRoot.cfg_librewxrTempOpacity)
+        }
+    }
+
+    // Zones of one color every few degrees, or a smooth gradient.
+    Label {
+        text: i18n("Temperature bands:")
+        visible: radarTab.configRoot.cfg_radarEnabled && radarTab.configRoot.cfg_radarProvider === "librewxr"
+        wrapMode: Text.Wrap
+        Layout.maximumWidth: Kirigami.Units.gridUnit * 14
+        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+    }
+    ComboBox {
+        readonly property var steps: [0, 2, 5, 10]
+        visible: radarTab.configRoot.cfg_radarEnabled && radarTab.configRoot.cfg_radarProvider === "librewxr"
+        Layout.preferredWidth: 200
+        model: steps.map(function (n) {
+            return n === 0 ? i18n("Smooth") : n + " °" + radarTab.tempUnit;
+        })
+        currentIndex: Math.max(0, steps.indexOf(radarTab.configRoot.cfg_librewxrTempStep))
+        onActivated: radarTab.configRoot.cfg_librewxrTempStep = steps[currentIndex]
+    }
+
+    TempPaletteDialog {
+        id: tempPaletteDialog
+        unit: radarTab.tempUnit
+        onSaved: function (palette) {
+            var list = radarTab.tempPalettes.slice();
+            if (index >= 0)
+                list[index] = palette;
+            else
+                list.push(palette);
+            radarTab.saveTempPalettes(list, palette.name);
         }
     }
 

@@ -250,3 +250,30 @@ function effectiveTempUnit(unitsMode, temperatureUnit, measurementSystem) {
         return measurementSystem === 1 ? "F" : "C";
     return temperatureUnit === "F" ? "F" : "C";
 }
+
+/**
+ * What keeps a temperature palette from being saved, for the editor:
+ * "name" (none given), "taken" (another palette has it), "count" (not 2 to
+ * 12 points), "order" (temperatures not going up), or "" when it can be.
+ */
+function tempPaletteProblem(name, stops, takenNames) {
+    var n = String(name || "").trim();
+    if (!n)
+        return "name";
+    if (takenNames.indexOf(n) >= 0)
+        return "taken";
+    if (stops.length < 2 || stops.length > 12)
+        return "count";
+    for (var i = 1; i < stops.length; i++) {
+        if (!(stops[i].t > stops[i - 1].t))
+            return "order";
+    }
+    return "";
+}
+
+/** The points of a palette and one more, 5 degrees of the unit above the last, in its color. */
+function tempAddStop(stops, unit) {
+    var last = stops[stops.length - 1];
+    var next = tempFromUnit(tempToUnit(last.t, unit) + 5, unit);
+    return stops.concat([{ t: next, color: last.color }]);
+}

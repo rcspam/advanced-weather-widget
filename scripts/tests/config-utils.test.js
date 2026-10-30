@@ -70,3 +70,21 @@ test('effectiveTempUnit: the KDE locale or the widget setting', () => {
   assert.equal(U.effectiveTempUnit('kde', 'F', 0), 'C');
   assert.equal(U.effectiveTempUnit('metric', '', 0), 'C');
 });
+
+test('tempPaletteProblem: a name, free, 2 to 12 points going up', () => {
+  const two = [{ t: 0, color: '#000000' }, { t: 10, color: '#ffffff' }];
+  assert.equal(U.tempPaletteProblem('', two, []), 'name');
+  assert.equal(U.tempPaletteProblem('  ', two, []), 'name');
+  assert.equal(U.tempPaletteProblem('Vivid', two, ['Vivid', 'Muted']), 'taken');
+  assert.equal(U.tempPaletteProblem('Mine', two.slice(0, 1), []), 'count');
+  assert.equal(U.tempPaletteProblem('Mine', Array.from({ length: 13 }, (_, i) => ({ t: i, color: '#000000' })), []), 'count');
+  assert.equal(U.tempPaletteProblem('Mine', [two[1], two[0]], []), 'order');
+  assert.equal(U.tempPaletteProblem('Mine', two, ['Other']), '');
+});
+
+test('tempAddStop: one more point 5 degrees of the unit above the last, same color', () => {
+  const two = [{ t: 0, color: '#000000' }, { t: 10, color: '#ff0000' }];
+  assert.deepEqual(plain(U.tempAddStop(two, 'C')), [...two, { t: 15, color: '#ff0000' }]);
+  assert.deepEqual(plain(U.tempAddStop(two, 'F')).pop(), { t: 12.8, color: '#ff0000' });
+  assert.equal(two.length, 2, 'the list given is left as it is');
+});
