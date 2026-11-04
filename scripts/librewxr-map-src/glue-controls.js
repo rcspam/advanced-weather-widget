@@ -268,6 +268,11 @@ window.setTempUnit = function (u) {
   if (tempLayer) tempLayer.setUnit(tempUnit);
 };
 
+// Coasts and borders over the color layers, from the widget's setting.
+window.setMapLines = function (on) {
+  if (_widgetAdapter.setLinesShown) _widgetAdapter.setLinesShown(!!on);
+};
+
 if (TEMP_ON) window.setTemp(true);
 
 // Fade-in fallback when nothing calls fixViewport (the page opened on its own).
