@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+project(qmlwindow CXX)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Qml)
+add_executable(qmlwindow main.cpp)
+target_link_libraries(qmlwindow Qt6::Widgets Qt6::Qml)
