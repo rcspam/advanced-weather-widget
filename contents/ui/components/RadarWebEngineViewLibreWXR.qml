@@ -777,7 +777,9 @@ Item {
             }
 
             MapToggle {
-                visible: radarRoot.optionsExpanded && radarRoot.tempOn && radarRoot.tempAvailable
+                // Options are always offered, even with the temperature off: the
+                // choice is kept for when it comes on.
+                visible: radarRoot.optionsExpanded && radarRoot.tempAvailable
                 icon.name: "map-flat"
                 title: i18n("Coasts and borders")
                 tip: i18n("Draw the coasts and the country borders over the temperature")
@@ -789,7 +791,7 @@ Item {
             }
 
             MapToggle {
-                visible: radarRoot.optionsExpanded && radarRoot.windOn
+                visible: radarRoot.optionsExpanded   // kept for when the wind comes on
                 iconInfo: radarRoot.barIcon("strong-wind")
                 badge: "\uF058"
                 badgeFamily: radarRoot.wiFontFamily
