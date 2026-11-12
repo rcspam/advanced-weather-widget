@@ -115,4 +115,4 @@ Volume per day if the page follows every run (simulated with the page's own run 
 
 At 5 Mbit/s, 670 MB is about 18 min of download per day, in small pieces. ECMWF alone: 3 min 30 for wind.
 
-**It does not download less, it downloads earlier, even if the map is never opened. Good for a slow unlimited connection, bad for a metered one. A switch in the widget settings is enough, off by default, next to "Keep the radar loaded". Everyone picks what fits their connection. To make it lighter: only the layers turned on, and follow the regional models less often (UKMO alone is more than a third of the wind).**
+**It does not download less, it downloads earlier, even if the map is never opened. Good for a slow unlimited connection, bad for a metered one. A switch in the widget settings is enough, off by default, next to "Keep the radar loaded". Everyone picks what fits their connection. Only the layers turned on are prepared.**
