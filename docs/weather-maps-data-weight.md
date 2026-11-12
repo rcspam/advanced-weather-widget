@@ -92,7 +92,6 @@ Public server api.librewxr.net, browser cache off. For each case, first pass the
 
 ## Ideas for a limited connection
 
-- Regional models make up about two thirds of wind and temperature over France. An option to turn them off would bring wind down to 38 MB and temperature to 24 MB.
 - For past images, accepting an image already stored from an older run would avoid reading them again after each new run. The image would be slightly less accurate.
 - A shorter range reduces everything in proportion (25 images by default).
 
