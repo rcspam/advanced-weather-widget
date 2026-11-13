@@ -884,17 +884,38 @@ Rectangle {
         x: 9.5
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 8
-        spacing: 7
         Divider {}
-        Caption { text: i18n("Time") }
-        // How far back, how far ahead (the wheel steps them), the speed.
-        Flow {
+        // The caption folds away in step with the icons below, so the block
+        // keeps a steady height and never jumps.
+        Item {
             width: panel.colW
-            spacing: panel.folded ? 4 : 10
-            // Side by side open, one under the other folded: they glide there.
-            move: Transition { NumberAnimation { properties: "x,y"; duration: 220; easing.type: Easing.OutCubic } }
+            height: 7 + (1 - timeRow.fold) * (timeCaption.implicitHeight + 7)
+            clip: true
+            Caption {
+                id: timeCaption
+                y: 7
+                visible: true
+                opacity: 1 - timeRow.fold
+                text: i18n("Time")
+            }
+        }
+        // How far back, how far ahead (the wheel steps them), the speed. Side
+        // by side open, one above the other folded, as the head's buttons in
+        // reverse: the speed stays at the bottom and glides left, the clocks
+        // glide up above it. One value drives the three and the height, so the
+        // caption above rises in step.
+        Item {
+            id: timeRow
+            property real fold: panel.folded ? 1 : 0
+            Behavior on fold { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            readonly property real cell: 36 + 10
+            readonly property real step: 40 + 4
+            width: panel.colW
+            height: 40 + fold * 2 * step
             RangeIcon {
                 id: pastPick
+                x: 0
+                y: 0
                 prefix: "−"
                 // A source's range shows its name on both clocks, its hours in the bubble.
                 override: panel.map.solo ? "−" + panel.map.hoursText(panel.map.pastH) : ""
@@ -906,6 +927,8 @@ Rectangle {
             }
             RangeIcon {
                 id: futurePick
+                x: (1 - timeRow.fold) * timeRow.cell
+                y: timeRow.fold * timeRow.step
                 prefix: "+"
                 // A source's range shows its name on both clocks, its hours in the bubble.
                 override: panel.map.solo ? "+" + panel.map.hoursText(panel.map.futureH) : ""
@@ -920,6 +943,8 @@ Rectangle {
             Item {
                 id: speedIcon
                 readonly property int speed: panel.map.speed
+                x: (1 - timeRow.fold) * 2 * timeRow.cell
+                y: timeRow.fold * 2 * timeRow.step
                 implicitWidth: 36
                 implicitHeight: 40
                 Rectangle {
