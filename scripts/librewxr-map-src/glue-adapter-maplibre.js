@@ -235,6 +235,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     var sun = WidgetEarth.subsolarPoint(new Date());
     map.setLight(dayNight ? { anchor: 'map', position: WidgetEarth.sunLightPosition(sun) } : EVEN_LIGHT);
     drawShade(sun);
+    drawSpaceSoon();
   }
   function applyDayNight() {
     addSunLayers();
@@ -403,8 +404,203 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     map.setProjection({ type: projection === 'globe' ? 'globe' : 'mercator' });
     var sky = {}, base = SKY[skyTheme] || SKY.dark, g = glow / 100;
     for (var k in base) sky[k] = base[k];
+    // Space on the globe is the page's own canvas under the map (drawSpace).
+    if (projection === 'globe') sky['sky-color'] = sky['fog-color'] = 'rgba(0,0,0,0)';
     sky['atmosphere-blend'] = ['interpolate', ['linear'], ['zoom'], 0, 0.5 * g, 4, 0.35 * g, 7, 0];
     map.setSky(sky);
+    drawSpaceSoon();
+  }
+
+  // Around the globe, a small model of the sky seen by MapLibre's camera,
+  // at the time of the picture shown (setSkyTime) or now: black space and
+  // the stars where they are (they turn with the globe), the Sun in its
+  // true direction, far away, and the Moon on its true orbit, brought in
+  // to MOON_ORBIT Earth radii, MOON_SIZE across. The Moon passes behind the
+  // globe (on the canvas under the map's) and in front of it (on a canvas
+  // over it), lit by the Sun: its phase is the one seen from the camera.
+  var STARS = 9000, SPACE = '#02040a', MOON_ORBIT = 1.45, MOON_SIZE = 0.2;
+  var space = null, spaceFrame = 0, skyTime = null;
+  var sunShown = typeof SUN_INIT === 'undefined' || SUN_INIT !== false;
+  var moonShown = typeof MOON_INIT === 'undefined' || MOON_INIT !== false;
+  function makeSpace() {
+    var canvas = document.createElement('canvas');
+    canvas.id = 'lv-space';
+    canvas.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;display:none';
+    var front = document.createElement('canvas');
+    front.id = 'lv-space-front';
+    front.style.cssText = canvas.style.cssText;
+    var under = map.getCanvasContainer();
+    map.getContainer().insertBefore(canvas, under);
+    map.getContainer().insertBefore(front, under.nextSibling);
+    var raw = WidgetEarth.starField(STARS, 20261114), n = STARS;
+    // Each star as sin ra cos dec, sin dec, cos ra cos dec (the sky as it is
+    // at sidereal time 0), its size and its alpha.
+    var stars = new Float32Array(n * 5);
+    for (var i = 0; i < n; i++) {
+      var ra = raw[i * 3] * Math.PI / 180, dec = raw[i * 3 + 1] * Math.PI / 180, b = raw[i * 3 + 2];
+      stars[i * 5] = Math.sin(ra) * Math.cos(dec);
+      stars[i * 5 + 1] = Math.sin(dec);
+      stars[i * 5 + 2] = Math.cos(ra) * Math.cos(dec);
+      stars[i * 5 + 3] = 0.7 + 1.6 * b;
+      stars[i * 5 + 4] = 0.25 + 0.75 * b;
+    }
+    space = { canvas: canvas, ctx: canvas.getContext('2d'), front: front, fctx: front.getContext('2d'), stars: stars };
+  }
+  // The globe's radius on screen, px: the farthest a point on the meridian
+  // through the middle of the map projects from it (towards the equator,
+  // never past a pole). globeApparentRadius() comes out a few percent short.
+  function globeEdge(c, mid) {
+    var dir = c.lat >= 0 ? -1 : 1, lo = 0, hi = 90;
+    function dist(a) { var p = map.project([c.lng, c.lat + dir * a]); return Math.hypot(p.x - mid.x, p.y - mid.y); }
+    for (var i = 0; i < 24; i++) {   // ternary search: the distance rises to the edge, then falls
+      var m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+      if (dist(m1) < dist(m2)) lo = m1; else hi = m2;
+    }
+    return dist((lo + hi) / 2);
+  }
+  function drawSpaceSoon() {
+    // (No animation frames in the unit tests' stand-in page.)
+    if (!map || spaceFrame || typeof requestAnimationFrame !== 'function') return;
+    spaceFrame = requestAnimationFrame(function () { spaceFrame = 0; drawSpace(); });
+  }
+  function drawSpace() {
+    if (!map || !styleReady) return;
+    if (!space) makeSpace();
+    var canvas = space.canvas, show = projection === 'globe';
+    canvas.style.display = space.front.style.display = show ? '' : 'none';
+    if (!show) return;
+    var box = map.getContainer(), w = box.clientWidth, h = box.clientHeight, dpr = window.devicePixelRatio || 1;
+    if (!(w > 0 && h > 0)) return;
+    [canvas, space.front].forEach(function (cv) {
+      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+        cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+      }
+    });
+    var ctx = space.ctx, fctx = space.fctx;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = SPACE;
+    ctx.fillRect(0, 0, w, h);
+    var c = map.getCenter(), mid = map.project(c), f = WidgetEarth.CAMERA * h;
+    var r = globeEdge(c, mid);
+    if (r > Math.hypot(w, h)) return;   // the globe covers it all
+    var cam = WidgetEarth.camera(c.lat, c.lng, map.getBearing(), map.getPitch());
+    var now = new Date(skyTime === null ? Date.now() : skyTime), g = WidgetEarth.gmst(now) * Math.PI / 180, cg = Math.cos(g), sg = Math.sin(g);
+    var F = cam.fwd, R = cam.right, U = cam.up, st = space.stars, v = [0, 0, 0];
+    ctx.fillStyle = '#fff';
+    for (var i = 0; i < st.length; i += 5) {
+      // The sky turned by the sidereal time: longitude = right ascension - GMST.
+      v[0] = st[i] * cg - st[i + 2] * sg; v[1] = st[i + 1]; v[2] = st[i + 2] * cg + st[i] * sg;
+      var z = v[0] * F[0] + v[1] * F[1] + v[2] * F[2];
+      if (z <= 0) continue;
+      var x = mid.x + f * (v[0] * R[0] + v[1] * R[1] + v[2] * R[2]) / z;
+      var y = mid.y - f * (v[0] * U[0] + v[1] * U[1] + v[2] * U[2]) / z;
+      if (x < 0 || y < 0 || x > w || y > h) continue;
+      var s = st[i + 3];
+      ctx.globalAlpha = st[i + 4];
+      ctx.fillRect(x - s / 2, y - s / 2, s, s);
+    }
+    ctx.globalAlpha = 1;
+    var sun = WidgetEarth.subsolarPoint(now), moon = WidgetEarth.sublunarPoint(now);
+    var sv = WidgetEarth.placeVector(sun.lat, sun.lon), mv = WidgetEarth.placeVector(moon.lat, moon.lon);
+    var earthR = WidgetEarth.earthRadiusPx(r, f);
+    var pos = WidgetEarth.cameraPosition(cam, WidgetEarth.placeVector(c.lat, c.lng), earthR, f);
+    var earthDist = Math.hypot(pos[0], pos[1], pos[2]);
+
+    // The Sun, at infinity: where its direction meets the screen, hidden
+    // by the globe when it is behind it. As it comes near the globe's edge,
+    // a faint touch of light on that side of the edge says where it is:
+    // blue, its light through the air at the Earth's rim.
+    var sp = sunShown ? WidgetEarth.projectDir(cam, sv, f) : null, sunR = 0.03 * Math.min(w, h);
+    if (sp) {
+      sp = { x: mid.x + sp.x, y: mid.y + sp.y };
+      var off = Math.hypot(sp.x - mid.x, sp.y - mid.y);
+      var near = Math.max(0, Math.min(1, 1 - (off - r) / (r * 0.6)));
+      if (near > 0) {
+        // Brightest towards the Sun, gone 50 degrees either side (all
+        // round the edge when the Sun is straight behind the globe).
+        var phi = Math.atan2(sp.y - mid.y, sp.x - mid.x);
+        var spread = Math.min(0.5, 0.14 + 0.36 * Math.max(0, 1 - off / r));
+        var hint = ctx.createConicGradient(phi + Math.PI, mid.x, mid.y), a = (0.32 * near).toFixed(3);
+        hint.addColorStop(0, 'rgba(140,195,255,0)');
+        hint.addColorStop(0.5 - spread, 'rgba(140,195,255,0)');
+        hint.addColorStop(0.5, 'rgba(140,195,255,' + a + ')');
+        hint.addColorStop(0.5 + spread, 'rgba(140,195,255,0)');
+        hint.addColorStop(1, 'rgba(140,195,255,0)');
+        ctx.save();
+        ctx.filter = 'blur(2px)';
+        ctx.fillStyle = hint;
+        ctx.beginPath();
+        ctx.arc(mid.x, mid.y, r * 1.035, 0, 2 * Math.PI);
+        ctx.arc(mid.x, mid.y, r * 0.99, 0, 2 * Math.PI, true);
+        ctx.fill();
+        ctx.restore();
+      }
+      var glowR = sunR * 2.4, halo = ctx.createRadialGradient(sp.x, sp.y, sunR * 0.6, sp.x, sp.y, glowR);
+      halo.addColorStop(0, 'rgba(255,226,160,0.4)');
+      halo.addColorStop(0.4, 'rgba(255,200,120,0.1)');
+      halo.addColorStop(1, 'rgba(255,190,110,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, glowR, 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = '#fff7df';
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, sunR, 0, 2 * Math.PI); ctx.fill();
+    }
+
+    // The Moon, a ball in space: under the map when farther than the
+    // Earth's centre (the globe hides it), over it when nearer. Only with
+    // the whole Earth in view: it fades out over the first zoom step.
+    var moonAlpha = moonShown ? Math.max(0, Math.min(1, 1 - (map.getZoom() - map.getMinZoom() - 0.1) / 0.5)) : 0;
+    var X = [mv[0] * MOON_ORBIT * earthR, mv[1] * MOON_ORBIT * earthR, mv[2] * MOON_ORBIT * earthR];
+    var mp = moonAlpha > 0 ? WidgetEarth.projectPoint(cam, pos, X, f) : null;
+    if (mp) {
+      var mx = mid.x + mp.x, my = mid.y + mp.y, mrad = f * MOON_SIZE / 2 * earthR / mp.z;
+      var inFront = mp.dist < earthDist;
+      if (mx > -mrad && my > -mrad && mx < w + mrad && my < h + mrad) drawMoon(inFront ? fctx : ctx, mx, my, mrad);
+      mp = { x: mx, y: my, r: mrad, front: inFront, alpha: moonAlpha, textured: !!space.moonTex };
+    }
+    space.last = { sun: sp, moon: mp, edge: r, time: now.getTime() };   // for the test bench
+
+    // Its texture on the ball, lit by the Sun (WidgetEarth.renderMoon),
+    // drawn through a small canvas. It shows the face and the phase seen
+    // from the Earth: from its true distance, 60 Earth radii, the camera
+    // would stand on the Earth's side of it; on the small orbit, it would
+    // see the far side whenever the Moon passes in front of the globe.
+    function drawMoon(cx, x, y, rad) {
+      var tex = space.moonTex;
+      if (!tex) { loadMoonTexture(); return; }
+      var v = mv;
+      // The screen's right, square to the line of sight (its up when that
+      // line runs along the right).
+      var side = Math.abs(dotv(R, v)) < 0.99 ? R : U;
+      var rt = [side[0] - dotv(side, v) * v[0], side[1] - dotv(side, v) * v[1], side[2] - dotv(side, v) * v[2]], rl = Math.hypot(rt[0], rt[1], rt[2]);
+      rt = [rt[0] / rl, rt[1] / rl, rt[2] / rl];
+      var up = [rt[1] * v[2] - rt[2] * v[1], rt[2] * v[0] - rt[0] * v[2], rt[0] * v[1] - rt[1] * v[0]];
+      var size = Math.max(2, Math.ceil(2 * rad * dpr) + 2), mc = space.moonCanvas;
+      if (!mc) mc = space.moonCanvas = document.createElement('canvas');
+      if (mc.width !== size) { mc.width = mc.height = size; space.moonPixels = mc.getContext('2d').createImageData(size, size); }
+      var img = space.moonPixels;
+      WidgetEarth.renderMoon(img.data, size, rad * dpr, { fwd: v, right: rt, up: up }, mv, sv, tex, moonAlpha);
+      mc.getContext('2d').putImageData(img, 0, 0);
+      cx.drawImage(mc, x - size / dpr / 2, y - size / dpr / 2, size / dpr, size / dpr);
+    }
+    function dotv(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+  }
+
+  // The Moon's colors (vendor/moon.jpg), read once into pixels: fetched as
+  // a blob so the canvas that reads them is not tainted by the file:// page.
+  var MOON_URL = 'vendor/moon.jpg', moonLoading = false;
+  function loadMoonTexture() {
+    if (moonLoading || !space) return;
+    moonLoading = true;
+    fetch(MOON_URL).then(function (r) { return r.blob(); }).then(function (b) { return createImageBitmap(b); }).then(function (bmp) {
+      var c = document.createElement('canvas');
+      c.width = bmp.width; c.height = bmp.height;
+      var g = c.getContext('2d');
+      g.drawImage(bmp, 0, 0);
+      space.moonTex = g.getImageData(0, 0, c.width, c.height);
+      drawSpaceSoon();
+    }).catch(function (e) { console.warn('moon texture: ' + e); });
   }
 
   // A new style drops every source and layer the page added: put them back
@@ -584,6 +780,8 @@ var WidgetMapLibreAdapter = function (maplibregl) {
       map.on('movestart', function () { holdHiddenFrames(true); });
       map.on('moveend', function () { holdHiddenFrames(false); });
       map.on('resize', fitMinZoom);
+      map.on('move', drawSpaceSoon);
+      map.on('resize', drawSpaceSoon);
       map.on('render', checkPrepared);
       map.on('styledata', restack);
       return map;
@@ -771,6 +969,26 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     },
 
     getMap: function () { return map; },
+
+    /** The Sun and the Moon around the globe on or off: { sun, moon }
+        (booleans; a key left out stays as it is). */
+    setSkyBodies: function (on) {
+      if (on && on.sun !== undefined) sunShown = !!on.sun;
+      if (on && on.moon !== undefined) moonShown = !!on.moon;
+      drawSpaceSoon();
+    },
+
+    /** The time (ms) the sky around the globe shows: the picture's while
+        the animation runs; null for now. */
+    setSkyTime: function (ms) {
+      var t = ms == null || !isFinite(ms) ? null : +ms;
+      if (t === skyTime) return;
+      skyTime = t;
+      drawSpaceSoon();
+    },
+
+    /** Where the space canvas last put the Sun and the Moon (test bench). */
+    spaceState: function () { return space && space.last; },
 
     /* What glue-controls.js asks of any map. */
     resize: function () { if (map) map.resize(); },

@@ -146,7 +146,163 @@ var WidgetEarth = (function () {
     return { type: 'FeatureCollection', features: features };
   }
 
+  // ---- Space around the globe: the stars, the Sun and the Moon ----
+
+  function julianDay(date) { return date.getTime() / 86400000 + 2440587.5; }
+
+  /** Greenwich mean sidereal time at that instant, in degrees (Meeus 12.4):
+      how far the sky has turned over Greenwich. */
+  function gmst(date) {
+    var d = julianDay(date) - 2451545, t = d / 36525;
+    var g = 280.46061837 + 360.98564736629 * d + t * t * (0.000387933 - t / 38710000);
+    return ((g % 360) + 360) % 360;
+  }
+
+  /** Where the Moon is overhead at that instant, { lat, lon } in degrees,
+      seen from the Earth's centre: the low precision series of the
+      Astronomical Almanac, good to a few tenths of a degree. */
+  function sublunarPoint(date) {
+    var t = (julianDay(date) - 2451545) / 36525;
+    function s(a, b) { return Math.sin((a + b * t) * RAD); }
+    var lambda = 218.32 + 481267.881 * t + 6.29 * s(135.0, 477198.87) - 1.27 * s(259.3, -413335.36)
+      + 0.66 * s(235.7, 890534.22) + 0.21 * s(269.9, 954397.74) - 0.19 * s(357.5, 35999.05)
+      - 0.11 * s(186.5, 966404.03);
+    var beta = 5.13 * s(93.3, 483202.02) + 0.28 * s(228.2, 960400.89) - 0.28 * s(318.3, 6003.15)
+      - 0.17 * s(217.6, -407332.21);
+    var eps = (23.439 - 0.0130 * t) * RAD, l = lambda * RAD, b = beta * RAD;
+    var x = Math.cos(b) * Math.cos(l);
+    var y = Math.cos(eps) * Math.cos(b) * Math.sin(l) - Math.sin(eps) * Math.sin(b);
+    var z = Math.sin(eps) * Math.cos(b) * Math.sin(l) + Math.cos(eps) * Math.sin(b);
+    var ra = Math.atan2(y, x) * DEG, dec = Math.asin(Math.max(-1, Math.min(1, z))) * DEG;
+    return { lat: dec, lon: wrap180(ra - gmst(date)) };
+  }
+
+  /** A place, or a direction from the Earth's centre, in MapLibre's globe
+      frame: (sin lon cos lat, sin lat, cos lon cos lat). */
+  function placeVector(lat, lon) {
+    var c = Math.cos(lat * RAD);
+    return [Math.sin(lon * RAD) * c, Math.sin(lat * RAD), Math.cos(lon * RAD) * c];
+  }
+
+  function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+
+  /** Share of the Moon's disc the Sun lights, 0 (new) to 1 (full), from the
+      points under each: the phase angle taken as 180 degrees minus their
+      separation (the Sun is 400 times further). */
+  function moonPhase(sun, moon) {
+    return (1 - dot(placeVector(sun.lat, sun.lon), placeVector(moon.lat, moon.lon))) / 2;
+  }
+
+  /** The axes of MapLibre's camera over the globe, centred on (lat, lon),
+      turned by `bearing` and tilted by `pitch` (degrees): fwd looks into
+      the screen, right and up along it. Directions only: the stars, the Sun
+      and the Moon are far enough for the camera's place not to matter. */
+  function camera(lat, lon, bearing, pitch) {
+    var c = placeVector(lat, lon);
+    var east = [Math.cos(lon * RAD), 0, -Math.sin(lon * RAD)];
+    var north = [-Math.sin(lat * RAD) * Math.sin(lon * RAD), Math.cos(lat * RAD), -Math.sin(lat * RAD) * Math.cos(lon * RAD)];
+    var cb = Math.cos(bearing * RAD), sb = Math.sin(bearing * RAD);
+    var cp = Math.cos(pitch * RAD), sp = Math.sin(pitch * RAD);
+    var up0 = [], right = [], fwd = [], up = [];
+    for (var i = 0; i < 3; i++) {
+      up0[i] = north[i] * cb + east[i] * sb;
+      right[i] = east[i] * cb - north[i] * sb;
+      fwd[i] = -c[i] * cp + up0[i] * sp;
+      up[i] = up0[i] * cp + c[i] * sp;
+    }
+    return { fwd: fwd, right: right, up: up };
+  }
+
+  /** Screen offset in px from the middle of the map of a direction `v`, for
+      a camera of focal length `f` px; null when it is behind the camera. */
+  function projectDir(cam, v, f) {
+    var z = dot(v, cam.fwd);
+    if (z <= 1e-6) return null;
+    return { x: f * dot(v, cam.right) / z, y: -f * dot(v, cam.up) / z };
+  }
+
+  /** The Earth's radius in px from its edge on screen (`edge` px from the
+      middle) for a camera of focal length `f` px standing f past the
+      surface point in the middle, as MapLibre's does: edge = f R /
+      sqrt(f^2 + 2 f R), solved for R. */
+  function earthRadiusPx(edge, f) {
+    return (edge * edge + edge * Math.sqrt(edge * edge + f * f)) / f;
+  }
+
+  /** Where the camera stands, px from the Earth's centre in the globe
+      frame: f back from the surface point in the middle (`centre`, a
+      placeVector), along the camera's forward axis. */
+  function cameraPosition(cam, centre, earthR, f) {
+    return [0, 1, 2].map(function (i) { return centre[i] * earthR - cam.fwd[i] * f; });
+  }
+
+  /** A point of space (px from the Earth's centre, globe frame) on screen:
+      { x, y } px from the middle of the map, `dist` from the camera, `z`
+      its depth; null behind the camera or too close to it. */
+  function projectPoint(cam, pos, p, f) {
+    var d = [p[0] - pos[0], p[1] - pos[1], p[2] - pos[2]], z = dot(d, cam.fwd);
+    if (z <= f * 0.05) return null;
+    return { x: f * dot(d, cam.right) / z, y: -f * dot(d, cam.up) / z, z: z, dist: Math.hypot(d[0], d[1], d[2]) };
+  }
+
+  /** The Moon as RGBA pixels into `out` (`size` px square, the disc
+      `radPx` px across from the middle): its texture `tex` ({ width,
+      height, data }, equirectangular, longitude 0 in the middle) on a ball
+      seen along cam.fwd, lit by the Sun (direction `sunDir`), its near side
+      turned to the Earth (it is at `moonDir` from it) with its north up
+      the Earth's axis; `alpha` (0..1) fades it all. The night side keeps a
+      little earthshine. */
+  function renderMoon(out, size, radPx, cam, moonDir, sunDir, tex, alpha) {
+    var xm = [-moonDir[0], -moonDir[1], -moonDir[2]];
+    var zm = [-xm[1] * xm[0], 1 - xm[1] * xm[1], -xm[1] * xm[2]];   // the Earth's axis, square to xm
+    var zl = Math.hypot(zm[0], zm[1], zm[2]) || 1;
+    zm = [zm[0] / zl, zm[1] / zl, zm[2] / zl];
+    var ym = [zm[1] * xm[2] - zm[2] * xm[1], zm[2] * xm[0] - zm[0] * xm[2], zm[0] * xm[1] - zm[1] * xm[0]];
+    var F = cam.fwd, R = cam.right, U = cam.up, tw = tex.width, th = tex.height, td = tex.data;
+    var half = size / 2, n = [0, 0, 0];
+    for (var j = 0; j < size; j++) {
+      var v = -(j + 0.5 - half) / radPx;
+      for (var i = 0; i < size; i++) {
+        var u = (i + 0.5 - half) / radPx, q = u * u + v * v, k = (j * size + i) * 4;
+        // A pixel wide soft edge.
+        var edge = Math.max(0, Math.min(1, (1 - Math.sqrt(q)) * radPx + 0.5));
+        if (edge <= 0) { out[k + 3] = 0; continue; }
+        var w = Math.sqrt(Math.max(0, 1 - q));
+        for (var a = 0; a < 3; a++) n[a] = u * R[a] + v * U[a] - w * F[a];
+        var lon = Math.atan2(dot(n, ym), dot(n, xm)), lat = Math.asin(Math.max(-1, Math.min(1, dot(n, zm))));
+        var tx = Math.min(tw - 1, Math.floor((lon / (2 * Math.PI) + 0.5) * tw));
+        var ty = Math.min(th - 1, Math.floor((0.5 - lat / Math.PI) * th));
+        var t = (ty * tw + tx) * 4, light = 0.05 + 1.05 * Math.max(0, dot(n, sunDir));
+        out[k] = td[t] * light; out[k + 1] = td[t + 1] * light; out[k + 2] = td[t + 2] * light;
+        out[k + 3] = 255 * edge * alpha;
+      }
+    }
+  }
+
+  /** `count` stars spread evenly over the sky, the same for the same seed:
+      right ascension and declination in degrees, then a brightness from 0
+      to 1, with many more faint stars than bright ones. */
+  function starField(count, seed) {
+    var a = seed >>> 0;
+    function rand() {   // mulberry32
+      a = (a + 0x6D2B79F5) >>> 0;
+      var r = Math.imul(a ^ (a >>> 15), 1 | a);
+      r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    }
+    var out = new Float64Array(count * 3);
+    for (var i = 0; i < count; i++) {
+      out[i * 3] = rand() * 360;
+      out[i * 3 + 1] = Math.asin(2 * rand() - 1) * DEG;
+      out[i * 3 + 2] = Math.pow(rand(), 5);
+    }
+    return out;
+  }
+
   return {
+    gmst: gmst, sublunarPoint: sublunarPoint, placeVector: placeVector, moonPhase: moonPhase,
+    camera: camera, projectDir: projectDir, earthRadiusPx: earthRadiusPx,
+    cameraPosition: cameraPosition, projectPoint: projectPoint, renderMoon: renderMoon, starField: starField, CAMERA: CAMERA,
     decodeLines: decodeLines,
     GLOBE_FILL: GLOBE_FILL, subsolarPoint: subsolarPoint, sunAltitude: sunAltitude,
     shadeTile: shadeTile, sunLightPosition: sunLightPosition,

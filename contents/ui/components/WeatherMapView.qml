@@ -109,6 +109,9 @@ Item {
     readonly property string tempPalette: ConfigUtils.formatTempPalette(ConfigUtils.tempPaletteStops(Plasmoid.configuration.librewxrTempPalette || "", Plasmoid.configuration.librewxrTempPalettes || "[]"))
     // Coasts and borders drawn over the color layers (the settings of the column).
     readonly property bool mapLinesOn: Plasmoid.configuration.librewxrMapLines !== false
+    // The Sun and the Moon around the globe (the settings of the column).
+    readonly property bool globeSunOn: Plasmoid.configuration.librewxrGlobeSun !== false
+    readonly property bool globeMoonOn: Plasmoid.configuration.librewxrGlobeMoon !== false
     readonly property int tempOpacity: Plasmoid.configuration.librewxrTempOpacity >= 0 ? Plasmoid.configuration.librewxrTempOpacity : 45
     readonly property real tempStep: Plasmoid.configuration.librewxrTempStep
     // The widget's temperature unit, which the bands and the legend follow.
@@ -434,6 +437,14 @@ Item {
     function setMapLines(on) {
         Plasmoid.configuration.librewxrMapLines = on;
         call("setMapLines", on);
+    }
+    function setGlobeSun(on) {
+        Plasmoid.configuration.librewxrGlobeSun = on;
+        call("setGlobeSun", on);
+    }
+    function setGlobeMoon(on) {
+        Plasmoid.configuration.librewxrGlobeMoon = on;
+        call("setGlobeMoon", on);
     }
 
     // The palettes of the wind and the temperature, those of the Radar
@@ -1055,7 +1066,7 @@ Item {
             ["wind", 0], ["windlevel", windLevel], ["windfps", windRate[0]], ["windmaxfps", windRate[1]], ["windwidth", windLineWidth],
             ["proj", projection], ["night", dayNight ? 1 : 0], ["glow", glow], ["nightdepth", nightDepth], ["prepare", prepareMode],
             ["windpalette", windPalette], ["winddensity", windDensity], ["temp", 0], ["temppalette", tempPalette],
-            ["tempopacity", tempOpacity], ["tempstep", tempStep], ["tempunit", tempUnit], ["lines", mapLinesOn ? 1 : 0],
+            ["tempopacity", tempOpacity], ["tempstep", tempStep], ["tempunit", tempUnit], ["lines", mapLinesOn ? 1 : 0], ["sun", globeSunOn ? 1 : 0], ["moon", globeMoonOn ? 1 : 0],
             ["windunit", windUnit], ["cells", activeCells], ["alerts", alertsOn ? 1 : 0], ["smooth", smoothOn ? 1 : 0],
             ["snow", snowOn ? 1 : 0], ["format", tileFormat], ["tilesize", tileSizeChoice], ["theme", mapTheme], ["server", serverUrl],
             ["hour12", is24h ? 0 : 1], ["dtfmt", weatherRoot ? weatherRoot.dateTimeSpec : ""], ["locale", Qt.locale().name.replace("_", "-")],

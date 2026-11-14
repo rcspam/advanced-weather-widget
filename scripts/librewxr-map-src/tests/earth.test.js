@@ -171,3 +171,124 @@ test('the widget file holds the coasts and borders of the whole Earth', () => {
   assert.equal(out, 0);
   assert.ok(minLat < -80 && maxLat > 80, minLat + ' ' + maxLat);
 });
+
+// ---- Space around the globe: sidereal time, the Moon, the camera ----
+
+test('gmst: Greenwich mean sidereal time (Meeus example 12.a)', () => {
+  // 1987 April 10, 0h UT: 13h10m46.3668s = 197.693195 degrees.
+  near(E.gmst(new Date('1987-04-10T00:00:00Z')), 197.693195, 1e-4, 'GMST');
+});
+
+test('sublunarPoint: the Moon of Meeus example 47.a', () => {
+  // 1992 April 12, 0h TD: right ascension 134.688470, declination 13.768368.
+  const date = new Date('1992-04-12T00:00:00Z');
+  const m = E.sublunarPoint(date);
+  near(m.lat, 13.768, 0.4, 'declination');
+  const lon = ((134.688470 - E.gmst(date) + 540) % 360) - 180;
+  near(m.lon, lon, 0.5, 'longitude');
+});
+
+test('moonPhase: lit share of the Moon (Meeus example 48.a)', () => {
+  const date = new Date('1992-04-12T00:00:00Z');
+  near(E.moonPhase(E.subsolarPoint(date), E.sublunarPoint(date)), 0.6786, 0.02, 'illuminated fraction');
+  // Same direction: new Moon; opposite: full.
+  near(E.moonPhase({ lat: 0, lon: 0 }, { lat: 0, lon: 0 }), 0, 1e-9, 'new');
+  near(E.moonPhase({ lat: 0, lon: 0 }, { lat: 0, lon: 180 }), 1, 1e-9, 'full');
+});
+
+test('camera: the point in the middle of the map faces the viewer', () => {
+  const cam = E.camera(45, 10, 0, 0);
+  const p = E.placeVector(45, 10);
+  // Looking at the Earth: forward points from the camera to its centre.
+  near(cam.fwd[0], -p[0], 1e-12, 'fwd x'); near(cam.fwd[1], -p[1], 1e-12, 'fwd y'); near(cam.fwd[2], -p[2], 1e-12, 'fwd z');
+  // A direction straight away from the viewer projects to the middle.
+  const mid = E.projectDir(cam, cam.fwd, 100);
+  near(mid.x, 0, 1e-9, 'x'); near(mid.y, 0, 1e-9, 'y');
+  // Towards the viewer: behind the camera, not drawn.
+  assert.equal(E.projectDir(cam, p, 100), null);
+});
+
+test('camera: north up, east right, then turned by the bearing', () => {
+  // Over the equator at 0, looking at the Earth along -z: a direction
+  // past it and north is up the screen, one past it and east to the right.
+  const cam = E.camera(0, 0, 0, 0);
+  const north = E.projectDir(cam, [0, 1, -1], 100), east = E.projectDir(cam, [1, 0, -1], 100);
+  assert.ok(north.y < 0 && Math.abs(north.x) < 1e-9, 'north up: ' + JSON.stringify(north));
+  assert.ok(east.x > 0 && Math.abs(east.y) < 1e-9, 'east right: ' + JSON.stringify(east));
+  // Bearing 90: east is up.
+  const turned = E.camera(0, 0, 90, 0);
+  const e2 = E.projectDir(turned, [1, 0, -1], 100);
+  assert.ok(e2.y < 0 && Math.abs(e2.x) < 1e-9, 'east up at bearing 90: ' + JSON.stringify(e2));
+});
+
+test('starField: same stars for the same seed, spread over the sky', () => {
+  const a = E.starField(2000, 7), b = E.starField(2000, 7);
+  assert.deepEqual(a, b);
+  let north = 0;
+  for (let i = 0; i < 2000; i++) if (a[i * 3 + 1] > 0) north++;
+  near(north / 2000, 0.5, 0.05, 'half in the northern sky');
+});
+
+test('earthRadiusPx: the globe radius that shows a given edge on screen', () => {
+  // A sphere of radius R seen from f past its surface, focal length f:
+  // edge = f R / sqrt(f^2 + 2 f R).
+  const f = 700, R = 300, edge = f * R / Math.sqrt(f * f + 2 * f * R);
+  near(E.earthRadiusPx(edge, f), R, 1e-6, 'radius');
+});
+
+test('projectPoint: the Earth seen by the camera, a Moon in front and behind', () => {
+  const f = 700, R = 300, cam = E.camera(0, 0, 0, 0);
+  const pos = E.cameraPosition(cam, E.placeVector(0, 0), R, f);
+  // The camera stands f past the surface point in the middle.
+  near(pos[2], R + f, 1e-9, 'camera distance');
+  const centre = E.projectPoint(cam, pos, [0, 0, 0], f);
+  near(centre.x, 0, 1e-9, 'centre x'); near(centre.y, 0, 1e-9, 'centre y');
+  near(centre.dist, R + f, 1e-9, 'centre distance');
+  // A Moon at 2.4 radii towards the viewer, then away from it.
+  const front = E.projectPoint(cam, pos, [0, 0, 2.4 * R], f);
+  const back = E.projectPoint(cam, pos, [0, 0, -2.4 * R], f);
+  assert.ok(front.dist < centre.dist && back.dist > centre.dist);
+  // East of the middle, on the Earth's side plane: right of the globe.
+  const east = E.projectPoint(cam, pos, [2.4 * R, 0, 0], f);
+  assert.ok(east.x > 0 && Math.abs(east.y) < 1e-9);
+  // Behind the camera: null.
+  assert.equal(E.projectPoint(cam, pos, [0, 0, 2 * (R + f)], f), null);
+});
+
+// A 4 x 2 texture: longitude -180..-90 red, -90..0 green, 0..90 blue,
+// 90..180 white; both rows the same.
+function stripes() {
+  const cols = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 255]], data = new Uint8ClampedArray(4 * 2 * 4);
+  for (let y = 0; y < 2; y++) for (let x = 0; x < 4; x++) data.set([...cols[x], 255], (y * 4 + x) * 4);
+  return { width: 4, height: 2, data };
+}
+function px(out, size, x, y) { const k = (y * size + x) * 4; return Array.from(out.slice(k, k + 4)); }
+
+test('renderMoon: seen from the Earth, lit from behind the viewer: full, its near side in the middle', () => {
+  // Camera looking along -z at a Moon on +z... the Moon at direction (0,0,-1)
+  // from the Earth, the camera between them looking at it.
+  const cam = { fwd: [0, 0, -1], right: [1, 0, 0], up: [0, 1, 0] };
+  const size = 21, out = new Uint8ClampedArray(size * size * 4);
+  E.renderMoon(out, size, 10, cam, [0, 0, -1], [0, 0, 1], stripes(), 1);
+  const mid = px(out, size, 10, 10);
+  // The near side (longitude 0, blue/green border): just right of it east, blue.
+  assert.ok(mid[3] === 255, 'opaque middle');
+  const east = px(out, size, 14, 10), west = px(out, size, 6, 10);
+  assert.ok(east[2] > 150 && east[0] < 50, 'east of the near side blue: ' + east);
+  assert.ok(west[1] > 150 && west[0] < 50, 'west of it green: ' + west);
+  // Outside the disc: transparent.
+  assert.equal(px(out, size, 0, 0)[3], 0);
+});
+
+test('renderMoon: the Sun behind the Moon leaves its face dark, faded by `alpha`', () => {
+  const cam = { fwd: [0, 0, -1], right: [1, 0, 0], up: [0, 1, 0] };
+  const size = 21, out = new Uint8ClampedArray(size * size * 4);
+  E.renderMoon(out, size, 10, cam, [0, 0, -1], [0, 0, -1], stripes(), 0.5);
+  const mid = px(out, size, 10, 10);
+  assert.ok(mid[0] + mid[1] + mid[2] < 60, 'dark: ' + mid);
+  assert.ok(Math.abs(mid[3] - 128) <= 1, 'half faded: ' + mid[3]);
+  // Lit from the right (east): the right half bright, the left dark.
+  E.renderMoon(out, size, 10, cam, [0, 0, -1], [1, 0, 0], stripes(), 1);
+  const r = px(out, size, 17, 10), l = px(out, size, 3, 10);
+  assert.ok(r[0] + r[1] + r[2] > l[0] + l[1] + l[2] + 100, 'lit right: ' + r + ' vs ' + l);
+});

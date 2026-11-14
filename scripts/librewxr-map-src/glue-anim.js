@@ -1157,6 +1157,7 @@ var WidgetAnim = (function () {
     var base = now >= this.dueAt && now - this.dueAt < this.minFrameMs ? this.dueAt : now;
     this.dueAt = base + this.minFrameMs;
     this.layer.showFile(g);
+    if (this.onShown) this.onShown(pos);
     return true;
   };
 

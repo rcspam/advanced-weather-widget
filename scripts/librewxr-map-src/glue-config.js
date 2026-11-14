@@ -137,6 +137,9 @@ var WIND_FILES_BASE = PARAMS.get('omfiles') || '';
 var TEMP_ON = PARAMS.get('temp') === '1';
 // Coasts and borders over the color layers; on unless the widget says no.
 var LINES_INIT = PARAMS.get('lines') !== '0';
+// The Sun and the Moon around the globe, from the widget's settings.
+var SUN_INIT = PARAMS.get('sun') !== '0';
+var MOON_INIT = PARAMS.get('moon') !== '0';
 var TEMP_PALETTE_PARAM = PARAMS.get('temppalette') || '';
 var TEMP_OPACITY = PARAMS.get('tempopacity');
 var TEMP_STEP = PARAMS.get('tempstep');

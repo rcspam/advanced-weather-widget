@@ -233,6 +233,9 @@
     <entry name="librewxrWindPalette"   type="String"><default></default></entry>
     <!-- Coasts and borders drawn over the temperature (MapLibre page), switched in the map's Options -->
     <entry name="librewxrMapLines"      type="Bool"><default>true</default></entry>
+    <!-- The Sun and the Moon drawn around the globe (MapLibre page), switched in the map's settings -->
+    <entry name="librewxrGlobeSun"      type="Bool"><default>true</default></entry>
+    <entry name="librewxrGlobeMoon"     type="Bool"><default>true</default></entry>
     <!-- Temperature palette in use: empty for the vivid one, "builtin:muted",
          "builtin:bluered", or the name of a palette made in the settings -->
     <entry name="librewxrTempPalette"   type="String"><default></default></entry>

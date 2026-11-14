@@ -18,3 +18,11 @@ this local copy.
 its color layers (temperature...). Natural Earth 1:10m, public domain
 (https://www.naturalearthdata.com/), simplified to about 500 m and packed by
 `scripts/make_coast_lines.py`.
+
+# Moon
+
+`moon.jpg`: the Moon's colors, equirectangular, 0 degrees of longitude in
+the middle, for the Moon drawn around the globe. NASA's Scientific
+Visualization Studio, CGI Moon Kit (Lunar Reconnaissance Orbiter Camera
+color map, `lroc_color_poles_1k.jpg`), public domain
+(https://svs.gsfc.nasa.gov/4720), scaled down to 512 x 256.

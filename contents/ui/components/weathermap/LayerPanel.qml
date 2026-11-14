@@ -514,11 +514,12 @@ Rectangle {
                 }
             }
             // Set once: pictures per second at most, the resolution
-            // while playing, coasts and borders, the dark map.
+            // while playing, coasts and borders, the Sun and the Moon around
+            // the globe, the dark map, then the panels' look.
             HeadButton {
                 id: settingsButton
                 iconName: "gear"
-                tip: i18n("Settings: pictures per second, resolution while playing,<br>coasts and borders, dark map, see-through panels")
+                tip: i18n("Settings: pictures per second, resolution while playing,<br>coasts and borders, Sun and Moon, dark map, see-through panels")
                 on: settingsMenu.visible
                 onClicked: settingsMenu.visible ? settingsMenu.close() : settingsMenu.open()
                 PlasmaComponents.Popup {
@@ -546,19 +547,6 @@ Rectangle {
                             current: panel.map.resolution
                             onPicked: function (v) { panel.map.setResolution(v); }
                         }
-                        SliderSetting {
-                            title: i18n("Panel opacity")
-                            valueText: i18n("%1 %", Math.round(value))
-                            value: panel.map.panelOpacity
-                            onMoved: function (v, done) { panel.map.setPanelOpacity(Math.round(v), done); }
-                        }
-                        SliderSetting {
-                            title: i18n("Blur under the panels")
-                            valueText: value > 0 ? i18n("%1 px", Math.round(value)) : i18n("None")
-                            to: 40
-                            value: panel.map.panelBlur
-                            onMoved: function (v, done) { panel.map.setPanelBlur(Math.round(v), done); }
-                        }
                         MapSwitch {
                             own: panel.map.ownControls
                             text: i18n("Coasts and borders")
@@ -566,6 +554,24 @@ Rectangle {
                             onToggled: {
                                 panel.map.setMapLines(checked);
                                 checked = Qt.binding(function () { return panel.map.mapLinesOn; });
+                            }
+                        }
+                        MapSwitch {
+                            own: panel.map.ownControls
+                            text: i18n("Sun around the globe")
+                            checked: panel.map.globeSunOn
+                            onToggled: {
+                                panel.map.setGlobeSun(checked);
+                                checked = Qt.binding(function () { return panel.map.globeSunOn; });
+                            }
+                        }
+                        MapSwitch {
+                            own: panel.map.ownControls
+                            text: i18n("Moon around the globe")
+                            checked: panel.map.globeMoonOn
+                            onToggled: {
+                                panel.map.setGlobeMoon(checked);
+                                checked = Qt.binding(function () { return panel.map.globeMoonOn; });
                             }
                         }
                         MapSwitch {
@@ -582,6 +588,19 @@ Rectangle {
                                 visible: parent.hovered
                                 delay: Kirigami.Units.toolTipDelay
                             }
+                        }
+                        SliderSetting {
+                            title: i18n("Panel opacity")
+                            valueText: i18n("%1 %", Math.round(value))
+                            value: panel.map.panelOpacity
+                            onMoved: function (v, done) { panel.map.setPanelOpacity(Math.round(v), done); }
+                        }
+                        SliderSetting {
+                            title: i18n("Blur under the panels")
+                            valueText: value > 0 ? i18n("%1 px", Math.round(value)) : i18n("None")
+                            to: 40
+                            value: panel.map.panelBlur
+                            onMoved: function (v, done) { panel.map.setPanelBlur(Math.round(v), done); }
                         }
                     }
                 }

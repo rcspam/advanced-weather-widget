@@ -302,6 +302,14 @@ window.setMapLines = function (on) {
   if (_widgetAdapter.setLinesShown) _widgetAdapter.setLinesShown(!!on);
 };
 
+// The Sun and the Moon around the globe, from the widget's settings.
+window.setGlobeSun = function (on) {
+  if (_widgetAdapter.setSkyBodies) _widgetAdapter.setSkyBodies({ sun: !!on });
+};
+window.setGlobeMoon = function (on) {
+  if (_widgetAdapter.setSkyBodies) _widgetAdapter.setSkyBodies({ moon: !!on });
+};
+
 if (TEMP_ON) window.setTemp(true);
 
 // === ANIMATIONS (glue-anim.js; MapLibre page) ===
@@ -630,6 +638,10 @@ window.animStart = function (pastH, futureH, layers) {
   anim.player.stops = animStops;
   anim.player.canShow = animOverlaysLoaded;
   anim.player.loop = animLoop;
+  // The sky around the globe at the time of the picture shown.
+  anim.player.onShown = function (pos) {
+    if (anim && anim.group && _widgetAdapter.setSkyTime) _widgetAdapter.setSkyTime(anim.group.timeAt(pos));
+  };
   animLoad(pastH == null ? 24 : pastH, futureH == null ? 48 : futureH);
   _widgetAdapter.setFramesHidden(true);
   document.body.classList.add('lv-anim');
@@ -699,6 +711,7 @@ window.animStop = function () {
   anim.switcher.clear();
   animOverlaysStop();
   anim = null;
+  if (_widgetAdapter.setSkyTime) _widgetAdapter.setSkyTime(null);
   if (windLayer) windLayer.setActive(true);
   _widgetAdapter.setFramesHidden(false);
   document.body.classList.remove('lv-anim');
