@@ -249,6 +249,37 @@ test('the darkness of the night comes from the widget, and changes live', async 
   assert.equal(adapter.getNightDepth(), 50);
 });
 
+/** The night at the equator under a longitude, 0..1 (tile 0/0/0): the
+    black only, not the light veil a dark map lays over the day. */
+async function shadeAt(map, protocols, lon) {
+  const url = map.getSource('lv-night').tiles[0].replace('{z}/{x}/{y}', '0/0/0');
+  const name = url.slice(0, url.indexOf('://'));
+  const px = (await protocols[name]({ url, type: 'image' }, new AbortController())).data.data;
+  const c = Math.min(127, Math.floor(((lon + 540) % 360) / 360 * 128));
+  const k = (64 * 128 + c) * 4;
+  return px[k] === 0 ? px[k + 3] / 255 : 0;
+}
+
+test('the night and the glow follow the time of the picture shown, then come back to now', async () => {
+  const { adapter, map, protocols } = loadAdapter();
+  const E = require('../glue-earth.js');
+  adapter.setDayNight(true);
+  // Twelve hours apart: noon at one longitude, midnight there after.
+  const t = Date.UTC(2026, 10, 14, 12), sun = E.subsolarPoint(new Date(t));
+  adapter.setSkyTime(t);
+  assert.deepEqual(map.light.position, E.sunLightPosition(sun), 'the glow at the picture\'s Sun');
+  assert.equal(await shadeAt(map, protocols, sun.lon), 0, 'day under the Sun of the picture');
+  assert.ok(await shadeAt(map, protocols, sun.lon + 180) > 0.3, 'night on the other side');
+  adapter.setSkyTime(t + 12 * 3600e3);
+  assert.ok(await shadeAt(map, protocols, sun.lon) > 0.3, 'twelve hours on: night there');
+  assert.equal(await shadeAt(map, protocols, sun.lon + 180), 0, 'and day on the other side');
+  // The animation stops: back to now.
+  adapter.setSkyTime(null);
+  const now = E.subsolarPoint(new Date());
+  assert.ok(Math.abs(map.light.position[1] - E.sunLightPosition(now)[1]) < 0.5, 'the glow at today\'s Sun');
+  assert.equal(await shadeAt(map, protocols, now.lon), 0, 'day under today\'s Sun');
+});
+
 test('day and night off: no night, and the glow no longer follows the Sun', () => {
   const { adapter, map } = loadAdapter();
   adapter.setDayNight(true);

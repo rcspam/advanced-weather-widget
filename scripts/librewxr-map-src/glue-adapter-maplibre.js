@@ -231,8 +231,12 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     attribution = new maplibregl.AttributionControl(dataAttribution ? { compact: true, customAttribution: OPEN_METEO } : { compact: true });
     map.addControl(attribution);
   }
+  // The Sun of the picture shown while the animation runs (setSkyTime),
+  // now otherwise: the night, the glow and the sky around the globe turn
+  // with the time bar.
+  function skyDate() { return new Date(skyTime == null ? Date.now() : skyTime); }
   function moveSun() {
-    var sun = WidgetEarth.subsolarPoint(new Date());
+    var sun = WidgetEarth.subsolarPoint(skyDate());
     map.setLight(dayNight ? { anchor: 'map', position: WidgetEarth.sunLightPosition(sun) } : EVEN_LIGHT);
     drawShade(sun);
     drawSpaceSoon();
@@ -486,7 +490,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     var r = globeEdge(c, mid);
     if (r > Math.hypot(w, h)) return;   // the globe covers it all
     var cam = WidgetEarth.camera(c.lat, c.lng, map.getBearing(), map.getPitch());
-    var now = new Date(skyTime === null ? Date.now() : skyTime), g = WidgetEarth.gmst(now) * Math.PI / 180, cg = Math.cos(g), sg = Math.sin(g);
+    var now = skyDate(), g = WidgetEarth.gmst(now) * Math.PI / 180, cg = Math.cos(g), sg = Math.sin(g);
     var F = cam.fwd, R = cam.right, U = cam.up, st = space.stars, v = [0, 0, 0];
     ctx.fillStyle = '#fff';
     for (var i = 0; i < st.length; i += 5) {
@@ -793,7 +797,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
       // Same base map, other theme: the space around the globe and the day veil follow.
       applyProjection();
       addSunLayers();
-      drawShade(WidgetEarth.subsolarPoint(new Date()));
+      drawShade(WidgetEarth.subsolarPoint(skyDate()));
     },
 
     /** opts.anim: an image of the animation (glue-anim-radar.js), shown
@@ -970,13 +974,14 @@ var WidgetMapLibreAdapter = function (maplibregl) {
       drawSpaceSoon();
     },
 
-    /** The time (ms) the sky around the globe shows: the picture's while
-        the animation runs; null for now. */
+    /** The time (ms) of the Sun, the night and the sky around the globe:
+        the picture's while the animation runs; null for now. */
     setSkyTime: function (ms) {
       var t = ms == null || !isFinite(ms) ? null : +ms;
       if (t === skyTime) return;
       skyTime = t;
-      drawSpaceSoon();
+      if (map && styleReady && !swapInProgress) moveSun();
+      else drawSpaceSoon();
     },
 
     /** Where the space canvas last put the Sun and the Moon (test bench). */
@@ -1032,7 +1037,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
       var d = percent(value);
       if (d === null) return;
       nightDepth = d;
-      if (styleReady && map.getLayer('lv-night')) drawShade(WidgetEarth.subsolarPoint(new Date()));
+      if (styleReady && map.getLayer('lv-night')) drawShade(WidgetEarth.subsolarPoint(skyDate()));
     },
 
     getNightDepth: function () { return nightDepth; },
