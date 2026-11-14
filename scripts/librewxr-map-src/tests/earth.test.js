@@ -292,3 +292,48 @@ test('renderMoon: the Sun behind the Moon leaves its face dark, faded by `alpha`
   const r = px(out, size, 17, 10), l = px(out, size, 3, 10);
   assert.ok(r[0] + r[1] + r[2] > l[0] + l[1] + l[2] + 100, 'lit right: ' + r + ' vs ' + l);
 });
+
+function brightness(p) { return p[0] + p[1] + p[2]; }
+function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+
+test('moonView: straight ahead, the camera itself', () => {
+  const f = 700, R = 300, cam = E.camera(0, 0, 0, 0);
+  const pos = E.cameraPosition(cam, E.placeVector(0, 0), R, f);
+  const v = E.moonView(cam, pos, [0, 0, -1.45 * R]);
+  for (const k of ['fwd', 'right', 'up']) for (let i = 0; i < 3; i++) near(v[k][i], cam[k][i], 1e-9, k + i);
+});
+
+test('moonView: off to the side, looks along the line from the camera to the Moon', () => {
+  const f = 700, R = 300, cam = E.camera(20, 30, 40, 10);
+  const pos = E.cameraPosition(cam, E.placeVector(20, 30), R, f);
+  const X = E.placeVector(-10, 120).map(c => c * 1.45 * R);
+  const v = E.moonView(cam, pos, X);
+  const d = [X[0] - pos[0], X[1] - pos[1], X[2] - pos[2]], dl = Math.hypot(...d);
+  for (let i = 0; i < 3; i++) near(v.fwd[i], d[i] / dl, 1e-9, 'fwd' + i);
+  near(E.dot(v.fwd, v.right), 0, 1e-9, 'right square'); near(E.dot(v.fwd, v.up), 0, 1e-9, 'up square');
+  near(E.dot(v.right, v.up), 0, 1e-9, 'right/up square'); near(Math.hypot(...v.right), 1, 1e-9, 'right unit');
+  assert.ok(E.dot(v.right, cam.right) > 0.5 && E.dot(v.up, cam.up) > 0.5, 'still the screen right and up');
+  // Same hand as the camera: up x right along the same way as its fwd.
+  assert.ok(E.dot(cross(v.up, v.right), v.fwd) * E.dot(cross(cam.up, cam.right), cam.fwd) > 0, 'same hand');
+});
+
+test('moonView: the Moon lit by the Sun of the scene, as the camera sees it', () => {
+  const f = 700, R = 300, cam = E.camera(0, 0, 0, 0);
+  const pos = E.cameraPosition(cam, E.placeVector(0, 0), R, f);
+  const size = 21, out = new Uint8ClampedArray(size * size * 4), tex = stripes();
+  const front = [0, 0, 1.45 * R], back = [0.6 * R, 0, -1.45 * R], mvFront = [0, 0, 1], mvBack = E.placeVector(0, 180 - 22.5);
+  // Noon under the camera, the Sun behind it: the face of the Earth in view
+  // is lit, and so is the face of the Moon passing in front of it.
+  E.renderMoon(out, size, 10, E.moonView(cam, pos, front), mvFront, [0, 0, 1], tex, 1);
+  assert.ok(brightness(px(out, size, 10, 10)) > 150, 'full in front: ' + px(out, size, 10, 10));
+  // The Sun behind the globe: the Moon in front shows its night side.
+  E.renderMoon(out, size, 10, E.moonView(cam, pos, front), mvFront, [0, 0, -1], tex, 1);
+  assert.ok(brightness(px(out, size, 10, 10)) < 60, 'dark in front: ' + px(out, size, 10, 10));
+  // The Sun off to the right of the screen: the right side of the Moon is
+  // the lit one, in front of the globe and behind it.
+  for (const [X, mv] of [[front, mvFront], [back, mvBack]]) {
+    E.renderMoon(out, size, 10, E.moonView(cam, pos, X), mv, cam.right, tex, 1);
+    const r = px(out, size, 17, 10), l = px(out, size, 3, 10);
+    assert.ok(brightness(r) > brightness(l) + 100, 'lit right: ' + r + ' vs ' + l);
+  }
+});

@@ -561,30 +561,22 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     }
     space.last = { sun: sp, moon: mp, edge: r, time: now.getTime() };   // for the test bench
 
-    // Its texture on the ball, lit by the Sun (WidgetEarth.renderMoon),
-    // drawn through a small canvas. It shows the face and the phase seen
-    // from the Earth: from its true distance, 60 Earth radii, the camera
-    // would stand on the Earth's side of it; on the small orbit, it would
-    // see the far side whenever the Moon passes in front of the globe.
+    // Its texture on the ball, drawn through a small canvas, as the camera
+    // sees it (WidgetEarth.moonView): lit by the same Sun as the globe, its
+    // bright side always turns the same way as the Earth's day side. Its
+    // near side faces the Earth, so on the small orbit the camera sees the
+    // far side whenever the Moon passes in front of the globe.
     function drawMoon(cx, x, y, rad) {
       var tex = space.moonTex;
       if (!tex) { loadMoonTexture(); return; }
-      var v = mv;
-      // The screen's right, square to the line of sight (its up when that
-      // line runs along the right).
-      var side = Math.abs(dotv(R, v)) < 0.99 ? R : U;
-      var rt = [side[0] - dotv(side, v) * v[0], side[1] - dotv(side, v) * v[1], side[2] - dotv(side, v) * v[2]], rl = Math.hypot(rt[0], rt[1], rt[2]);
-      rt = [rt[0] / rl, rt[1] / rl, rt[2] / rl];
-      var up = [rt[1] * v[2] - rt[2] * v[1], rt[2] * v[0] - rt[0] * v[2], rt[0] * v[1] - rt[1] * v[0]];
       var size = Math.max(2, Math.ceil(2 * rad * dpr) + 2), mc = space.moonCanvas;
       if (!mc) mc = space.moonCanvas = document.createElement('canvas');
       if (mc.width !== size) { mc.width = mc.height = size; space.moonPixels = mc.getContext('2d').createImageData(size, size); }
       var img = space.moonPixels;
-      WidgetEarth.renderMoon(img.data, size, rad * dpr, { fwd: v, right: rt, up: up }, mv, sv, tex, moonAlpha);
+      WidgetEarth.renderMoon(img.data, size, rad * dpr, WidgetEarth.moonView(cam, pos, X), mv, sv, tex, moonAlpha);
       mc.getContext('2d').putImageData(img, 0, 0);
       cx.drawImage(mc, x - size / dpr / 2, y - size / dpr / 2, size / dpr, size / dpr);
     }
-    function dotv(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
   }
 
   // The Moon's colors (vendor/moon.jpg), read once into pixels: fetched as

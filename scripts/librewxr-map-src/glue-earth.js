@@ -245,6 +245,24 @@ var WidgetEarth = (function () {
     return { x: f * dot(d, cam.right) / z, y: -f * dot(d, cam.up) / z, z: z, dist: Math.hypot(d[0], d[1], d[2]) };
   }
 
+  /** How the camera (frame `cam`, at `pos`) sees a body at `p` (both px
+      from the Earth's centre, globe frame): fwd along the line from the
+      camera to it, right and up the screen's, squared to that line. Lit
+      along that line by the Sun of the scene, the Moon shows the same
+      light as the globe beside it. */
+  function moonView(cam, pos, p) {
+    var d = [p[0] - pos[0], p[1] - pos[1], p[2] - pos[2]], dl = Math.hypot(d[0], d[1], d[2]);
+    var fwd = [d[0] / dl, d[1] / dl, d[2] / dl];
+    function square(a, b) {   // a, less its share along fwd and b, as a unit
+      var ka = dot(a, fwd), kb = b ? dot(a, b) : 0;
+      var r = [0, 1, 2].map(function (i) { return a[i] - ka * fwd[i] - (b ? kb * b[i] : 0); });
+      var l = Math.hypot(r[0], r[1], r[2]);
+      return [r[0] / l, r[1] / l, r[2] / l];
+    }
+    var right = square(cam.right, null);
+    return { fwd: fwd, right: right, up: square(cam.up, right) };
+  }
+
   /** The Moon as RGBA pixels into `out` (`size` px square, the disc
       `radPx` px across from the middle): its texture `tex` ({ width,
       height, data }, equirectangular, longitude 0 in the middle) on a ball
@@ -302,7 +320,7 @@ var WidgetEarth = (function () {
   return {
     gmst: gmst, sublunarPoint: sublunarPoint, placeVector: placeVector, moonPhase: moonPhase,
     camera: camera, projectDir: projectDir, earthRadiusPx: earthRadiusPx,
-    cameraPosition: cameraPosition, projectPoint: projectPoint, renderMoon: renderMoon, starField: starField, CAMERA: CAMERA,
+    cameraPosition: cameraPosition, projectPoint: projectPoint, moonView: moonView, renderMoon: renderMoon, dot: dot, starField: starField, CAMERA: CAMERA,
     decodeLines: decodeLines,
     GLOBE_FILL: GLOBE_FILL, subsolarPoint: subsolarPoint, sunAltitude: sunAltitude,
     shadeTile: shadeTile, sunLightPosition: sunLightPosition,
