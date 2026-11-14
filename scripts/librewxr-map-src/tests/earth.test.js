@@ -337,3 +337,41 @@ test('moonView: the Moon lit by the Sun of the scene, as the camera sees it', ()
     assert.ok(brightness(r) > brightness(l) + 100, 'lit right: ' + r + ' vs ' + l);
   }
 });
+
+test('nightLight: off by day and as the Sun sets, full once the sky is dark, fading in through the dusk', () => {
+  const L = E.NIGHT_LIGHTS;
+  assert.equal(E.nightLight(1, 10), 0, 'day');
+  assert.equal(E.nightLight(1, L.on), 0, 'the Sun just set');
+  near(E.nightLight(1, L.full), 1, 1e-9, 'dark sky');
+  near(E.nightLight(1, -60), 1, 1e-9, 'deep night');
+  let last = 0;
+  for (let h = L.on; h >= L.full; h -= 0.5) {
+    const k = E.nightLight(1, h);
+    assert.ok(k >= last, 'brighter as the Sun goes down, at ' + h);
+    last = k;
+  }
+  const mid = E.nightLight(1, (L.on + L.full) / 2);
+  assert.ok(mid > 0.3 && mid < 0.7, 'halfway: ' + mid);
+});
+
+test('nightLight: unlit land stays dark, the faint lights come up', () => {
+  const L = E.NIGHT_LIGHTS;
+  assert.equal(E.nightLight(0, -30), 0);
+  assert.equal(E.nightLight(L.floor, -30), 0, 'at the floor: the noise of the picture');
+  const faint = E.nightLight(0.1, -30);
+  assert.ok(faint > 0.15 && faint < 0.5, 'a faint town brought up: ' + faint);
+  assert.ok(E.nightLight(0.5, -30) < E.nightLight(0.8, -30), 'brighter towns brighter');
+});
+
+test('night lights: the shader works the Sun out as placeVector does, with the numbers of nightLight', () => {
+  // sin(altitude) = place . Sun, both as placeVector (the shader's frame).
+  for (let i = 0; i < 200; i++) {
+    const lat = Math.random() * 170 - 85, lon = Math.random() * 360 - 180;
+    const sun = { lat: Math.random() * 47 - 23.5, lon: Math.random() * 360 - 180 };
+    const s = E.dot(E.placeVector(lat, lon), E.placeVector(sun.lat, sun.lon));
+    near(Math.asin(s) * 180 / Math.PI, E.sunAltitude(sun, lat, lon), 1e-9, 'altitude at ' + lat + ',' + lon);
+  }
+  const L = E.NIGHT_LIGHTS, fs = E.NIGHT_LIGHTS_FS;
+  for (const k of ['on', 'full', 'gamma', 'floor']) assert.ok(fs.includes(E.glslFloat(L[k])), k + ' in the shader');
+  assert.ok(fs.includes('vec3(sin(lon) * cos(lat), sin(lat), cos(lon) * cos(lat))'), 'the place as placeVector');
+});

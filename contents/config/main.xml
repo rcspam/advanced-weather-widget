@@ -236,6 +236,8 @@
     <!-- The Sun and the Moon drawn around the globe (MapLibre page), switched in the map's settings -->
     <entry name="librewxrGlobeSun"      type="Bool"><default>true</default></entry>
     <entry name="librewxrGlobeMoon"     type="Bool"><default>true</default></entry>
+    <!-- Brightness of the lights of the towns on the night side (MapLibre page), percent; 0 for none -->
+    <entry name="librewxrNightLights"   type="Int"><default>70</default><min>0</min><max>100</max></entry>
     <!-- Temperature palette in use: empty for the vivid one, "builtin:muted",
          "builtin:bluered", or the name of a palette made in the settings -->
     <entry name="librewxrTempPalette"   type="String"><default></default></entry>

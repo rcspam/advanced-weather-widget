@@ -446,6 +446,15 @@ Item {
         Plasmoid.configuration.librewxrGlobeMoon = on;
         call("setGlobeMoon", on);
     }
+    // The lights of the towns at night, percent (0 for none): shown while
+    // the slider moves, saved once it is let go.
+    property int nightLights: Plasmoid.configuration.librewxrNightLights
+    function setNightLights(v, save) {
+        nightLights = v;
+        call("setNightLights", v);
+        if (save)
+            Plasmoid.configuration.librewxrNightLights = v;
+    }
 
     // The palettes of the wind and the temperature, those of the Radar
     // settings: [id, name], the id being what the setting holds ("" for the
@@ -1066,7 +1075,7 @@ Item {
             ["wind", 0], ["windlevel", windLevel], ["windfps", windRate[0]], ["windmaxfps", windRate[1]], ["windwidth", windLineWidth],
             ["proj", projection], ["night", dayNight ? 1 : 0], ["glow", glow], ["nightdepth", nightDepth], ["prepare", prepareMode],
             ["windpalette", windPalette], ["winddensity", windDensity], ["temp", 0], ["temppalette", tempPalette],
-            ["tempopacity", tempOpacity], ["tempstep", tempStep], ["tempunit", tempUnit], ["lines", mapLinesOn ? 1 : 0], ["sun", globeSunOn ? 1 : 0], ["moon", globeMoonOn ? 1 : 0],
+            ["tempopacity", tempOpacity], ["tempstep", tempStep], ["tempunit", tempUnit], ["lines", mapLinesOn ? 1 : 0], ["sun", globeSunOn ? 1 : 0], ["moon", globeMoonOn ? 1 : 0], ["lights", nightLights],
             ["windunit", windUnit], ["cells", activeCells], ["alerts", alertsOn ? 1 : 0], ["smooth", smoothOn ? 1 : 0],
             ["snow", snowOn ? 1 : 0], ["format", tileFormat], ["tilesize", tileSizeChoice], ["theme", mapTheme], ["server", serverUrl],
             ["hour12", is24h ? 0 : 1], ["dtfmt", weatherRoot ? weatherRoot.dateTimeSpec : ""], ["locale", Qt.locale().name.replace("_", "-")],

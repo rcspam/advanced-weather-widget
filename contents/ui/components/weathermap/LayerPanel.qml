@@ -515,11 +515,12 @@ Rectangle {
             }
             // Set once: pictures per second at most, the resolution
             // while playing, coasts and borders, the Sun and the Moon around
-            // the globe, the dark map, then the panels' look.
+            // the globe, the lights of the towns at night, the dark map, then
+            // the panels' look.
             HeadButton {
                 id: settingsButton
                 iconName: "gear"
-                tip: i18n("Settings: pictures per second, resolution while playing,<br>coasts and borders, Sun and Moon, dark map, see-through panels")
+                tip: i18n("Settings: pictures per second, resolution while playing,<br>coasts and borders, Sun, Moon and night lights, dark map, see-through panels")
                 on: settingsMenu.visible
                 onClicked: settingsMenu.visible ? settingsMenu.close() : settingsMenu.open()
                 PlasmaComponents.Popup {
@@ -573,6 +574,16 @@ Rectangle {
                                 panel.map.setGlobeMoon(checked);
                                 checked = Qt.binding(function () { return panel.map.globeMoonOn; });
                             }
+                        }
+                        // The lights of the towns on the night side: 0 turns them off.
+                        // They light the night of the day and night setting only.
+                        SliderSetting {
+                            title: i18n("Night lights")
+                            valueText: value > 0 ? i18n("%1 %", Math.round(value)) : i18nc("night lights at 0", "Off")
+                            enabled: panel.map.dayNight
+                            opacity: enabled ? 1 : 0.5
+                            value: panel.map.nightLights
+                            onMoved: function (v, done) { panel.map.setNightLights(Math.round(v), done); }
                         }
                         MapSwitch {
                             own: panel.map.ownControls

@@ -87,6 +87,8 @@ var DAYNIGHT_INIT = PARAMS.get('night') !== '0';
 var GLOW_INIT = PARAMS.get('glow');
 // Darkness of the deep night, in percent of black; the adapter reads and bounds it.
 var NIGHTDEPTH_INIT = PARAMS.get('nightdepth');
+// Brightness of the lights of the towns at night, in percent (0 for none).
+var LIGHTS_INIT = PARAMS.get('lights');
 // What the map prepares while hidden: 'none', 'first' (the latest image) or
 // 'all' (the whole animation).
 var PREPARE_MODE = /^(first|all)$/.test(PARAMS.get('prepare')) ? PARAMS.get('prepare') : 'none';

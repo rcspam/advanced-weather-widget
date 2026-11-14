@@ -83,6 +83,54 @@ var WidgetEarth = (function () {
     return img;
   }
 
+  /** The lights of the towns on the night side (NASA's Black Marble, a
+      grey picture of the whole Earth, vendor/night-lights.jpg): off while
+      the Sun is above `on` degrees, full once it is below `full` (the sky
+      dark), the dusk between; the picture's faint lights brought up
+      (`gamma`), its noise below `floor` left dark. */
+  var NIGHT_LIGHTS = { on: -2, full: -10, gamma: 0.55, floor: 0.02, color: [1, 0.8, 0.5] };
+
+  /** How bright a light of value v (0..1, the picture's) shows with the
+      Sun h degrees above the horizon, 0..1. Line for line what the shader
+      (NIGHT_LIGHTS_FS) does. */
+  function nightLight(v, h) {
+    var L = NIGHT_LIGHTS;
+    var t = Math.max(0, Math.min(1, (L.on - h) / (L.on - L.full)));
+    var dusk = t * t * (3 - 2 * t);
+    return Math.pow(Math.max(v - L.floor, 0) / (1 - L.floor), L.gamma) * dusk;
+  }
+
+  /** A number as GLSL reads a float (with its point). */
+  function glslFloat(x) { return x.toFixed(4); }
+
+  // The fragment shader of the lights, on the mesh of the GL layers
+  // (WidgetTemp.TempLayerGL.GLLayer): v_merc is Mercator 0..1, past 0..1
+  // for the copies of the world on a flat map (the picture repeats across).
+  var NIGHT_LIGHTS_FS = (function () {
+    var L = NIGHT_LIGHTS, c = L.color.map(glslFloat).join(', ');
+    return [
+      '#version 300 es',
+      'precision highp float;',
+      'in vec2 v_merc;',
+      'out vec4 fragColor;',
+      'const float PI = 3.141592653589793;',
+      'uniform sampler2D u_lights;',
+      'uniform vec3 u_sun;',
+      'uniform float u_opacity;',
+      'void main() {',
+      '  float lat = atan(sinh(PI * (1.0 - 2.0 * v_merc.y)));',
+      '  float lon = (v_merc.x - 0.5) * 2.0 * PI;',
+      '  float v = texture(u_lights, vec2(v_merc.x, 0.5 - lat / PI)).r;',
+      '  vec3 p = vec3(sin(lon) * cos(lat), sin(lat), cos(lon) * cos(lat));',
+      '  float h = degrees(asin(clamp(dot(p, u_sun), -1.0, 1.0)));',
+      '  float t = clamp((' + glslFloat(L.on) + ' - h) / (' + glslFloat(L.on) + ' - (' + glslFloat(L.full) + ')), 0.0, 1.0);',
+      '  float dusk = t * t * (3.0 - 2.0 * t);',
+      '  float a = pow(max(v - ' + glslFloat(L.floor) + ', 0.0) / (1.0 - ' + glslFloat(L.floor) + '), ' + glslFloat(L.gamma) + ') * dusk * u_opacity;',
+      '  fragColor = vec4(vec3(' + c + ') * a, a);',
+      '}'
+    ].join('\n');
+  })();
+
   /** MapLibre light position [radial, azimuthal, polar] (anchor 'map') that
       lights the globe's atmosphere from the Sun. MapLibre makes it the
       direction (sin az sin p, -cos az sin p, -cos p) in its globe frame,
@@ -324,6 +372,7 @@ var WidgetEarth = (function () {
     decodeLines: decodeLines,
     GLOBE_FILL: GLOBE_FILL, subsolarPoint: subsolarPoint, sunAltitude: sunAltitude,
     shadeTile: shadeTile, sunLightPosition: sunLightPosition,
+    NIGHT_LIGHTS: NIGHT_LIGHTS, nightLight: nightLight, NIGHT_LIGHTS_FS: NIGHT_LIGHTS_FS, glslFloat: glslFloat,
     globeApparentRadius: globeApparentRadius, wholeEarthZoom: wholeEarthZoom
   };
 })();

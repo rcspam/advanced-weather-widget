@@ -124,12 +124,81 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     if (!dayNight) {
       if (map.getLayer('lv-night')) map.removeLayer('lv-night');
       if (map.getSource('lv-night')) map.removeSource('lv-night');
+      applyLights();
       return;
     }
     if (!map.getSource('lv-night')) {
       map.addSource('lv-night', { type: 'raster', tiles: shadeTiles(), tileSize: 256, maxzoom: SHADE_MAXZOOM });
     }
     if (!map.getLayer('lv-night')) addLayer({ id: 'lv-night', type: 'raster', source: 'lv-night', paint: { 'raster-fade-duration': 0 } });
+    applyLights();
+  }
+
+  // The lights of the towns on the night side (WidgetEarth.nightLight):
+  // NASA's grey picture of the Earth at night on one texture, lit by the
+  // chip as the Sun goes down, through a GL layer like the temperature's
+  // (glue-temp-gl.js), right over the night. With the day and night only,
+  // as bright as the widget's slider says (percent, 0 for none).
+  var LIGHTS_URL = 'vendor/night-lights.jpg';
+  var nightLights = percent(typeof LIGHTS_INIT === 'undefined' ? null : LIGHTS_INIT);
+  if (nightLights === null) nightLights = 70;
+  var lights = { layer: null, image: null, loading: false, sun: [0, 0, 1] };
+  function glLayerClass() {
+    return typeof WidgetTemp !== 'undefined' && WidgetTemp.TempLayerGL && WidgetTemp.TempLayerGL.GLLayer;
+  }
+  function applyLights() {
+    var GL = glLayerClass();
+    if (!dayNight || !(nightLights > 0) || !GL) {
+      if (map.getLayer('lv-lights')) map.removeLayer('lv-lights');
+      return;
+    }
+    if (!lights.layer) lights.layer = makeLightsLayer(GL);
+    if (!map.getLayer('lv-lights')) addLayer(lights.layer);
+    loadLights();
+    if (map.triggerRepaint) map.triggerRepaint();
+  }
+  function makeLightsLayer(GL) {
+    var layer = new GL('lv-lights', WidgetEarth.NIGHT_LIGHTS_FS, function (gl, u, l) {
+      if (!lights.image || !(nightLights > 0)) return false;
+      gl.activeTexture(gl.TEXTURE0);
+      if (!l.lightsTex) {
+        // The picture as one channel, with its smaller copies: far out the
+        // globe shows it a few times smaller, and they keep it from sparkling.
+        l.lightsTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, l.lightsTex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, gl.RED, gl.UNSIGNED_BYTE, lights.image);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      }
+      gl.bindTexture(gl.TEXTURE_2D, l.lightsTex);
+      gl.uniform1i(u.u_lights, 0);
+      gl.uniform3fv(u.u_sun, lights.sun);
+      gl.uniform1f(u.u_opacity, nightLights / 100);
+      return true;
+    });
+    var remove = layer.onRemove;
+    layer.onRemove = function (m, gl) {
+      if (this.lightsTex) gl.deleteTexture(this.lightsTex);
+      this.lightsTex = null;
+      remove.call(this, m, gl);
+    };
+    return layer;
+  }
+  // Read once, the first time the lights are on.
+  function loadLights() {
+    if (lights.image || lights.loading || typeof fetch !== 'function') return;
+    lights.loading = true;
+    fetch(LIGHTS_URL).then(function (r) { return r.blob(); }).then(function (b) {
+      return createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+    }).then(function (bmp) {
+      lights.image = bmp;
+      if (map && map.triggerRepaint) map.triggerRepaint();
+    }).catch(function (e) { lights.loading = false; console.warn('night lights: ' + e); });
   }
 
   // The temperature (glue-temp-layer.js): raster tiles the layer draws,
@@ -239,6 +308,8 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     var sun = WidgetEarth.subsolarPoint(skyDate());
     map.setLight(dayNight ? { anchor: 'map', position: WidgetEarth.sunLightPosition(sun) } : EVEN_LIGHT);
     drawShade(sun);
+    lights.sun = WidgetEarth.placeVector(sun.lat, sun.lon);
+    if (map.getLayer('lv-lights') && map.triggerRepaint) map.triggerRepaint();
     drawSpaceSoon();
   }
   function applyDayNight() {
@@ -648,6 +719,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
   /** [group, rank inside the group] of a layer id; null for one not stacked. */
   function stackGroup(id) {
     if (id === 'lv-night') return ['night', 0];
+    if (id === 'lv-lights') return ['night', 1];
     if (id === LINES_LAYER) return ['lines', 0];
     if (id.indexOf('lv-alerts') === 0) return ['radar', 0];
     if (id.indexOf('lv-layer-sat-') >= 0) return ['satellite', 1];
@@ -1041,6 +1113,19 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     },
 
     getNightDepth: function () { return nightDepth; },
+
+    /** How bright the lights of the towns at night, percent; 0 for none. */
+    setNightLights: function (value) {
+      var d = percent(value);
+      if (d === null) return;
+      nightLights = d;
+      if (styleReady && !swapInProgress) applyLights();
+    },
+
+    /** The lights' setting and Sun (test bench). */
+    nightLightsState: function () {
+      return { percent: nightLights, sun: lights.sun.slice(), shown: !!(map && map.getLayer('lv-lights')), loaded: !!lights.image };
+    },
 
     /** Show the temperature tiles drawn by provider(z, x, y, signal) ->
         Promise of 256 x 256 RGBA pixels, at opacity 0..1; again with a new

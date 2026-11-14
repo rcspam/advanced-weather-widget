@@ -65,6 +65,7 @@ class FakeMap {
   }
   setSky(sky) { this.sky = sky; }
   setLight(l) { this.light = l; }
+  triggerRepaint() { this.repaints = (this.repaints || 0) + 1; }
   getContainer() { return { clientWidth: 800, clientHeight: 330 }; }
   getMinZoom() { return 0; }
   getMaxZoom() { return 12; }
@@ -901,4 +902,61 @@ test('a local server is reached under several names, six connections each; a rem
 test('MapLibre may load 32 images at once, not 16', () => {
   const { parallel } = loadAdapter();
   assert.equal(parallel.n, 32);
+});
+
+// The GL layers' class (glue-temp-gl.js), as far as the adapter sees it.
+const withGL = {
+  WidgetTemp: { TempLayerGL: { GLLayer: function (id, fs, draw) { this.id = id; this.type = 'custom'; this.fs = fs; this.draw = draw; } } },
+};
+const order = (map) => map.getLayersOrder();
+
+test('night lights: with the day and night, right over the night, 70 % by default; gone at 0, back above it', () => {
+  const { adapter, map } = loadAdapter(withGL);
+  adapter.setDayNight(true);
+  const l = map.getLayer('lv-lights');
+  assert.equal(l.type, 'custom');
+  assert.equal(order(map).indexOf('lv-lights'), order(map).indexOf('lv-night') + 1, 'right over the night');
+  assert.equal(adapter.nightLightsState().percent, 70);
+  adapter.setNightLights(0);
+  assert.equal(map.getLayer('lv-lights'), undefined, 'the slider at 0: no layer');
+  adapter.setNightLights(35);
+  assert.ok(map.getLayer('lv-lights'), 'back');
+  assert.equal(adapter.nightLightsState().percent, 35);
+  adapter.setNightLights('x');
+  assert.equal(adapter.nightLightsState().percent, 35, 'unreadable: unchanged');
+  adapter.setDayNight(false);
+  assert.equal(map.getLayer('lv-lights'), undefined, 'no night, no lights');
+  adapter.setNightLights(60);
+  assert.equal(map.getLayer('lv-lights'), undefined, 'still none while the night is off');
+  adapter.setDayNight(true);
+  assert.ok(map.getLayer('lv-lights'));
+  assert.equal(adapter.nightLightsState().percent, 60, 'kept while off');
+});
+
+test('night lights: from the page address, 0 for none', () => {
+  let r = loadAdapter(Object.assign({ LIGHTS_INIT: '20' }, withGL));
+  r.adapter.setDayNight(true);
+  assert.equal(r.adapter.nightLightsState().percent, 20);
+  r = loadAdapter(Object.assign({ LIGHTS_INIT: '0' }, withGL));
+  r.adapter.setDayNight(true);
+  assert.equal(r.map.getLayer('lv-lights'), undefined);
+});
+
+test('night lights: lit by the Sun of the picture shown', () => {
+  const { adapter, map } = loadAdapter(withGL);
+  const E = require('../glue-earth.js');
+  adapter.setDayNight(true);
+  const t = Date.UTC(2026, 10, 15, 3), sun = E.subsolarPoint(new Date(t)), want = E.placeVector(sun.lat, sun.lon);
+  const before = map.repaints || 0;
+  adapter.setSkyTime(t);
+  const got = adapter.nightLightsState().sun;
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(got[i] - want[i]) < 1e-9, 'sun ' + i);
+  assert.ok((map.repaints || 0) > before, 'drawn again');
+});
+
+test('night lights: none without the GL layers, and no harm done', () => {
+  const { adapter, map } = loadAdapter();
+  adapter.setDayNight(true);
+  assert.equal(map.getLayer('lv-lights'), undefined);
+  assert.ok(map.getLayer('lv-night'));
 });

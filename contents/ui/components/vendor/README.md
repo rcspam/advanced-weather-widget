@@ -26,3 +26,11 @@ the middle, for the Moon drawn around the globe. NASA's Scientific
 Visualization Studio, CGI Moon Kit (Lunar Reconnaissance Orbiter Camera
 color map, `lroc_color_poles_1k.jpg`), public domain
 (https://svs.gsfc.nasa.gov/4720), scaled down to 512 x 256.
+
+# Night lights
+
+`night-lights.jpg`: the lights of the Earth at night, grey,
+equirectangular, 3600 x 1800 (0.1 degree), for the towns lit on the night
+side of the map. NASA Earth Observatory, Black Marble 2016
+(`BlackMarble_2016_01deg_gray.jpg`, Suomi NPP VIIRS), public domain
+(https://earthobservatory.nasa.gov/features/NightLights), as published.

@@ -309,6 +309,10 @@ window.setGlobeSun = function (on) {
 window.setGlobeMoon = function (on) {
   if (_widgetAdapter.setSkyBodies) _widgetAdapter.setSkyBodies({ moon: !!on });
 };
+// The lights of the towns at night, in percent (0 for none).
+window.setNightLights = function (percent) {
+  if (_widgetAdapter.setNightLights) _widgetAdapter.setNightLights(percent);
+};
 
 if (TEMP_ON) window.setTemp(true);
 
