@@ -92,7 +92,7 @@ var WidgetEarth = (function () {
       picture. Gone as the map closes in: all of them while it spans
       fadeKm[1] km or more (a whole country), none from fadeKm[0] (half
       of France). */
-  var NIGHT_LIGHTS = { on: -2, full: -10, gamma: 0.55, floor: 0.02, color: [1, 0.8, 0.5], cols: 13500, boost: 2, fadeKm: [500, 1000] };
+  var NIGHT_LIGHTS = { on: -2, full: -10, gamma: 0.55, floor: 0.02, color: [1, 0.96, 0.82], cols: 13500, boost: 2, fadeKm: [500, 1000] };
 
   /** How bright a light of value v (0..1, the picture's) shows with the
       Sun h degrees above the horizon, 0..1. Line for line what the vertex

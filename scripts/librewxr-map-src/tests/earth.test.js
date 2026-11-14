@@ -462,3 +462,11 @@ test('nightLightsFade: all the lights over a whole country, none once half of Fr
     last = f;
   }
 });
+
+test('night lights: white with a touch of yellow, as the shader draws them', () => {
+  const [r, g, b] = E.NIGHT_LIGHTS.color;
+  assert.equal(r, 1);
+  assert.ok(g >= 0.92 && g < 1, 'nearly white: ' + g);
+  assert.ok(b >= 0.75 && b < g - 0.05, 'a touch of yellow: ' + b);
+  assert.ok(E.NIGHT_LIGHTS_FS.includes('vec3(' + E.NIGHT_LIGHTS.color.map(E.glslFloat).join(', ') + ')'), 'in the shader');
+});
