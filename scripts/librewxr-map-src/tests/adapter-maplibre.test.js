@@ -488,8 +488,9 @@ test('the temperature goes right over the base map and the night, under the fram
   adapter.setTempTiles(provider, 1, 0.45);
   // The fake map only holds the layers added at run time: lv-base is in the style.
   const order = ids(map).filter((id) => id.indexOf('lv-') === 0);
-  assert.deepEqual(order.slice(0, 2), ['lv-night', 'lv-temp']);
-  assert.ok(order[2].indexOf('lv-layer-radar-') === 0);
+  // The lights of the towns right over the night, under the weather.
+  assert.deepEqual(order.slice(0, 3), ['lv-night', 'lv-lights', 'lv-temp']);
+  assert.ok(order[3].indexOf('lv-layer-radar-') === 0);
   assert.equal(map.getLayer('lv-temp').paint['raster-opacity'], 0.45);
   const src = map.getSource('lv-temp-src');
   assert.equal(src.type, 'raster');
@@ -904,14 +905,10 @@ test('MapLibre may load 32 images at once, not 16', () => {
   assert.equal(parallel.n, 32);
 });
 
-// The GL layers' class (glue-temp-gl.js), as far as the adapter sees it.
-const withGL = {
-  WidgetTemp: { TempLayerGL: { GLLayer: function (id, fs, draw) { this.id = id; this.type = 'custom'; this.fs = fs; this.draw = draw; } } },
-};
 const order = (map) => map.getLayersOrder();
 
 test('night lights: with the day and night, right over the night, 70 % by default; gone at 0, back above it', () => {
-  const { adapter, map } = loadAdapter(withGL);
+  const { adapter, map } = loadAdapter();
   adapter.setDayNight(true);
   const l = map.getLayer('lv-lights');
   assert.equal(l.type, 'custom');
@@ -934,16 +931,16 @@ test('night lights: with the day and night, right over the night, 70 % by defaul
 });
 
 test('night lights: from the page address, 0 for none', () => {
-  let r = loadAdapter(Object.assign({ LIGHTS_INIT: '20' }, withGL));
+  let r = loadAdapter({ LIGHTS_INIT: '20' });
   r.adapter.setDayNight(true);
   assert.equal(r.adapter.nightLightsState().percent, 20);
-  r = loadAdapter(Object.assign({ LIGHTS_INIT: '0' }, withGL));
+  r = loadAdapter({ LIGHTS_INIT: '0' });
   r.adapter.setDayNight(true);
   assert.equal(r.map.getLayer('lv-lights'), undefined);
 });
 
 test('night lights: lit by the Sun of the picture shown', () => {
-  const { adapter, map } = loadAdapter(withGL);
+  const { adapter, map } = loadAdapter();
   const E = require('../glue-earth.js');
   adapter.setDayNight(true);
   const t = Date.UTC(2026, 10, 15, 3), sun = E.subsolarPoint(new Date(t)), want = E.placeVector(sun.lat, sun.lon);
@@ -954,9 +951,3 @@ test('night lights: lit by the Sun of the picture shown', () => {
   assert.ok((map.repaints || 0) > before, 'drawn again');
 });
 
-test('night lights: none without the GL layers, and no harm done', () => {
-  const { adapter, map } = loadAdapter();
-  adapter.setDayNight(true);
-  assert.equal(map.getLayer('lv-lights'), undefined);
-  assert.ok(map.getLayer('lv-night'));
-});

@@ -134,69 +134,128 @@ var WidgetMapLibreAdapter = function (maplibregl) {
     applyLights();
   }
 
-  // The lights of the towns on the night side (WidgetEarth.nightLight):
-  // NASA's grey picture of the Earth at night on one texture, lit by the
-  // chip as the Sun goes down, through a GL layer like the temperature's
-  // (glue-temp-gl.js), right over the night. With the day and night only,
-  // as bright as the widget's slider says (percent, 0 for none).
-  var LIGHTS_URL = 'vendor/night-lights.jpg';
+  // The lights of the towns on the night side: some 240 000 points from
+  // NASA's Black Marble (vendor/night-lights.bin, WidgetEarth), each lit by
+  // the chip as the Sun goes down where it stands, sharp at every zoom.
+  // A layer of MapLibre's own (type custom) right over the night, for the
+  // day and night only, as bright as the widget's slider says (percent, 0
+  // for none).
+  var LIGHTS_URL = 'vendor/night-lights.bin';
   var nightLights = percent(typeof LIGHTS_INIT === 'undefined' ? null : LIGHTS_INIT);
   if (nightLights === null) nightLights = 70;
-  var lights = { layer: null, image: null, loading: false, sun: [0, 0, 1] };
-  function glLayerClass() {
-    return typeof WidgetTemp !== 'undefined' && WidgetTemp.TempLayerGL && WidgetTemp.TempLayerGL.GLLayer;
-  }
+  var lights = { layer: null, vertices: null, loading: false, sun: [0, 0, 1] };
   function applyLights() {
-    var GL = glLayerClass();
-    if (!dayNight || !(nightLights > 0) || !GL) {
+    if (!dayNight || !(nightLights > 0)) {
       if (map.getLayer('lv-lights')) map.removeLayer('lv-lights');
       return;
     }
-    if (!lights.layer) lights.layer = makeLightsLayer(GL);
+    if (!lights.layer) lights.layer = makeLightsLayer();
     if (!map.getLayer('lv-lights')) addLayer(lights.layer);
     loadLights();
     if (map.triggerRepaint) map.triggerRepaint();
   }
-  function makeLightsLayer(GL) {
-    var layer = new GL('lv-lights', WidgetEarth.NIGHT_LIGHTS_FS, function (gl, u, l) {
-      if (!lights.image || !(nightLights > 0)) return false;
-      gl.activeTexture(gl.TEXTURE0);
-      if (!l.lightsTex) {
-        // The picture as one channel, with its smaller copies: far out the
-        // globe shows it a few times smaller, and they keep it from sparkling.
-        l.lightsTex = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, l.lightsTex);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, gl.RED, gl.UNSIGNED_BYTE, lights.image);
-        gl.generateMipmap(gl.TEXTURE_2D);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  function makeLightsLayer() {
+    return {
+      id: 'lv-lights',
+      type: 'custom',
+      renderingMode: '2d',
+      programs: {},
+      vbo: null,
+      count: 0,
+      failed: false,
+      onAdd: function () {},
+      onRemove: function (m, gl) {
+        var self = this;
+        Object.keys(this.programs).forEach(function (k) {
+          var pr = self.programs[k];
+          if (pr) { gl.deleteProgram(pr.p); gl.deleteVertexArray(pr.vao); }
+        });
+        this.programs = {};
+        if (this.vbo) gl.deleteBuffer(this.vbo);
+        this.vbo = null;
+      },
+      // The program for MapLibre's projection variant (flat or globe), made once.
+      program: function (gl, sd) {
+        if (sd.variantName in this.programs) return this.programs[sd.variantName];
+        var ok = true;
+        function sh(type, src) {
+          var x = gl.createShader(type);
+          gl.shaderSource(x, src);
+          gl.compileShader(x);
+          if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) { ok = false; console.warn('[gl] lv-lights shader: ' + gl.getShaderInfoLog(x)); }
+          return x;
+        }
+        var pr = gl.createProgram();
+        var v = sh(gl.VERTEX_SHADER, '#version 300 es\n' + sd.vertexShaderPrelude + '\n' + sd.define + '\n' + WidgetEarth.NIGHT_LIGHTS_VS);
+        var f = sh(gl.FRAGMENT_SHADER, WidgetEarth.NIGHT_LIGHTS_FS);
+        gl.attachShader(pr, v);
+        gl.attachShader(pr, f);
+        gl.linkProgram(pr);
+        gl.deleteShader(v);
+        gl.deleteShader(f);
+        if (!ok || !gl.getProgramParameter(pr, gl.LINK_STATUS)) {
+          console.warn('[gl] lv-lights link: ' + gl.getProgramInfoLog(pr));
+          gl.deleteProgram(pr);
+          return (this.programs[sd.variantName] = null);
+        }
+        var loc = {}, n = gl.getProgramParameter(pr, gl.ACTIVE_UNIFORMS);
+        for (var i = 0; i < n; i++) {
+          var name = gl.getActiveUniform(pr, i).name.replace(/\[0\]$/, '');
+          loc[name] = gl.getUniformLocation(pr, name);
+        }
+        var vao = gl.createVertexArray();
+        gl.bindVertexArray(vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+        var ap = gl.getAttribLocation(pr, 'a_pos');
+        gl.enableVertexAttribArray(ap);
+        gl.vertexAttribPointer(ap, 3, gl.FLOAT, false, 0, 0);
+        gl.bindVertexArray(null);
+        return (this.programs[sd.variantName] = { p: pr, loc: loc, vao: vao });
+      },
+      render: function (gl, args) {
+        if (this.failed || !lights.vertices || !(nightLights > 0)) return;
+        if (!this.vbo) {
+          this.vbo = gl.createBuffer();
+          gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+          gl.bufferData(gl.ARRAY_BUFFER, lights.vertices, gl.STATIC_DRAW);
+          this.count = lights.vertices.length / 3;
+        }
+        var sd = args.shaderData, d = args.defaultProjectionData, pr = this.program(gl, sd);
+        if (!pr) { this.failed = true; return; }
+        var u = pr.loc, look = WidgetEarth.nightLightsLook(map.getZoom()), dpr = window.devicePixelRatio || 1;
+        gl.useProgram(pr.p);
+        gl.uniformMatrix4fv(u.u_projection_matrix, false, d.mainMatrix);
+        if (u.u_projection_fallback_matrix) gl.uniformMatrix4fv(u.u_projection_fallback_matrix, false, d.fallbackMatrix);
+        if (u.u_projection_tile_mercator_coords) gl.uniform4fv(u.u_projection_tile_mercator_coords, d.tileMercatorCoords);
+        if (u.u_projection_clipping_plane) gl.uniform4fv(u.u_projection_clipping_plane, d.clippingPlane);
+        if (u.u_projection_transition) gl.uniform1f(u.u_projection_transition, d.projectionTransition);
+        gl.uniform3fv(u.u_sun, lights.sun);
+        gl.uniform1f(u.u_opacity, nightLights / 100);
+        gl.uniform1f(u.u_size, look.size * dpr);
+        gl.uniform1f(u.u_gain, look.gain);
+        // Added to what is under them: lights glow, and many in one place glow more.
+        gl.enable(gl.BLEND);
+        gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ZERO, gl.ONE);
+        gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.STENCIL_TEST);
+        gl.disable(gl.CULL_FACE);
+        gl.bindVertexArray(pr.vao);
+        // Flat, the copies of the world on either side; on the globe one is all.
+        var shifts = sd.variantName === 'globe' ? [0] : [-1, 0, 1];
+        for (var k = 0; k < shifts.length; k++) {
+          gl.uniform1f(u.u_shift, shifts[k]);
+          gl.drawArrays(gl.POINTS, 0, this.count);
+        }
+        gl.bindVertexArray(null);
       }
-      gl.bindTexture(gl.TEXTURE_2D, l.lightsTex);
-      gl.uniform1i(u.u_lights, 0);
-      gl.uniform3fv(u.u_sun, lights.sun);
-      gl.uniform1f(u.u_opacity, nightLights / 100);
-      return true;
-    });
-    var remove = layer.onRemove;
-    layer.onRemove = function (m, gl) {
-      if (this.lightsTex) gl.deleteTexture(this.lightsTex);
-      this.lightsTex = null;
-      remove.call(this, m, gl);
     };
-    return layer;
   }
   // Read once, the first time the lights are on.
   function loadLights() {
-    if (lights.image || lights.loading || typeof fetch !== 'function') return;
+    if (lights.vertices || lights.loading || typeof fetch !== 'function') return;
     lights.loading = true;
-    fetch(LIGHTS_URL).then(function (r) { return r.blob(); }).then(function (b) {
-      return createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
-    }).then(function (bmp) {
-      lights.image = bmp;
+    fetch(LIGHTS_URL).then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      lights.vertices = WidgetEarth.nightLightsVertices(WidgetEarth.decodeNightLights(buf));
       if (map && map.triggerRepaint) map.triggerRepaint();
     }).catch(function (e) { lights.loading = false; console.warn('night lights: ' + e); });
   }
@@ -1124,7 +1183,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
 
     /** The lights' setting and Sun (test bench). */
     nightLightsState: function () {
-      return { percent: nightLights, sun: lights.sun.slice(), shown: !!(map && map.getLayer('lv-lights')), loaded: !!lights.image };
+      return { percent: nightLights, sun: lights.sun.slice(), shown: !!(map && map.getLayer('lv-lights')), loaded: !!lights.vertices, points: lights.vertices ? lights.vertices.length / 3 : 0 };
     },
 
     /** Show the temperature tiles drawn by provider(z, x, y, signal) ->

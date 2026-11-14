@@ -29,8 +29,9 @@ color map, `lroc_color_poles_1k.jpg`), public domain
 
 # Night lights
 
-`night-lights.jpg`: the lights of the Earth at night, grey,
-equirectangular, 3600 x 1800 (0.1 degree), for the towns lit on the night
-side of the map. NASA Earth Observatory, Black Marble 2016
-(`BlackMarble_2016_01deg_gray.jpg`, Suomi NPP VIIRS), public domain
-(https://earthobservatory.nasa.gov/features/NightLights), as published.
+`night-lights.bin`: the lights of the Earth at night as some 240 000
+points, for the towns lit on the night side of the map. Made by
+`scripts/make_night_lights.py` from NASA Earth Observatory's Black Marble
+2016, grey, 3 km (`BlackMarble_2016_3km_gray.jpg`, 13500 x 6750, Suomi NPP
+VIIRS), public domain
+(https://earthobservatory.nasa.gov/features/NightLights).
