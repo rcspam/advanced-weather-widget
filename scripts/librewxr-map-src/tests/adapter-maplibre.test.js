@@ -653,6 +653,25 @@ test('the lines are thicker on the whole globe, where they are dense and small',
   assert.ok(Math.abs(widthAt(width, 10) - 1.8) < 1e-9);
 });
 
+test('a light edge right under the dark lines, so they still show over the night', async () => {
+  const { adapter, map } = loadAdapter(linesGlobals([]));
+  adapter.setLines('pressure', true);
+  await tick(); await tick();
+  const order = ids(map), halo = map.getLayer('lv-lines-halo'), line = map.getLayer('lv-lines');
+  assert.equal(order.indexOf('lv-lines-halo') + 1, order.indexOf('lv-lines'), 'right under the lines: ' + order.join());
+  assert.equal(halo.type, 'line');
+  assert.equal(halo.source, 'lv-lines-src', 'the same lines');
+  for (const z of [0, 1, 2, 4, 6, 10]) {
+    assert.ok(widthAt(halo.paint['line-width'], z) > widthAt(line.paint['line-width'], z) + 1, 'wider at zoom ' + z);
+  }
+  assert.match(halo.paint['line-color'], /^rgba\(2\d\d, 2\d\d, 2\d\d, 0\.\d+\)$/, 'light, see-through');
+  adapter.setLines('pressure', false);
+  assert.equal(map.getLayer('lv-lines-halo').layout.visibility, 'none', 'hidden with the lines');
+  adapter.setLines('pressure', true);
+  assert.equal(map.getLayer('lv-lines-halo').layout.visibility, 'visible');
+  assert.equal(ids(map).filter((id) => id === 'lv-lines-halo').length, 1, 'made once');
+});
+
 test('a layer that asks for the lines before the style loads gets them once it has', async () => {
   // The widget switches the radar on as soon as the page is up, which can
   // be before MapLibre's 'load' (the popup closed, the page kept loaded).
@@ -807,7 +826,9 @@ test('a base map change puts the lines back over the temperature', async () => {
   for (const id in map.loadedStyle.sources) map.addSource(id, map.loadedStyle.sources[id]);
   map.fire('style.load');
   const order = ids(map);
-  assert.equal(order.indexOf('lv-lines'), order.indexOf('lv-temp') + 1);
+  // The light edge of the lines, then the lines.
+  assert.equal(order.indexOf('lv-lines-halo'), order.indexOf('lv-temp') + 1);
+  assert.equal(order.indexOf('lv-lines'), order.indexOf('lv-temp') + 2);
   assert.equal(map.getSource('lv-lines-src').data, LINES);
 });
 
@@ -819,7 +840,7 @@ test('lines switched off: none drawn, even wanted; back on, they come back', asy
   assert.equal(linesVisible(map), false);
   adapter.setLinesShown(true);
   assert.ok(linesVisible(map));
-  assert.equal(ids(map).indexOf('lv-lines'), ids(map).indexOf('lv-temp') + 1);
+  assert.equal(ids(map).indexOf('lv-lines'), ids(map).indexOf('lv-temp') + 2, 'over their light edge');
 });
 
 test('the widget can open the page with the lines off, and nothing is fetched', async () => {

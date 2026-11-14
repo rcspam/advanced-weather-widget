@@ -306,6 +306,16 @@ var WidgetMapLibreAdapter = function (maplibregl) {
   // color layer to another they stay as they are, tiles and all.
   var homeMarker = null;      // the widget's place
   var LINES_LAYER = 'lv-lines', LINES_SOURCE = 'lv-lines-src', LINES_URL = 'vendor/coast-borders.bin';
+  // Under the dark lines, a light edge: they still show where the map is
+  // dark, the night side above all, now that the night turns with the
+  // time bar.
+  var LINES_HALO = 'lv-lines-halo';
+  var LINES_WIDTH = [0, 1.7, 2, 1.3, 4, 1.0, 6, 1.2, 10, 1.8];
+  function linesWidth(extra) {
+    var e = ['interpolate', ['linear'], ['zoom']];
+    for (var i = 0; i < LINES_WIDTH.length; i += 2) e.push(LINES_WIDTH[i], LINES_WIDTH[i + 1] + extra);
+    return e;
+  }
   var linesOwners = {}, linesData = null, linesLoading = false;
   var linesShown = typeof LINES_INIT === 'undefined' || LINES_INIT !== false;
   function linesWanted() {
@@ -317,7 +327,9 @@ var WidgetMapLibreAdapter = function (maplibregl) {
   function applyLines() {
     if (!styleReady) return;
     if (!linesWanted()) {
-      if (map.getLayer(LINES_LAYER)) map.setLayoutProperty(LINES_LAYER, 'visibility', 'none');
+      [LINES_HALO, LINES_LAYER].forEach(function (id) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+      });
       return;
     }
     if (!linesData) {
@@ -333,6 +345,13 @@ var WidgetMapLibreAdapter = function (maplibregl) {
       return;
     }
     if (!map.getSource(LINES_SOURCE)) map.addSource(LINES_SOURCE, { type: 'geojson', data: linesData });
+    if (!map.getLayer(LINES_HALO)) {
+      addLayer({
+        id: LINES_HALO, type: 'line', source: LINES_SOURCE,
+        layout: { 'line-join': 'round', visibility: 'visible' },
+        paint: { 'line-color': 'rgba(235, 235, 235, 0.3)', 'line-width': linesWidth(1.6), 'line-blur': 1 }
+      });
+    } else map.setLayoutProperty(LINES_HALO, 'visibility', 'visible');
     if (map.getLayer(LINES_LAYER)) {
       map.setLayoutProperty(LINES_LAYER, 'visibility', 'visible');
       return;
@@ -344,7 +363,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
         'line-color': 'rgba(20, 20, 20, 0.6)',
         // Thicker far out: on the whole globe (zoom ~1) a hairline is lost
         // in the colors. Thinnest around zoom 4, then wider again close in.
-        'line-width': ['interpolate', ['linear'], ['zoom'], 0, 1.7, 2, 1.3, 4, 1.0, 6, 1.2, 10, 1.8]
+        'line-width': linesWidth(0)
       }
     });
   }
@@ -779,7 +798,8 @@ var WidgetMapLibreAdapter = function (maplibregl) {
   function stackGroup(id) {
     if (id === 'lv-night') return ['night', 0];
     if (id === 'lv-lights') return ['night', 1];
-    if (id === LINES_LAYER) return ['lines', 0];
+    if (id === LINES_HALO) return ['lines', 0];
+    if (id === LINES_LAYER) return ['lines', 1];
     if (id.indexOf('lv-alerts') === 0) return ['radar', 0];
     if (id.indexOf('lv-layer-sat-') >= 0) return ['satellite', 1];
     if (id.indexOf('lv-layer-radar-') >= 0) return ['radar', 1];
