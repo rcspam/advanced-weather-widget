@@ -972,3 +972,16 @@ test('night lights: lit by the Sun of the picture shown', () => {
   assert.ok((map.repaints || 0) > before, 'drawn again');
 });
 
+
+test('night lights: all of them far out, fading as the map closes in, none on half of France', () => {
+  const { adapter, map } = loadAdapter();
+  adapter.setDayNight(true);
+  // The fake map: 800 px wide, its middle at 48 degrees north.
+  map.getZoom = () => 5;       // some 1300 km across
+  assert.equal(adapter.nightLightsState().fade, 1);
+  map.getZoom = () => 6;       // some 650 km
+  const f = adapter.nightLightsState().fade;
+  assert.ok(f > 0 && f < 1, 'fading: ' + f);
+  map.getZoom = () => 7;       // some 330 km
+  assert.equal(adapter.nightLightsState().fade, 0);
+});

@@ -213,7 +213,8 @@ var WidgetMapLibreAdapter = function (maplibregl) {
         return (this.programs[sd.variantName] = { p: pr, loc: loc, vao: vao });
       },
       render: function (gl, args) {
-        if (this.failed || !lights.vertices || !(nightLights > 0)) return;
+        var fade = lightsFade();
+        if (this.failed || !lights.vertices || !(nightLights > 0) || !(fade > 0)) return;
         if (!this.vbo) {
           this.vbo = gl.createBuffer();
           gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
@@ -232,7 +233,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
         gl.uniform3fv(u.u_sun, lights.sun);
         gl.uniform1f(u.u_opacity, nightLights / 100);
         gl.uniform1f(u.u_size, look.size * dpr);
-        gl.uniform1f(u.u_gain, look.gain);
+        gl.uniform1f(u.u_gain, look.gain * fade);
         // Added to what is under them: lights glow, and many in one place glow more.
         gl.enable(gl.BLEND);
         gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ZERO, gl.ONE);
@@ -249,6 +250,11 @@ var WidgetMapLibreAdapter = function (maplibregl) {
         gl.bindVertexArray(null);
       }
     };
+  }
+  // How much of the lights shows: all of them over a country, fading out
+  // as the map closes in on half of France (WidgetEarth.nightLightsFade).
+  function lightsFade() {
+    return WidgetEarth.nightLightsFade(WidgetEarth.viewWidthKm(map.getContainer().clientWidth, map.getZoom(), map.getCenter().lat));
   }
   // Read once, the first time the lights are on.
   function loadLights() {
@@ -1203,7 +1209,7 @@ var WidgetMapLibreAdapter = function (maplibregl) {
 
     /** The lights' setting and Sun (test bench). */
     nightLightsState: function () {
-      return { percent: nightLights, sun: lights.sun.slice(), shown: !!(map && map.getLayer('lv-lights')), loaded: !!lights.vertices, points: lights.vertices ? lights.vertices.length / 3 : 0 };
+      return { percent: nightLights, sun: lights.sun.slice(), shown: !!(map && map.getLayer('lv-lights')), loaded: !!lights.vertices, points: lights.vertices ? lights.vertices.length / 3 : 0, fade: map ? lightsFade() : 1 };
     },
 
     /** Show the temperature tiles drawn by provider(z, x, y, signal) ->

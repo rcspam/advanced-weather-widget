@@ -440,3 +440,25 @@ test('the widget file holds the lights of the towns of the whole Earth', () => {
   assert.ok(paris > 30, 'Paris: ' + paris);
   assert.ok(atlantic < 5, 'mid-Atlantic: ' + atlantic);
 });
+
+test('viewWidthKm: the ground across the map, from its width in px, the zoom and the latitude', () => {
+  near(E.viewWidthKm(512, 0, 0), 40075.0167, 1e-3, 'the equator at zoom 0');
+  near(E.viewWidthKm(512, 1, 0), 40075.0167 / 2, 1e-3, 'half at zoom 1');
+  near(E.viewWidthKm(512, 0, 60), 40075.0167 / 2, 1e-3, 'half as much ground at 60 degrees');
+});
+
+test('nightLightsFade: all the lights over a whole country, none once half of France fills the map', () => {
+  const [gone, full] = E.NIGHT_LIGHTS.fadeKm;
+  assert.equal(gone, 500); assert.equal(full, 1000);
+  assert.equal(E.nightLightsFade(20000), 1, 'the whole Earth');
+  assert.equal(E.nightLightsFade(full), 1);
+  assert.equal(E.nightLightsFade(gone), 0);
+  assert.equal(E.nightLightsFade(100), 0);
+  near(E.nightLightsFade((gone + full) / 2), 0.5, 1e-9, 'halfway');
+  let last = 0;
+  for (let km = gone; km <= full; km += 25) {
+    const f = E.nightLightsFade(km);
+    assert.ok(f >= last, 'more as the view widens, at ' + km);
+    last = f;
+  }
+});

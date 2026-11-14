@@ -89,8 +89,10 @@ var WidgetEarth = (function () {
       the Sun is above `on` degrees, full once it is below `full` (the sky
       dark), the dusk between; the picture's faint lights brought up
       (`gamma`) above its `floor`. Far out, `boost` times as bright as the
-      picture. */
-  var NIGHT_LIGHTS = { on: -2, full: -10, gamma: 0.55, floor: 0.02, color: [1, 0.8, 0.5], cols: 13500, boost: 2 };
+      picture. Gone as the map closes in: all of them while it spans
+      fadeKm[1] km or more (a whole country), none from fadeKm[0] (half
+      of France). */
+  var NIGHT_LIGHTS = { on: -2, full: -10, gamma: 0.55, floor: 0.02, color: [1, 0.8, 0.5], cols: 13500, boost: 2, fadeKm: [500, 1000] };
 
   /** How bright a light of value v (0..1, the picture's) shows with the
       Sun h degrees above the horizon, 0..1. Line for line what the vertex
@@ -157,6 +159,18 @@ var WidgetEarth = (function () {
     var cell = 512 * Math.pow(2, z) / NIGHT_LIGHTS.cols;
     var size = Math.max(1.5, Math.min(4, cell * 1.2));
     return { size: size, gain: Math.min(1, NIGHT_LIGHTS.boost * cell * cell / (size * size)) };
+  }
+
+  /** The ground across a map widthPx wide at zoom z, its middle at
+      latitude lat, in km (MapLibre's 512 px tiles). */
+  function viewWidthKm(widthPx, z, lat) {
+    return widthPx * 40075.0167 * Math.cos(lat * RAD) / (512 * Math.pow(2, z));
+  }
+
+  /** How much of the lights shows on a map viewKm across, 0..1. */
+  function nightLightsFade(viewKm) {
+    var k = NIGHT_LIGHTS.fadeKm, t = Math.max(0, Math.min(1, (viewKm - k[0]) / (k[1] - k[0])));
+    return t * t * (3 - 2 * t);
   }
 
   /** A number as GLSL reads a float (with its point). */
@@ -450,6 +464,7 @@ var WidgetEarth = (function () {
     shadeTile: shadeTile, sunLightPosition: sunLightPosition,
     NIGHT_LIGHTS: NIGHT_LIGHTS, nightLight: nightLight, NIGHT_LIGHTS_VS: NIGHT_LIGHTS_VS, NIGHT_LIGHTS_FS: NIGHT_LIGHTS_FS, glslFloat: glslFloat,
     decodeNightLights: decodeNightLights, nightLightsVertices: nightLightsVertices, nightLightsLook: nightLightsLook,
+    viewWidthKm: viewWidthKm, nightLightsFade: nightLightsFade,
     globeApparentRadius: globeApparentRadius, wholeEarthZoom: wholeEarthZoom
   };
 })();
